@@ -1,0 +1,83 @@
+{{/*
+The archiver. Like the counter it is a consumer, so it has no Service and no
+route: nothing calls it, it calls the stream and the store.
+
+It is the only component here that is not Go. That is deliberate and it
+changes nothing visible in this file — the same probes on the same port, the
+same drain, the same account, the same configuration contract. A platform
+that had to know which language a workload was written in would be a platform
+every new language has to be added to.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener.name" . }}-log
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas.log }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: log
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener.labels" . | nindent 8 }}
+        app.kubernetes.io/component: log
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      {{- include "url-shortener.podSecurity" . | nindent 6 }}
+      {{- include "url-shortener.drain" . | nindent 6 }}
+      {{- include "url-shortener.spread" (dict "Release" .Release "component" "log") | nindent 6 }}
+      containers:
+        - name: log
+          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "log") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/etc/url-shortener/log.yaml"]
+          {{- with .Values.archive.bucket.credentialsSecret }}
+          env:
+            {{- $bucket := $.Values.archive.bucket }}
+            # The NAMES are in the configuration file; the values are here,
+            # from a Secret, and appear in nothing that is rendered, printed
+            # or committed.
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $bucket.accessKeyIDKey }}
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $bucket.secretAccessKeyKey }}
+          {{- end }}
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          {{- include "url-shortener.preStop" . | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            {{- include "url-shortener.identityMount" . | nindent 12 }}
+          resources: {{- toYaml .Values.resources.log | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener.name" . }}-config
+        {{- include "url-shortener.identityVolume" . | nindent 8 }}

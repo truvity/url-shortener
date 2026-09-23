@@ -70,5 +70,44 @@ data:
         url: {{ .Values.events.url }}
       consumer:
         stream: {{ .Values.events.stream }}
-        durable: {{ .Values.events.consumer }}
+        durable: {{ .Values.events.consumers.stat }}
         subject: {{ .Values.events.redirectSubject }}
+
+  log.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.log.level }}
+    drain:
+      seconds: {{ .Values.drain.seconds }}
+    events:
+      nats:
+        url: {{ .Values.events.url }}
+      consumer:
+        stream: {{ .Values.events.stream }}
+        durable: {{ .Values.events.consumers.log }}
+        subject: {{ .Values.events.requestSubject }}
+    archive:
+      bucket:
+        name: {{ required "archive.bucket.name is required: a component that archives to a bucket nobody named has nowhere to write" .Values.archive.bucket.name }}
+        {{- with .Values.archive.bucket.region }}
+        region: {{ . }}
+        {{- end }}
+        {{- with .Values.archive.bucket.endpoint }}
+        endpoint: {{ . }}
+        {{- end }}
+        {{- with .Values.archive.bucket.ca }}
+        ca: {{ . }}
+        {{- end }}
+        {{- if .Values.archive.bucket.pathStyle }}
+        pathStyle: true
+        {{- end }}
+        {{- if .Values.archive.bucket.credentialsSecret }}
+        credentialsEnv:
+          accessKeyID: S3_ACCESS_KEY_ID
+          secretAccessKey: S3_SECRET_ACCESS_KEY
+        {{- end }}
+      prefix: {{ .Values.archive.prefix }}
+      batch:
+        maxRecords: {{ .Values.archive.batch.maxRecords }}
+        maxSeconds: {{ .Values.archive.batch.maxSeconds }}

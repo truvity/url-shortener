@@ -11,7 +11,8 @@
     "log",
     "replicas",
     "resources",
-    "route"
+    "route",
+    "archive"
   ],
   "properties": {
     "database": {
@@ -86,7 +87,7 @@
         "redirectSubject",
         "requestSubject",
         "stream",
-        "consumer"
+        "consumers"
       ],
       "properties": {
         "url": {
@@ -105,9 +106,86 @@
           "type": "string",
           "minLength": 1
         },
-        "consumer": {
+        "consumers": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "One durable name per consuming component, shared by every replica of it.",
+          "required": [
+            "stat",
+            "log"
+          ],
+          "properties": {
+            "stat": {
+              "type": "string",
+              "minLength": 1
+            },
+            "log": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the request archive goes. The vendor is not in here: an endpoint, a region and a path-style flag reach a cloud service, a store inside the cluster or a test double.",
+      "required": [
+        "bucket"
+      ],
+      "properties": {
+        "bucket": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema."
+            },
+            "region": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "ca": {
+              "type": "string"
+            },
+            "pathStyle": {
+              "type": "boolean"
+            },
+            "credentialsSecret": {
+              "type": "string",
+              "description": "The Secret holding static credentials. Empty means the SDK's ambient credentials, which is what a workload identity provides."
+            },
+            "accessKeyIDKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "secretAccessKeyKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "prefix": {
           "type": "string",
           "minLength": 1
+        },
+        "batch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxRecords": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },
@@ -163,6 +241,10 @@
         "stat": {
           "type": "integer",
           "minimum": 0
+        },
+        "log": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -178,6 +260,9 @@
           "type": "object"
         },
         "migrate": {
+          "type": "object"
+        },
+        "log": {
           "type": "object"
         }
       }

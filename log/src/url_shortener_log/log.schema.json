@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/url-shortener/schemas/log.json",
+  "title": "log",
+  "description": "The archiver: consume what the redirect service recorded about each request, and write it to an object store as NDJSON. It owns no database and answers no calls.",
+  "allOf": [{ "$ref": "https://github.com/truvity/policy/schemas/service.json" }],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["events", "archive"],
+  "properties": {
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nats", "consumer"],
+      "properties": {
+        "nats": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json" },
+        "consumer": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json" }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket"],
+      "properties": {
+        "bucket": { "$ref": "https://github.com/truvity/policy/schemas/fragments/bucket.json" },
+        "prefix": {
+          "type": "string",
+          "description": "What every key this component writes begins with. A bucket is usually shared, and a component that writes to the root of one cannot be given permission to write only its own objects.",
+          "default": "url-shortener/requests"
+        },
+        "batch": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "When to close an object and write it. Both limits apply: whichever is reached first. A size-only rule means a quiet hour is never archived; a time-only rule means a busy one is archived in objects too small to be worth reading.",
+          "properties": {
+            "maxRecords": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 500,
+              "description": "Write once this many records are held."
+            },
+            "maxSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 60,
+              "description": "Write this long after the first record of a batch arrived, however few there are."
+            }
+          }
+        }
+      }
+    }
+  }
+}

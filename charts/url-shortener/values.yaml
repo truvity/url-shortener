@@ -34,7 +34,51 @@ events:
   redirectSubject: url-shortener.redirect
   requestSubject: url-shortener.log
   stream: URL_SHORTENER
-  consumer: stat
+  # One durable name per consuming component, shared by every replica of it.
+  # That is what makes the replicas ONE consumer group rather than several
+  # copies of the same work, and what lets a restart resume where it left off
+  # instead of replaying the stream or losing what arrived while it was gone.
+  consumers:
+    stat: stat
+    log: log
+
+# Where the request archive goes.
+#
+# The vendor is not in here. An endpoint, a region and a path-style flag
+# reach a cloud service, a store inside the cluster or a test double, and the
+# component cannot tell which it got — platform.md §4. The local cluster
+# points this at its own S3; a deployment points it at whatever the platform
+# has.
+archive:
+  bucket:
+    # It exists already. A service does not create its own store: a component
+    # that can create a bucket can create it in the wrong account, with the
+    # wrong retention, and nothing notices until somebody looks.
+    name: ""
+    region: ""
+    # Unset means the SDK's own resolution for the region.
+    endpoint: ""
+    # Required by most non-cloud implementations.
+    pathStyle: false
+    # A bundle the platform mounts, for a store whose endpoint is not signed
+    # by a public root. Unset means the system trust store.
+    ca: ""
+    # The Secret holding static credentials, and the keys inside it. EMPTY is
+    # the better answer: it means the SDK's ambient credentials, which is
+    # what a workload identity provides and what leaves nothing to leak.
+    credentialsSecret: ""
+    accessKeyIDKey: accessKeyID
+    secretAccessKeyKey: secretAccessKey
+  # What every key this component writes begins with. A bucket is usually
+  # shared, and a component that writes to the root of one cannot be granted
+  # permission to write only its own objects.
+  prefix: url-shortener/requests
+  # When an object is closed. Both limits apply, whichever is reached first:
+  # a size-only rule never archives a quiet hour, and a time-only rule
+  # archives a busy one in objects too small to be worth reading.
+  batch:
+    maxRecords: 500
+    maxSeconds: 60
 
 image:
   repository: ghcr.io/truvity/policy/url-shortener
@@ -153,6 +197,7 @@ replicas:
   # service holds no state, and the counter is a queue-group consumer.
   redirect: 2
   stat: 2
+  log: 2
 
 # Voluntary disruption, which is not the same thing as a rollout.
 #
@@ -169,6 +214,8 @@ resources:
     requests: { cpu: 50m, memory: 64Mi }
   stat:
     requests: { cpu: 50m, memory: 64Mi }
+  log:
+    requests: { cpu: 50m, memory: 128Mi }
   migrate:
     requests: { cpu: 50m, memory: 64Mi }
 

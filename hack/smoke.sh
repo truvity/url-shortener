@@ -94,4 +94,43 @@ if [ "${count:-0}" -ne 2 ]; then
 fi
 
 echo "    click_count = $count"
-echo "smoke passed: migrate, redirect, the broker and the counter all did their part"
+
+echo "==> waiting for the archive"
+# The other consumer of the same stream, and the one that proves the rest of
+# the contracts hold for a component that is not written in Go: it read the
+# configuration this chart rendered, validated it against a schema carried
+# inside its own wheel, bound a durable consumer on a DIFFERENT subject, and
+# wrote to a store it reached by endpoint rather than by vendor.
+#
+# The install sets the batch limits low, so this is seconds rather than the
+# default minute.
+BUCKET="${BUCKET:-url-shortener-archive}"
+objects=""
+for _ in $(seq 1 60); do
+    objects=$(kubectl -n object-store exec deploy/s3 -- \
+        awslocal s3 ls "s3://$BUCKET/url-shortener/requests/" --recursive 2>/dev/null || true)
+    [ -n "$objects" ] && break
+    sleep 2
+done
+
+if [ -z "$objects" ]; then
+    echo "SMOKE: nothing was archived to s3://$BUCKET after two requests" >&2
+    kubectl -n "$NS" logs -l app.kubernetes.io/component=log --tail=30 >&2
+    exit 1
+fi
+
+# An object is not the same as a record in it. Read the newest one back and
+# require the subject the archiver was bound to — an empty object, or one
+# holding somebody else's events, would pass a check for "a key exists".
+newest=$(printf '%s\n' "$objects" | awk '{print $NF}' | sort | tail -1)
+body=$(kubectl -n object-store exec deploy/s3 -- \
+    awslocal s3 cp "s3://$BUCKET/$newest" - 2>/dev/null)
+
+if ! printf '%s' "$body" | grep -q '"subject":"url-shortener.log"'; then
+    echo "SMOKE: $newest does not hold a request record:" >&2
+    printf '%s\n' "$body" | head -5 >&2
+    exit 1
+fi
+
+echo "    $newest holds $(printf '%s\n' "$body" | grep -c . ) record(s)"
+echo "smoke passed: migrate, redirect, the broker, the counter and the archive all did their part"

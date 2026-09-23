@@ -26,6 +26,21 @@ func Read(name string) []byte {
 	return b
 }
 
+// ReadPython returns the schema of a component that is not written in Go.
+//
+// There is one, and it is here rather than beside the others because a
+// Python wheel carries only what is inside the package. The chart renders
+// its configuration file like any other, and the chart's tests validate it
+// like any other — a platform that had to know which language a workload
+// was written in would be a platform every new language has to be added to.
+func ReadPython(path string) []byte {
+	b, err := urlshortener.PythonSchemas.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 type (
 	// Listen is a TCP listener.
 	Listen struct {

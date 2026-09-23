@@ -1,0 +1,4 @@
+# Only what the build produced belongs in the context. The sources are
+# already inside the wheels.
+*
+!build/site-packages

@@ -71,6 +71,7 @@ func defaults(extra ...string) []string {
 		"--set", "database.owner.passwordSecret=example-pg-app",
 		"--set", "database.app.passwordSecret=example-pg-runtime",
 		"--set", "events.url=nats://nats.nats.svc:4222",
+		"--set", "archive.bucket.name=url-shortener-archive",
 	}, extra...)
 }
 
@@ -93,15 +94,35 @@ func TestWhatTheChartRendersIsWhatTheBinariesAccept(t *testing.T) {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
 
-	for _, tc := range []struct{ file, schema string }{
-		{"migrate.yaml", "migrate.json"},
-		{"redirect.yaml", "redirect.json"},
-		{"stat.yaml", "stat.json"},
-	} {
+	for _, tc := range rendered() {
 		t.Run(tc.file, func(t *testing.T) {
-			rendered := conformance.ConfigMapData(t, []byte(out), tc.file)
-			conformance.ValidDocument(t, rendered, config.Read(tc.schema))
+			doc := conformance.ConfigMapData(t, []byte(out), tc.file)
+			conformance.ValidDocument(t, doc, tc.schema())
 		})
+	}
+}
+
+// Every configuration file this chart renders, with the schema the binary
+// that reads it validates against.
+//
+// `log.yaml` belongs to a component written in Python, and it is in this
+// list on exactly the same terms as the others. That is the claim worth
+// testing: the configuration contract is a property of the file, not of the
+// language that reads it.
+func rendered() []struct {
+	file   string
+	schema func() []byte
+} {
+	return []struct {
+		file   string
+		schema func() []byte
+	}{
+		{"migrate.yaml", func() []byte { return config.Read("migrate.json") }},
+		{"redirect.yaml", func() []byte { return config.Read("redirect.json") }},
+		{"stat.yaml", func() []byte { return config.Read("stat.json") }},
+		{"log.yaml", func() []byte {
+			return config.ReadPython("log/src/url_shortener_log/log.schema.json")
+		}},
 	}
 }
 
@@ -114,13 +135,9 @@ func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
-	for _, tc := range []struct{ file, schema string }{
-		{"migrate.yaml", "migrate.json"},
-		{"redirect.yaml", "redirect.json"},
-		{"stat.yaml", "stat.json"},
-	} {
+	for _, tc := range rendered() {
 		t.Run(tc.file, func(t *testing.T) {
-			conformance.ValidDocument(t, conformance.ConfigMapData(t, []byte(out), tc.file), config.Read(tc.schema))
+			conformance.ValidDocument(t, conformance.ConfigMapData(t, []byte(out), tc.file), tc.schema())
 		})
 	}
 }

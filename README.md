@@ -11,13 +11,23 @@ and says what happened; something else counts that.
 
 | Component | Kind | Does |
 |---|---|---|
-| `cmd/migrate` | job | brings the schema up to date, then exits |
-| `cmd/redirect` | service | resolves a key, redirects, publishes what happened |
-| `cmd/stat` | service | consumes redirects, counts them |
+| `cmd/migrate` | job, Go | brings the schema up to date, then exits |
+| `cmd/redirect` | service, Go | resolves a key, redirects, publishes what happened |
+| `cmd/stat` | service, Go | consumes redirects, counts them |
+| `log/` | service, **Python** | consumes request records, archives them as NDJSON |
 
 More arrives: an owning service for the URLs themselves with a typed RPC
-boundary, a web front end, and a log archiver. The pieces here are the ones
-that make a working shortener without a user interface.
+boundary, and a web front end. The pieces here are the ones that make a
+working shortener without a user interface.
+
+The archiver is not written in Go, and that is the point of it rather than a
+detail. It reads a configuration file this chart rendered, validated against
+a schema it carries itself; it serves the same probes on the same port; it
+drains on SIGTERM within the same number the chart gives the platform; and
+its deployment is [twenty lines that never mention the
+language](charts/url-shortener/templates/log.yaml). A platform that had to
+know which language a workload was written in would be a platform every new
+language has to be added to.
 
 ## How it satisfies the contracts
 
@@ -37,9 +47,14 @@ visible in one place:
   repeat it.
 - **Probes on their own listener.** Liveness checks nothing; readiness
   checks what the component needs in order to serve.
-- **One log level, JSON, on stdout.**
-- **SIGTERM drains.** Both servers, and the consumer, which finishes the
-  messages it already pulled rather than abandoning them to redelivery.
+- **One log level, JSON, on stderr.** stdout is the program's product; a
+  service usually has none, and these produce none.
+- **SIGTERM drains.** Both servers, and both consumers, which finish the
+  messages they already pulled rather than abandoning them to redelivery.
+- **A store is an endpoint, not a vendor.** The archiver reaches its bucket
+  through a name, a region and a path-style flag, so the same configuration
+  shape reaches a cloud service, a store inside the cluster or the local
+  box's test double. Nothing in the component knows which it got.
 - **Events carry their type in a header**, and the body is the detail. See
   below.
 

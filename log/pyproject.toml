@@ -1,0 +1,58 @@
+[project]
+name = "url-shortener-log"
+version = "0.0.0"
+description = "Archive what the redirect service recorded, as NDJSON in an object store."
+requires-python = ">=3.14"
+license = "MIT"
+dependencies = [
+    "boto3>=1.35",
+    "nats-py>=2.9",
+    "structlog>=24.4",
+    "truvity-policy",
+]
+
+[dependency-groups]
+dev = [
+    "boto3-stubs[s3]>=1.35",
+    "mypy>=1.18",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "types-pyyaml>=6.0.12.20260906",
+]
+
+[tool.uv.sources]
+# Inside the repository the loader is the checkout, the way the Go modules
+# use `replace`. A consumer outside it installs the published wheel; see
+# python/README.md for where that comes from.
+truvity-policy = { path = "../../../python" }
+
+[tool.uv]
+python-preference = "only-system"
+python-downloads = "never"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/url_shortener_log"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# The same rule set as the loader, for the same reasons. See
+# python/pyproject.toml, where each exclusion is argued.
+select = ["ALL"]
+ignore = ["D203", "D213", "COM812", "CPY001", "TRY003", "EM101", "EM102"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106", "PLR2004", "INP001", "D103"]

@@ -20,7 +20,28 @@ CHARTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../charts" && pwd)"
 # manifest, where anyone who can read a release can read the password.
 RUNTIME_SECRET="${INFRA}-pg-runtime"
 
+# The archive's bucket and the credential to reach it. Both belong to the
+# PLATFORM, not to either chart: a service does not create its own store, for
+# the same reason it does not create its own database — a component that can
+# create a bucket can create it in the wrong account, with the wrong
+# retention, and nothing notices until somebody looks.
+BUCKET="${BUCKET:-url-shortener-archive}"
+BUCKET_SECRET="${INFRA}-archive"
+
 kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
+
+echo "==> the archive's bucket"
+kubectl -n object-store exec deploy/s3 -- awslocal s3 mb "s3://$BUCKET" >/dev/null 2>&1 || true
+
+if ! kubectl -n "$NS" get secret "$BUCKET_SECRET" >/dev/null 2>&1; then
+    # The local store accepts anything; a real one would not, and the shape
+    # is the same either way — the chart takes the NAME of a secret, the
+    # configuration file takes the NAMES of two variables, and no value
+    # appears in anything that is rendered or committed.
+    kubectl -n "$NS" create secret generic "$BUCKET_SECRET" \
+        --from-literal=accessKeyID=test \
+        --from-literal=secretAccessKey=test
+fi
 
 if ! kubectl -n "$NS" get secret "$RUNTIME_SECRET" >/dev/null 2>&1; then
     echo "==> the runtime role's credential"
@@ -50,6 +71,13 @@ helm upgrade --install "$APP" "$CHARTS/url-shortener" -n "$NS" \
     --set "database.owner.passwordSecret=${INFRA}-pg-app" \
     --set "database.app.passwordSecret=$RUNTIME_SECRET" \
     --set events.url=nats://nats.nats.svc:4222 \
+    --set "archive.bucket.name=$BUCKET" \
+    --set archive.bucket.endpoint=http://s3.object-store.svc:4566 \
+    --set archive.bucket.region=us-east-1 \
+    --set archive.bucket.pathStyle=true \
+    --set "archive.bucket.credentialsSecret=$BUCKET_SECRET" \
+    --set archive.batch.maxRecords=5 \
+    --set archive.batch.maxSeconds=5 \
     --wait --timeout 8m
 
 kubectl -n "$NS" get pods
