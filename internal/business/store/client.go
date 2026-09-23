@@ -37,7 +37,8 @@ type (
 
 // NewClient creates a new GORM-based store client
 // Note: Migrations are handled separately by the migration package.
-// Call migration.RunMigrations() at Lambda startup before creating the store client.
+// The tables it reads are created by the migration, which runs to completion
+// before any service starts.
 func NewClient(
 	ctx context.Context,
 	logger *slog.Logger,
@@ -59,7 +60,8 @@ func hashLongURL(longURL string) string {
 
 // PutURL stores a URL entry (idempotent)
 // Note: Stats are NOT created here - they are created lazily by IncrementClickCount (upsert)
-// when the first redirect happens. This allows the web Lambda to have read-only access to stats.
+// when the first redirect happens, so a reader of the counters needs no
+// rights to create them.
 func (c *Client) PutURL(ctx context.Context, urlKey, longURL string, expiresAt *time.Time) error {
 	// Calculate deterministic hash for ID (idempotency key)
 	id := hashLongURL(longURL)

@@ -32,11 +32,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/stat.yaml"]
           env:
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "url-shortener.passwordSecret" . }}
-                  key: {{ include "url-shortener.passwordKey" . }}
+            {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}
           ports:
             - name: probes
               containerPort: 7070

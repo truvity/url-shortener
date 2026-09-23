@@ -1,0 +1,34 @@
+{{/*
+The migration's configuration, and it is a HOOK resource like the job that
+reads it.
+
+That is not symmetry for its own sake. Helm applies hook resources before
+anything else in the release, so a pre-install hook cannot mount a ConfigMap
+that the release has not created yet — the pod sits in ContainerCreating
+until the install times out, and the message ("configmap not found") is
+buried in the pod's events rather than in the failure Helm reports.
+
+Weight -5 puts it before the job at weight 0. `before-hook-creation` replaces
+it on each run, so an upgrade migrates with the configuration of the release
+being installed rather than the one before it.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "url-shortener.name" . }}-migrate-config
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  migrate.yaml: |
+    log:
+      level: {{ .Values.log.level }}
+    database:
+      url: postgres://{{ .Values.database.owner.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+    ownerRole: {{ .Values.database.owner.role }}
+    {{- with .Values.database.app.role }}
+    appRole: {{ . }}
+    {{- end }}

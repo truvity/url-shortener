@@ -1,0 +1,38 @@
+# The database and the stream.
+#
+# This is a SEPARATE chart from the application, and the reason is ordering
+# rather than taste. The application's migration runs as a pre-install hook,
+# and Helm runs hooks before it applies anything else in the same release —
+# so a chart that creates its own database cannot also migrate it: the hook
+# looks for a database the release has not created yet.
+#
+# That was found by building it the other way first. The ring model this
+# mirrors is not ceremony; it is the only ordering that works.
+
+postgres:
+  # One instance is an example's answer. A deployment sizes it.
+  instances: 1
+  storage: 1Gi
+  database: url_shortener
+
+  # The owner: the operator creates it with the bootstrap, and its password
+  # lands in a secret the operator names `<release>-pg-app`. Only the
+  # migration ever uses it.
+  ownerRole: url_shortener_owner
+
+  # The role the services run as, and the NAME of the basic-auth secret
+  # holding its password. The secret is created outside this chart, for the
+  # same reason the application chart takes a name rather than a value.
+  runtimeRole: url_shortener_app
+  runtimePasswordSecret: ""
+
+events:
+  stream: URL_SHORTENER
+  # Memory keeps the example's events for as long as the example runs.
+  # A deployment says `file`.
+  storage: memory
+  subjects:
+    - url-shortener.redirect
+    - url-shortener.log
+  # The NATS server the stream is created on.
+  url: nats://nats.nats.svc:4222

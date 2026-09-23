@@ -29,11 +29,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "url-shortener.passwordSecret" . }}
-                  key: {{ include "url-shortener.passwordKey" . }}
+            {{- include "url-shortener.passwordEnv" .Values.database.owner | nindent 12 }}
           volumeMounts:
             - name: config
               mountPath: /etc/url-shortener
@@ -42,4 +38,4 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "url-shortener.name" . }}-config
+            name: {{ include "url-shortener.name" . }}-migrate-config

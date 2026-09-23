@@ -61,6 +61,18 @@ func chartDir(t *testing.T) string {
 	return filepath.Join(root, "url-shortener")
 }
 
+// defaults supplies the addresses every render needs. They are REQUIRED —
+// the database and the stream belong to the infra release — so every test
+// that is not about them says so once, here.
+func defaults(extra ...string) []string {
+	return append([]string{
+		"--set", "database.host=example-pg-rw",
+		"--set", "database.owner.passwordSecret=example-pg-app",
+		"--set", "database.app.passwordSecret=example-pg-runtime",
+		"--set", "events.url=nats://nats.nats.svc:4222",
+	}, extra...)
+}
+
 func render(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command("helm", append([]string{"template", "example", chartDir(t)}, args...)...)
@@ -75,7 +87,7 @@ func render(t *testing.T, args ...string) (string, error) {
 // keeps setting a key the binary stopped reading, and the service runs on a
 // default nobody chose, with no signal but behaviour.
 func TestWhatTheChartRendersIsWhatTheBinariesAccept(t *testing.T) {
-	out, err := render(t, "--set", "image.tag=dev")
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
@@ -92,17 +104,12 @@ func TestWhatTheChartRendersIsWhatTheBinariesAccept(t *testing.T) {
 	}
 }
 
-// The same, for an install that supplies its own database and stream rather
-// than letting the chart create them. It is a different set of rendered
-// values, so it is a different chance to be wrong.
-func TestTheExternalInfraShapeAlsoRendersWhatTheBinariesAccept(t *testing.T) {
-	out, err := render(t,
+// The same for a digest-pinned install, which is what a release produces.
+// Different values, so a different chance to be wrong.
+func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
+	out, err := render(t, defaults(
 		"--set", "image.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000",
-		"--set", "infra.enabled=false",
-		"--set", "database.host=pg.example",
-		"--set", "database.passwordSecret=url-shortener-db",
-		"--set", "events.url=nats://nats.example:4222",
-	)
+	)...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
@@ -121,7 +128,7 @@ func TestTheExternalInfraShapeAlsoRendersWhatTheBinariesAccept(t *testing.T) {
 // ConfigMap, printed when somebody debugs a deployment, and committed as a
 // fixture; it must survive all three being true.
 func TestNoSecretIsRendered(t *testing.T) {
-	out, err := render(t, "--set", "image.tag=dev")
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,13 +168,74 @@ func TestEveryRefusalRefuses(t *testing.T) {
 // promised to the platform. A rename on one side is a pod that never becomes
 // ready, or worse, one that is restarted while healthy.
 func TestProbesUseTheContractPaths(t *testing.T) {
-	out, err := render(t, "--set", "image.tag=dev")
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"/health/live", "/health/ready"} {
 		if strings.Count(out, want) < 2 {
 			t.Errorf("%s is not on every component that serves probes", want)
+		}
+	}
+}
+
+// The migration and the services must not share a credential.
+//
+// They are separate roles in the chart's values, but "separate" is only
+// worth anything if the two actually read different secrets: a render that
+// handed both the owner's password would look correct in every other test
+// here while giving the request path the right to drop a table.
+func TestTheMigrationAndTheServicesUseDifferentCredentials(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	var migrate, services []string
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		name := ""
+		for _, line := range strings.Split(doc, "\n") {
+			if strings.HasPrefix(line, "  name: ") {
+				name = strings.TrimSpace(strings.TrimPrefix(line, "  name: "))
+
+				break
+			}
+		}
+
+		for i, line := range strings.Split(doc, "\n") {
+			if !strings.Contains(line, "DATABASE_PASSWORD") {
+				continue
+			}
+
+			lines := strings.Split(doc, "\n")
+			for _, l := range lines[i:min(i+5, len(lines))] {
+				l = strings.TrimSpace(l)
+				if !strings.HasPrefix(l, "name: ") {
+					continue
+				}
+
+				secret := strings.TrimPrefix(l, "name: ")
+				if strings.Contains(name, "migrate") {
+					migrate = append(migrate, secret)
+				} else {
+					services = append(services, secret)
+				}
+
+				break
+			}
+		}
+	}
+
+	if len(migrate) == 0 || len(services) == 0 {
+		t.Fatalf("expected the migration and the services to read a password each, got %v and %v", migrate, services)
+	}
+
+	for _, m := range migrate {
+		for _, s := range services {
+			if m == s {
+				t.Errorf("the migration and a service both read %q: the owner's rights are on the request path", m)
+			}
 		}
 	}
 }

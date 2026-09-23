@@ -51,7 +51,6 @@ func (m *Manager) RedirectWithInfo(ctx context.Context, urlKey string, reqInfo R
 		startTime = time.Now()
 	}
 
-	// Get URL from DynamoDB
 	longURL, err := m.store.GetURLString(ctx, urlKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to get URL: %w", err)
@@ -65,7 +64,8 @@ func (m *Manager) RedirectWithInfo(ctx context.Context, urlKey string, reqInfo R
 	// Calculate latency
 	latencyMS := int(time.Since(startTime).Milliseconds())
 
-	// Emit events synchronously with timeout (must complete before Lambda handler returns)
+	// Published before the response is written, and bounded by its own
+	// timeout: a redirect must not wait on the broker indefinitely.
 	// Use a timeout to prevent publish delays from blocking redirect too long
 	eventCtx, eventCancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer eventCancel()

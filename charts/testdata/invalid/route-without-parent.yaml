@@ -4,3 +4,11 @@ image:
   tag: dev
 route:
   enabled: true
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222

@@ -1,38 +1,35 @@
-# The database and the streams this service reads and writes.
+# Where this service's database and stream are.
 #
-# `infra.enabled` decides whether this chart CREATES them. An estate that
-# provisions its own — a platform team, a separate lifecycle, a database that
-# outlives the application — turns it off and supplies the addresses below.
-# A local cluster turns it on and gets a working install from one command.
-#
-# That is the same split the two-chart "ring" model expresses, as a flag:
-# with three components and one database, a second chart would be two files
-# of ceremony around one resource.
-infra:
-  enabled: true
-  postgres:
-    # Instances is 1 here because this is an example. A deployment sizes it.
-    instances: 1
-    storage: 1Gi
-  streams:
-    # Memory storage keeps the example's clicks for as long as the example
-    # runs, which is what an example needs. A deployment says `file`.
-    storage: memory
+# It does not create them: url-shortener-infra does, as a separate release
+# with a separate lifetime. That split is an ordering requirement rather than
+# a preference — the migration below runs as a pre-install hook, and Helm runs
+# hooks before it applies anything else in the same release, so a chart that
+# created its own database could never migrate it.
 
 database:
-  # Set when infra.enabled is false. Otherwise the chart fills these in from
-  # what it created.
+  # The read-write service of the cluster url-shortener-infra created, for
+  # example `<infra release>-pg-rw`.
   host: ""
   name: url_shortener
-  ownerRole: url_shortener_owner
-  appRole: app
-  # The NAME of the secret holding the password, and the key inside it. The
-  # value never appears in this file or in what it renders.
-  passwordSecret: ""
-  passwordKey: password
+
+  # TWO roles, with two credentials, because they are trusted with different
+  # things. The migration creates tables and grants rights; the services read
+  # and write rows and can do neither. Giving both jobs one account is the
+  # shortcut that makes "the service dropped a table" a sentence anyone can
+  # say.
+  #
+  # Each role names the SECRET holding its password, and the key inside it.
+  # No value appears in this file or in anything it renders.
+  owner:
+    role: url_shortener_owner
+    passwordSecret: ""
+    passwordKey: password
+  app:
+    role: url_shortener_app
+    passwordSecret: ""
+    passwordKey: password
 
 events:
-  # Set when infra.enabled is false.
   url: ""
   redirectSubject: url-shortener.redirect
   requestSubject: url-shortener.log

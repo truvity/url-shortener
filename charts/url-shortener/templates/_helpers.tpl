@@ -14,7 +14,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
-The image reference.
+The image reference: one repository per component under a common prefix,
+which is what every image builder produces by default and what a registry's
+own UI expects.
 
 A digest when there is one, and a tag only when there is not. An image that
 can move under a running deployment is one nobody can roll back to, so the
@@ -23,49 +25,28 @@ release stamps a digest and this template prefers it.
 {{- define "url-shortener.image" -}}
 {{- $i := .Values.image -}}
 {{- if $i.digest -}}
-{{ $i.repository }}-{{ .component }}@{{ $i.digest }}
+{{ $i.repository }}/{{ .component }}@{{ $i.digest }}
 {{- else if $i.tag -}}
-{{ $i.repository }}-{{ .component }}:{{ $i.tag }}
+{{ $i.repository }}/{{ .component }}:{{ $i.tag }}
 {{- else -}}
 {{ fail "image.digest or image.tag must be set: an image reference with neither is not a deployable thing" }}
 {{- end -}}
 {{- end -}}
 
 {{/*
-The database host. Created by this chart, or supplied.
-*/}}
-{{- define "url-shortener.dbHost" -}}
-{{- if .Values.infra.enabled -}}
-{{ .Release.Name }}-pg-rw
-{{- else -}}
-{{- required "database.host is required when infra.enabled is false: the chart has nothing to derive it from" .Values.database.host -}}
-{{- end -}}
-{{- end -}}
+A database password, as an environment variable read from a Secret.
 
-{{/*
-The NATS URL. Created by this chart, or supplied.
-*/}}
-{{- define "url-shortener.natsURL" -}}
-{{- if .Values.infra.enabled -}}
-nats://nats.nats.svc:4222
-{{- else -}}
-{{- required "events.url is required when infra.enabled is false" .Values.events.url -}}
-{{- end -}}
-{{- end -}}
+The chart takes the NAME of a secret, never a value: a chart that generated a
+password would put it in the release's own stored manifest, where anyone who
+can read a release can read the password.
 
-{{/*
-The secret holding the database password, and its key. When this chart
-created the database, the operator made the secret; otherwise the values say
-where it is.
+Takes the role block (.Values.database.owner or .Values.database.app), so the
+migration and the services cannot accidentally be handed the same credential.
 */}}
-{{- define "url-shortener.passwordSecret" -}}
-{{- if .Values.infra.enabled -}}
-{{ .Release.Name }}-pg-app
-{{- else -}}
-{{- required "database.passwordSecret is required when infra.enabled is false" .Values.database.passwordSecret -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "url-shortener.passwordKey" -}}
-{{- if .Values.infra.enabled -}}password{{- else -}}{{ .Values.database.passwordKey }}{{- end -}}
+{{- define "url-shortener.passwordEnv" -}}
+- name: DATABASE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .passwordSecret }}
+      key: {{ .passwordKey | default "password" }}
 {{- end -}}

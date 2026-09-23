@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -59,7 +60,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		// The library logs through the service's logger, not its own.
+		// See runtime.GormLogger.
+		Logger: runtime.GormLogger(log, time.Second),
+	})
 	if err != nil {
 		return fmt.Errorf("connect to the database: %w", err)
 	}
@@ -69,7 +74,7 @@ func run() error {
 	}
 	defer func() { _ = sqlDB.Close() }()
 
-	if err := migration.RunMigrations(ctx, log, db, cfg.OwnerRole, cfg.AppRole); err != nil {
+	if err := migration.Run(ctx, log, db, cfg.OwnerRole, cfg.AppRole); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
 

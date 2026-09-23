@@ -66,7 +66,7 @@ func run() error {
 
 	// --- what this process talks to ---
 
-	db, closeDB, err := openDatabase(cfg.Database)
+	db, closeDB, err := openDatabase(log, cfg.Database)
 	if err != nil {
 		return err
 	}
@@ -161,12 +161,16 @@ func (s subjectPublisher) PublishEvents(ctx context.Context, batch []events.Even
 	return s.publisher.PublishEvents(ctx, out)
 }
 
-func openDatabase(pg config.Postgres) (*gorm.DB, func(), error) {
+func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
 	dsn, err := dsn(pg)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		// The library logs through the service's logger, not its own.
+		// See runtime.GormLogger.
+		Logger: runtime.GormLogger(log, time.Second),
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("connect to the database: %w", err)
 	}

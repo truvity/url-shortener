@@ -6,7 +6,6 @@ import (
 
 type (
 	// Stat represents click statistics for a URL
-	// Aligned with DynamoDB STAT facet schema
 	Stat struct {
 		// ID matches URL.ID (sha256(long_url)) for pairing
 		ID string `gorm:"primaryKey;type:varchar(64);comment:sha256(long_url) - matches URL.ID"`
@@ -20,7 +19,8 @@ type (
 )
 
 // TableName overrides the table name.
-// Uses schema-qualified name for PostgreSQL (Aurora).
+// Schema-qualified, so the table lives in a schema this product owns
+// rather than in whatever `public` happens to contain.
 func (Stat) TableName() string {
 	return "stats.stats" // PostgreSQL: {schema}.{table}
 }

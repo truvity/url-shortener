@@ -15,7 +15,7 @@ type (
 	RedirectInterface interface {
 		// Redirect redirects to the long URL for the given short URL key.
 		// Returns the long URL or an error if not found.
-		// Automatically emits EventBridge events for statistics.
+		// Publishes an event per redirect, which the counter consumes.
 		Redirect(ctx context.Context, urlKey string) (string, error)
 	}
 )

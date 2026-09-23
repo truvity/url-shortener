@@ -5,3 +5,11 @@ image:
   tag: dev
 databse:
   name: url_shortener
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222

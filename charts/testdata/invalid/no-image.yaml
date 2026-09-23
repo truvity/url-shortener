@@ -3,3 +3,11 @@
 # one thing a release exists to prevent.
 image:
   repository: example.com/url-shortener
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222

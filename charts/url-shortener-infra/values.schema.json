@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "url-shortener-infra chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "postgres",
+    "events"
+  ],
+  "properties": {
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instances",
+        "storage",
+        "database",
+        "ownerRole",
+        "runtimeRole",
+        "runtimePasswordSecret"
+      ],
+      "properties": {
+        "instances": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "storage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "database": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ownerRole": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtimeRole": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtimePasswordSecret": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream",
+        "storage",
+        "subjects",
+        "url"
+      ],
+      "properties": {
+        "stream": {
+          "type": "string",
+          "minLength": 1
+        },
+        "storage": {
+          "enum": [
+            "memory",
+            "file"
+          ]
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

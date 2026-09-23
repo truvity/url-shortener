@@ -6,7 +6,6 @@ import (
 
 type (
 	// URL represents a shortened URL entry
-	// Aligned with DynamoDB URL facet schema
 	URL struct {
 		// ID is sha256(long_url) for idempotency (64-char hex string)
 		ID string `gorm:"primaryKey;type:varchar(64);comment:sha256(long_url)"`
@@ -21,10 +20,10 @@ type (
 		CreatedAt time.Time  `gorm:"not null;index:idx_created_at;comment:Creation timestamp"`
 		UpdatedAt *time.Time `gorm:"comment:Last update timestamp"`
 
-		// Soft delete support (aligned with DynamoDB deleted_at)
+		// Soft delete: a key is retired, never reused.
 		DeletedAt *time.Time `gorm:"index:idx_deleted_at;comment:Soft delete timestamp"`
 
-		// Expiration support (aligned with DynamoDB expires_at)
+		// Optional expiry, after which the key answers 410 rather than 302.
 		ExpiresAt *time.Time `gorm:"index:idx_expires_at;comment:Expiration timestamp"`
 	}
 )

@@ -8,6 +8,9 @@ know is a test failure here rather than a default nobody chose in a cluster.
 The test that proves it is chart_test.go, which pulls these files out of a
 render and validates them with the binary's schema.
 
+The migration's file is NOT here — it is in migrate.yaml, as part of the
+hook. See that file for why.
+
 No secret appears in any of them. The database password is NAMED — the
 component reads the variable the file points at.
 */}}
@@ -17,17 +20,6 @@ metadata:
   name: {{ include "url-shortener.name" . }}-config
   labels: {{- include "url-shortener.labels" . | nindent 4 }}
 data:
-  migrate.yaml: |
-    log:
-      level: {{ .Values.log.level }}
-    database:
-      url: postgres://{{ .Values.database.ownerRole }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?sslmode=require
-      passwordEnv: DATABASE_PASSWORD
-    ownerRole: {{ .Values.database.ownerRole }}
-    {{- with .Values.database.appRole }}
-    appRole: {{ . }}
-    {{- end }}
-
   redirect.yaml: |
     listen:
       address: ":8080"
@@ -36,12 +28,12 @@ data:
     log:
       level: {{ .Values.log.level }}
     database:
-      url: postgres://{{ .Values.database.appRole }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?sslmode=require
+      url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
       passwordEnv: DATABASE_PASSWORD
       maxConnections: 10
     events:
       nats:
-        url: {{ include "url-shortener.natsURL" . }}
+        url: {{ .Values.events.url }}
       redirectSubject: {{ .Values.events.redirectSubject }}
       requestSubject: {{ .Values.events.requestSubject }}
 
@@ -51,11 +43,11 @@ data:
     log:
       level: {{ .Values.log.level }}
     database:
-      url: postgres://{{ .Values.database.appRole }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?sslmode=require
+      url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
       passwordEnv: DATABASE_PASSWORD
     events:
       nats:
-        url: {{ include "url-shortener.natsURL" . }}
+        url: {{ .Values.events.url }}
       consumer:
         stream: {{ .Values.events.stream }}
         durable: {{ .Values.events.consumer }}

@@ -1,0 +1,64 @@
+{{/*
+The database and the stream, both CUSTOM RESOURCES: an operator turns each
+into the thing it describes.
+
+That is why this example's tests run against a real cluster rather than a
+set of containers. A resource nothing reconciles is accepted, stored, and
+never becomes anything — which looks exactly like success from a chart's
+side, and like an empty database from the application's.
+*/}}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}-pg
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  instances: {{ .Values.postgres.instances }}
+  storage:
+    size: {{ .Values.postgres.storage }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.database }}
+      owner: {{ .Values.postgres.ownerRole }}
+  managed:
+    roles:
+      {{/*
+      The role the SERVICES connect as. The operator reconciles it, so it
+      exists before anything tries to log in with it, and a change here is
+      applied to the running database rather than to a migration nobody
+      re-runs.
+
+      It can log in and nothing else. It gets its rights on the tables from
+      the migration, which is the only thing holding the owner's password.
+      That is the split the application chart's two credentials describe,
+      made real on the database's side.
+      */}}
+      - name: {{ .Values.postgres.runtimeRole }}
+        ensure: present
+        login: true
+        passwordSecret:
+          name: {{ required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent a password" .Values.postgres.runtimePasswordSecret }}
+---
+{{/*
+One stream, several subjects. The redirect service publishes to two of them
+and the counter consumes one, filtered.
+
+One stream rather than two, because they share a retention decision — and a
+consumer that filters by subject is a smaller thing to reason about than two
+streams that must never disagree.
+*/}}
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: {{ .Release.Name }}-events
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  name: {{ .Values.events.stream }}
+  subjects: {{- toYaml .Values.events.subjects | nindent 4 }}
+  storage: {{ .Values.events.storage }}
+  servers:
+    - {{ .Values.events.url }}

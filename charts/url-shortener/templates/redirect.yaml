@@ -35,11 +35,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "url-shortener.passwordSecret" . }}
-                  key: {{ include "url-shortener.passwordKey" . }}
+            {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080

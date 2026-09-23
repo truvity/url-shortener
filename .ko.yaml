@@ -1,0 +1,25 @@
+# ko builds the images: it cross-compiles the binary and assembles an OCI
+# image around it, with no Dockerfile, no daemon and nothing executed at
+# build time.
+#
+# That is the service contract's "runtime images contain no build step",
+# taken to its conclusion. One consequence is the one that matters: an image
+# with nothing executable in it can be assembled for any architecture without
+# emulation, so one job builds every platform.
+defaultBaseImage: cgr.dev/chainguard/static
+builds:
+  - id: migrate
+    main: ./cmd/migrate
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+  - id: redirect
+    main: ./cmd/redirect
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+  - id: stat
+    main: ./cmd/stat
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: [-s -w]

@@ -49,7 +49,6 @@ func (m *Manager) ProcessURLRedirectEvent(ctx context.Context, event events.URLR
 		return nil
 	}
 
-	// Increment click count in DynamoDB (STAT facet)
 	if err := m.store.IncrementClickCount(ctx, event.LongURL); err != nil {
 		m.logger.ErrorContext(ctx, "failed to increment click count",
 			slog.String("url_key", event.URLKey),
@@ -64,7 +63,7 @@ func (m *Manager) ProcessURLRedirectEvent(ctx context.Context, event events.URLR
 	return nil
 }
 
-// ProcessEvent processes a raw EventBridge message from SQS
+// ProcessEvent handles one message off the stream.
 // Determines event type and routes to appropriate handler
 func (m *Manager) ProcessEvent(ctx context.Context, messageBody string) error {
 	// Parse event
@@ -78,12 +77,12 @@ func (m *Manager) ProcessEvent(ctx context.Context, messageBody string) error {
 		return nil // Return nil to delete malformed message
 	}
 
-	m.logger.DebugContext(ctx, "received EventBridge message",
+	m.logger.DebugContext(ctx, "received a message",
 		slog.String("detail_type", envelope.DetailType))
 
 	// Route based on detail-type
 	switch envelope.DetailType {
-	case events.DetailTypeURLRedirect:
+	case events.EventDetailTypeURLRedirect:
 		var event events.URLRedirectEvent
 		if err := json.Unmarshal(envelope.Detail, &event); err != nil {
 			m.logger.ErrorContext(ctx, "failed to parse URL redirect event",

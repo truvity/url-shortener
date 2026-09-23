@@ -1,0 +1,9 @@
+apiVersion: v2
+name: url-shortener-infra
+description: >-
+  The database and the stream the example reads and writes. A separate
+  chart because it has a separate lifetime: the data outlives every
+  deployment of the code that uses it.
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
