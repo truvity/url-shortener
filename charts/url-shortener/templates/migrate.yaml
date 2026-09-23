@@ -1,0 +1,45 @@
+{{/*
+The migration, as a hook that runs BEFORE the components that read the
+schema, and again before every upgrade.
+
+`before-hook-creation` as the delete policy, not `hook-succeeded`: a Job that
+deletes itself on success leaves nothing to read when the NEXT one fails, and
+"what did the last successful migration do" is a question people ask during
+an incident.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "url-shortener.name" . }}-migrate
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels: {{- include "url-shortener.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "migrate") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/etc/url-shortener/migrate.yaml"]
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "url-shortener.passwordSecret" . }}
+                  key: {{ include "url-shortener.passwordKey" . }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+          resources: {{- toYaml .Values.resources.migrate | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener.name" . }}-config

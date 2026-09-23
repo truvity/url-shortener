@@ -1,0 +1,7 @@
+# infra.enabled false says "I will supply the database and the stream", and
+# then supplies neither. Better a refusal than an install pointed at an empty
+# host.
+image:
+  tag: dev
+infra:
+  enabled: false

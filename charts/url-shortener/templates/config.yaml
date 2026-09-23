@@ -1,0 +1,62 @@
+{{/*
+One ConfigMap per binary, holding exactly the file that binary validates
+against its own schema at start-up.
+
+This is the configuration contract's first rule made real: the chart and the
+binary read ONE schema, so a key this chart renders that the binary does not
+know is a test failure here rather than a default nobody chose in a cluster.
+The test that proves it is chart_test.go, which pulls these files out of a
+render and validates them with the binary's schema.
+
+No secret appears in any of them. The database password is NAMED — the
+component reads the variable the file points at.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "url-shortener.name" . }}-config
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+data:
+  migrate.yaml: |
+    log:
+      level: {{ .Values.log.level }}
+    database:
+      url: postgres://{{ .Values.database.ownerRole }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+    ownerRole: {{ .Values.database.ownerRole }}
+    {{- with .Values.database.appRole }}
+    appRole: {{ . }}
+    {{- end }}
+
+  redirect.yaml: |
+    listen:
+      address: ":8080"
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.log.level }}
+    database:
+      url: postgres://{{ .Values.database.appRole }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+      maxConnections: 10
+    events:
+      nats:
+        url: {{ include "url-shortener.natsURL" . }}
+      redirectSubject: {{ .Values.events.redirectSubject }}
+      requestSubject: {{ .Values.events.requestSubject }}
+
+  stat.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.log.level }}
+    database:
+      url: postgres://{{ .Values.database.appRole }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+    events:
+      nats:
+        url: {{ include "url-shortener.natsURL" . }}
+      consumer:
+        stream: {{ .Values.events.stream }}
+        durable: {{ .Values.events.consumer }}
+        subject: {{ .Values.events.redirectSubject }}

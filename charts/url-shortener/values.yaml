@@ -1,0 +1,74 @@
+# The database and the streams this service reads and writes.
+#
+# `infra.enabled` decides whether this chart CREATES them. An estate that
+# provisions its own — a platform team, a separate lifecycle, a database that
+# outlives the application — turns it off and supplies the addresses below.
+# A local cluster turns it on and gets a working install from one command.
+#
+# That is the same split the two-chart "ring" model expresses, as a flag:
+# with three components and one database, a second chart would be two files
+# of ceremony around one resource.
+infra:
+  enabled: true
+  postgres:
+    # Instances is 1 here because this is an example. A deployment sizes it.
+    instances: 1
+    storage: 1Gi
+  streams:
+    # Memory storage keeps the example's clicks for as long as the example
+    # runs, which is what an example needs. A deployment says `file`.
+    storage: memory
+
+database:
+  # Set when infra.enabled is false. Otherwise the chart fills these in from
+  # what it created.
+  host: ""
+  name: url_shortener
+  ownerRole: url_shortener_owner
+  appRole: app
+  # The NAME of the secret holding the password, and the key inside it. The
+  # value never appears in this file or in what it renders.
+  passwordSecret: ""
+  passwordKey: password
+
+events:
+  # Set when infra.enabled is false.
+  url: ""
+  redirectSubject: url-shortener.redirect
+  requestSubject: url-shortener.log
+  stream: URL_SHORTENER
+  consumer: stat
+
+image:
+  repository: ghcr.io/truvity/policy/url-shortener
+  # The release stamps a digest here. A tag is a moving target, and an image
+  # that can move under a running deployment is one nobody can roll back to.
+  digest: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+log:
+  level: info
+
+replicas:
+  redirect: 1
+  stat: 1
+
+resources:
+  redirect:
+    requests: { cpu: 50m, memory: 64Mi }
+  stat:
+    requests: { cpu: 50m, memory: 64Mi }
+  migrate:
+    requests: { cpu: 50m, memory: 64Mi }
+
+# The route this service is reached through. Off by default: a chart that
+# exposes something the moment it is installed is a chart that exposes
+# something nobody decided to expose.
+route:
+  enabled: false
+  parentRef:
+    name: ""
+    namespace: ""
+    sectionName: ""
+  hostname: ""

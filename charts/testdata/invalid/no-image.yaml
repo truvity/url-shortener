@@ -1,0 +1,5 @@
+# Neither a digest nor a tag. A render that produced an image reference with
+# no version at all would deploy "whatever :latest means today", which is the
+# one thing a release exists to prevent.
+image:
+  repository: example.com/url-shortener

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "url-shortener chart values",
+  "description": "Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["infra", "database", "events", "image", "log", "replicas", "resources", "route"],
+  "properties": {
+    "infra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "postgres": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "instances": { "type": "integer", "minimum": 1 },
+            "storage": { "type": "string", "minLength": 1 }
+          }
+        },
+        "streams": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "storage": { "enum": ["memory", "file"] }
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ownerRole"],
+      "properties": {
+        "host": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
+        "ownerRole": { "type": "string", "minLength": 1 },
+        "appRole": { "type": "string" },
+        "passwordSecret": { "type": "string" },
+        "passwordKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["redirectSubject", "requestSubject", "stream", "consumer"],
+      "properties": {
+        "url": { "type": "string" },
+        "redirectSubject": { "type": "string", "minLength": 1 },
+        "requestSubject": { "type": "string", "minLength": 1 },
+        "stream": { "type": "string", "minLength": 1 },
+        "consumer": { "type": "string", "minLength": 1 }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "pullPolicy"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "level": { "enum": ["debug", "info", "warn", "error"] } }
+    },
+    "replicas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "redirect": { "type": "integer", "minimum": 0 },
+        "stat": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.",
+      "properties": {
+        "redirect": { "type": "object" },
+        "stat": { "type": "object" },
+        "migrate": { "type": "object" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hostname": { "type": "string" },
+        "parentRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "namespace": { "type": "string" },
+            "sectionName": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

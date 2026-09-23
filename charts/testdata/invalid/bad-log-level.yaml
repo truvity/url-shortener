@@ -1,0 +1,6 @@
+# A level the binary does not accept. The chart refuses it rather than
+# rendering a file that would start the service on a default nobody chose.
+image:
+  tag: dev
+log:
+  level: chatty

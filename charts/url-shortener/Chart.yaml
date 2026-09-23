@@ -1,0 +1,11 @@
+apiVersion: v2
+name: url-shortener
+description: >-
+  The worked example's deployment: a migration job, the redirect service
+  and the click counter, each with the configuration file its binary
+  validates at start-up.
+type: application
+# Both are the placeholder a release stamps. A committed version that
+# moves by hand is a version two people can disagree about.
+version: 0.0.0
+appVersion: "0.0.0"

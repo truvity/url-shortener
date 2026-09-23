@@ -58,6 +58,27 @@ request as a redirect and counted a click for an empty URL. Keeping the body
 as the detail keeps every existing consumer working; moving the type to a
 header means it cannot silently go missing again.
 
+## The chart is held to the same schema
+
+`charts/url-shortener` renders one configuration file per binary, and
+`charts/chart_test.go` pulls each one out of the render and validates it with
+**the schema that binary validates against at start-up**. That is the
+configuration contract's first rule made real: a key the chart sets and the
+binary stopped reading is a test failure in the pull request, not a default
+nobody chose in a cluster.
+
+Five negative fixtures, one per refusal: an unknown key, an image with neither
+digest nor tag, a route naming no parent, an install that says it will supply
+its own database and then does not, and a log level the binary would reject.
+Each fails for its own reason, checked.
+
+The database and the streams are behind `infra.enabled`. An estate that
+provisions them separately turns it off and supplies the addresses; a local
+cluster turns it on and gets a working install from one command. That is the
+same split a two-chart "ring" model expresses, as a flag — with three
+components and one database, a second chart would be two files of ceremony
+around one resource.
+
 ## Running it
 
 ```sh

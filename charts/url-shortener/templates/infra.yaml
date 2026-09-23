@@ -1,0 +1,45 @@
+{{- if .Values.infra.enabled }}
+{{/*
+The database and the streams, when this chart is asked to create them.
+
+Both are CUSTOM RESOURCES: an operator turns them into a database and into
+streams. That is why the example's tests run against a real cluster rather
+than a container — a resource nothing reconciles looks exactly like success
+from here.
+*/}}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}-pg
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.infra.postgres.instances }}
+  storage:
+    size: {{ .Values.infra.postgres.storage }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.database.name }}
+      owner: {{ .Values.database.ownerRole }}
+---
+{{/*
+One stream, two subjects. The redirect service publishes both; the counter
+consumes one of them.
+
+A single stream rather than two, because they share a retention decision and
+a consumer that filters by subject is a smaller thing to reason about than
+two streams that must not disagree.
+*/}}
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: {{ .Release.Name }}-events
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  name: {{ .Values.events.stream }}
+  subjects:
+    - {{ .Values.events.redirectSubject }}
+    - {{ .Values.events.requestSubject }}
+  storage: {{ .Values.infra.streams.storage }}
+  servers:
+    - {{ include "url-shortener.natsURL" . }}
+{{- end }}

@@ -1,0 +1,57 @@
+{{/*
+The click counter. A consumer, so it has no Service and no route: nothing
+calls it, it calls the stream.
+
+It still serves probes, because an orchestrator needs to know whether a
+consumer is alive and whether it is connected to what it consumes. That is
+the one thing a workload with no traffic still owes the platform.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener.name" . }}-stat
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas.stat }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: stat
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener.labels" . | nindent 8 }}
+        app.kubernetes.io/component: stat
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: stat
+          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "stat") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/etc/url-shortener/stat.yaml"]
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "url-shortener.passwordSecret" . }}
+                  key: {{ include "url-shortener.passwordKey" . }}
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+          resources: {{- toYaml .Values.resources.stat | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener.name" . }}-config
