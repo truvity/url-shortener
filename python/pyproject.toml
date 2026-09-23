@@ -1,0 +1,81 @@
+[project]
+name = "truvity-policy"
+version = "0.1.0"
+description = "Load a service's configuration: one file, one schema, secrets by name."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+dependencies = [
+    "jsonschema>=4.23",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18",
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "types-jsonschema>=4.23",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/truvity_policy"]
+
+[tool.uv]
+# The interpreter is the one the toolchain declares, never one uv fetches.
+# A package manager that silently downloads a second Python makes "the same
+# versions on a laptop and in CI" untrue in the one place nobody looks.
+python-preference = "only-system"
+python-downloads = "never"
+
+[tool.mypy]
+# Strict, because an annotation nothing checks is a comment that rots, and
+# this package is read as an example of how the others should look.
+strict = true
+files = ["src", "tests"]
+# The generated module is data with a type declared at the top of it; there
+# is no author for a stricter reading to instruct.
+exclude = "src/truvity_policy/schemas\\.py$"
+
+[tool.ruff]
+line-length = 100
+# Generated code is not written by anyone, so there is nobody for a style
+# rule to instruct. The generator's output is checked by `just drift`.
+extend-exclude = ["src/truvity_policy/schemas.py"]
+
+[tool.ruff.lint]
+# Everything, then the few that argue with how this repository is written.
+# Each is named with its reason, because an unexplained ignore is one nobody
+# can ever remove.
+select = ["ALL"]
+ignore = [
+    # Ruff asks for one of each incompatible pair.
+    "D203",
+    "D213",
+    # Trailing commas are the formatter's business, not the linter's.
+    "COM812",
+    # No copyright header per file. The licence is at the root, once.
+    "CPY001",
+    # These three forbid an exception carrying a sentence: they want short
+    # literals, defined on the class, assembled elsewhere. This repository's
+    # errors are written to be READ by whoever has to fix the thing —
+    # naming the key, the variable, what was expected — and splitting that
+    # across a class hierarchy to satisfy a rule would make every message
+    # worse in exchange for nothing.
+    "TRY003",
+    "EM101",
+    "EM102",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# A test names what it is doing in its own name; asserting is the point; a
+# fixture value that looks like a password is the fixture working.
+"tests/*" = ["S101", "S105", "S106", "PLR2004", "INP001", "D103"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
