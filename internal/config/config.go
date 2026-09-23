@@ -55,6 +55,15 @@ type (
 		Subject string `json:"subject"`
 	}
 
+	// Drain is how long the service may take to finish in-flight work.
+	// It is the service's end of ONE number shared with whatever deploys
+	// it: the grace period the orchestrator grants is derived from this,
+	// and a process that used its own default would be killed at whatever
+	// moment that default happened to disagree.
+	Drain struct {
+		Seconds int `json:"seconds"`
+	}
+
 	// Migrate is the migration job: no listener, no probes. A job that runs
 	// once and exits is not a service.
 	Migrate struct {
@@ -69,6 +78,7 @@ type (
 		Listen   Listen   `json:"listen"`
 		Probes   Listen   `json:"probes"`
 		Log      Log      `json:"log"`
+		Drain    Drain    `json:"drain"`
 		Database Postgres `json:"database"`
 		Events   struct {
 			NATS            NATS   `json:"nats"`
@@ -82,6 +92,7 @@ type (
 		Listen   Listen   `json:"listen"`
 		Probes   Listen   `json:"probes"`
 		Log      Log      `json:"log"`
+		Drain    Drain    `json:"drain"`
 		Database Postgres `json:"database"`
 		Events   struct {
 			NATS     NATS     `json:"nats"`

@@ -1,0 +1,29 @@
+{{/*
+Voluntary disruption, which is a different event from a rollout.
+
+The deployment's own strategy keeps a ROLLOUT gapless. Nothing in it stops a
+node drain, a cluster autoscaler or an operator from evicting every replica
+at once while the deployment sits idle and healthy — that is what a budget
+is for, and it is why the two settings are not redundant.
+
+`maxUnavailable: 1` rather than `0`: a budget that permits no disruption at
+all does not protect a service, it wedges the drain of the node underneath it
+and the service goes down anyway, later and less predictably.
+*/}}
+{{- if .Values.disruption.enabled }}
+{{- range $component := list "redirect" "stat" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "url-shortener.name" $ }}-{{ $component }}
+  labels: {{- include "url-shortener.labels" $ | nindent 4 }}
+spec:
+  maxUnavailable: {{ $.Values.disruption.maxUnavailable | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $component }}
+---
+{{- end }}
+{{- end }}

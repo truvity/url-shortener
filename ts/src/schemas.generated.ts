@@ -64,6 +64,22 @@ export const sharedSchemas: Record<string, object> = {
       }
     }
   },
+  "https://github.com/truvity/policy/schemas/fragments/drain.json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/truvity/policy/schemas/fragments/drain.json",
+    "title": "drain",
+    "description": "How long the service may take to finish in-flight work after SIGTERM. It is one number shared with whatever deploys the service: the grace period granted to the process and the pre-stop delay before it are derived from this, so that a draining process is never killed at the moment it would have finished.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 20,
+        "description": "Seconds to finish in-flight work. Unset means the service's own default, which is only correct if nothing external is counting."
+      }
+    }
+  },
   "https://github.com/truvity/policy/schemas/fragments/listen.json": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/truvity/policy/schemas/fragments/listen.json",
@@ -216,6 +232,9 @@ export const sharedSchemas: Record<string, object> = {
       },
       "log": {
         "$ref": "https://github.com/truvity/policy/schemas/fragments/log.json"
+      },
+      "drain": {
+        "$ref": "https://github.com/truvity/policy/schemas/fragments/drain.json"
       }
     },
     "required": [

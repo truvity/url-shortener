@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -238,4 +239,286 @@ func TestTheMigrationAndTheServicesUseDifferentCredentials(t *testing.T) {
 			}
 		}
 	}
+}
+
+// A rollout must not have a gap, and the three numbers that make that true
+// must agree. This is the only place it can be checked: it is a property of
+// what is rendered, not of what runs.
+func TestARolloutHasNoGap(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if !strings.Contains(doc, "kind: Deployment") {
+			continue
+		}
+
+		name := docName(doc)
+
+		// One instance cannot be replaced without a gap, whatever the
+		// strategy says.
+		if !strings.Contains(doc, "replicas: 2") {
+			t.Errorf("%s: fewer than two instances, so a rollout has a gap", name)
+		}
+
+		// The default is 25%, which on two replicas removes one first.
+		if !strings.Contains(doc, "maxUnavailable: 0") {
+			t.Errorf("%s: the incumbent is removed before the replacement is ready", name)
+		}
+
+		if !strings.Contains(doc, "preStop") {
+			t.Errorf("%s: no pre-stop delay, so traffic arrives after the process stops accepting", name)
+		}
+
+		if !strings.Contains(doc, "topologySpreadConstraints") {
+			t.Errorf("%s: replicas may land on one machine, which satisfies the budget and not the intent", name)
+		}
+	}
+}
+
+// The grace period must exceed what the service is given to finish, or the
+// orchestrator kills a draining process at the moment it would have
+// succeeded. The failure looks like a network fault and is attributed to
+// anything but the deploy.
+func TestTheGracePeriodOutlastsTheDrain(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev",
+		"--set", "drain.seconds=30", "--set", "drain.preStopSeconds=7")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	var seen int
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		for _, line := range strings.Split(doc, "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "terminationGracePeriodSeconds:") {
+				continue
+			}
+
+			seen++
+
+			grace, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "terminationGracePeriodSeconds:")))
+			if err != nil {
+				t.Fatalf("%s: %v", docName(doc), err)
+			}
+
+			// 30 to finish, 7 before it starts: anything at or under 37
+			// cuts the drain short.
+			if grace <= 37 {
+				t.Errorf("%s: grace period %d does not outlast a 30s drain behind a 7s delay", docName(doc), grace)
+			}
+		}
+	}
+
+	if seen == 0 {
+		t.Fatal("no workload declares a grace period, so every drain is cut at the default")
+	}
+}
+
+// A policy attaches to a route's rule BY NAME. A rule with no name cannot be
+// targeted, and a policy that targets a name which does not exist is not
+// refused — it is simply not attached, and the route keeps serving without
+// it. An unauthenticated route that renders correctly is the failure this
+// test exists to make impossible.
+func TestEveryRouteRuleIsNamed(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev",
+		"--set", "route.enabled=true", "--set", "route.parentRef.name=gw")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	var routes int
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if !strings.Contains(doc, "kind: HTTPRoute") {
+			continue
+		}
+
+		routes++
+
+		lines := strings.Split(doc, "\n")
+		for i, line := range lines {
+			if strings.TrimSpace(line) != "rules:" {
+				continue
+			}
+
+			// The first entry of the list that follows must carry a name.
+			for _, l := range lines[i+1:] {
+				if strings.TrimSpace(l) == "" || strings.HasPrefix(strings.TrimSpace(l), "{{") {
+					continue
+				}
+
+				if !strings.HasPrefix(strings.TrimSpace(l), "- name:") {
+					t.Errorf("%s: the first rule is %q, which carries no name", docName(doc), strings.TrimSpace(l))
+				}
+
+				break
+			}
+		}
+	}
+
+	if routes == 0 {
+		t.Fatal("no route rendered, so the rule name was not checked")
+	}
+}
+
+// The chart grants nothing; it names an account. Every workload runs as it,
+// so that a platform binding rights to that account binds them once.
+func TestEveryWorkloadNamesTheAccount(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	var workloads int
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if !strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job") {
+			continue
+		}
+
+		workloads++
+
+		if !strings.Contains(doc, "serviceAccountName:") {
+			t.Errorf("%s: runs as the namespace's default account, which nothing can grant to", docName(doc))
+		}
+	}
+
+	if workloads < 3 {
+		t.Fatalf("expected the migration and both services, found %d", workloads)
+	}
+}
+
+// docName pulls a manifest's metadata name out for an error message.
+func docName(doc string) string {
+	for _, line := range strings.Split(doc, "\n") {
+		if strings.HasPrefix(line, "  name: ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "  name: "))
+		}
+	}
+
+	return "an unnamed document"
+}
+
+// The migration and the services must not share an account, for the same
+// reason they do not share a database credential: the migration's rights
+// create and grant, and nothing on the request path should have them.
+func TestTheMigrationAndTheServicesUseDifferentAccounts(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	var migrate, services []string
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if !strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job") {
+			continue
+		}
+
+		name := docName(doc)
+
+		for _, line := range strings.Split(doc, "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "serviceAccountName:") {
+				continue
+			}
+
+			account := strings.TrimSpace(strings.TrimPrefix(line, "serviceAccountName:"))
+			if strings.Contains(name, "migrate") {
+				migrate = append(migrate, account)
+			} else {
+				services = append(services, account)
+			}
+		}
+	}
+
+	if len(migrate) == 0 || len(services) == 0 {
+		t.Fatalf("expected the migration and the services to name an account each, got %v and %v", migrate, services)
+	}
+
+	for _, m := range migrate {
+		for _, s := range services {
+			if m == s {
+				t.Errorf("the migration and a service both run as %q: the rights that create tables are on the request path", m)
+			}
+		}
+	}
+}
+
+// Anything a pre-install hook REFERENCES must itself be a hook, because Helm
+// applies every hook before the rest of the release. This has bitten three
+// times here — a database, a configuration map, and an account — and each
+// time the symptom was a hook that hung rather than an error naming a cause.
+func TestWhatTheMigrationHookNeedsIsAlsoAHook(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	// A manifest is identified by KIND and name: the migration's Job and
+	// the account it runs as are both called "<release>-migrate", and a
+	// map keyed on the name alone silently loses one of them — which is
+	// how the first version of this test passed while the install hung.
+	type ref struct{ kind, name string }
+
+	hooks := map[ref]bool{}
+	needs := map[ref]bool{}
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		kind, name := docKind(doc), docName(doc)
+		if kind == "" || name == "" {
+			continue
+		}
+
+		if strings.Contains(doc, `"helm.sh/hook":`) {
+			hooks[ref{kind, name}] = true
+		}
+
+		if kind != "Job" || !strings.Contains(name, "migrate") {
+			continue
+		}
+
+		lines := strings.Split(doc, "\n")
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+
+			if account, ok := strings.CutPrefix(trimmed, "serviceAccountName:"); ok {
+				needs[ref{"ServiceAccount", strings.TrimSpace(account)}] = true
+			}
+
+			// A volume's `configMap:` is followed by its name.
+			if trimmed == "configMap:" && i+1 < len(lines) {
+				if cm, ok := strings.CutPrefix(strings.TrimSpace(lines[i+1]), "name:"); ok {
+					needs[ref{"ConfigMap", strings.TrimSpace(cm)}] = true
+				}
+			}
+		}
+	}
+
+	if len(needs) < 2 {
+		t.Fatalf("expected the migration to need an account and a configuration, found %v", needs)
+	}
+
+	for n := range needs {
+		if !hooks[n] {
+			t.Errorf("the migration hook needs %s/%s, which is an ordinary resource: "+
+				"Helm applies hooks first, so the pod is never created and the install hangs",
+				n.kind, n.name)
+		}
+	}
+}
+
+// docKind pulls a manifest's kind out.
+func docKind(doc string) string {
+	for _, line := range strings.Split(doc, "\n") {
+		if kind, ok := strings.CutPrefix(line, "kind: "); ok {
+			return strings.TrimSpace(kind)
+		}
+	}
+
+	return ""
 }

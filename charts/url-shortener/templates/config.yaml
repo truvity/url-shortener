@@ -27,6 +27,8 @@ data:
       address: ":7070"
     log:
       level: {{ .Values.log.level }}
+    drain:
+      seconds: {{ .Values.drain.seconds }}
     database:
       url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
       passwordEnv: DATABASE_PASSWORD
@@ -42,6 +44,8 @@ data:
       address: ":7070"
     log:
       level: {{ .Values.log.level }}
+    drain:
+      seconds: {{ .Values.drain.seconds }}
     database:
       url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
       passwordEnv: DATABASE_PASSWORD

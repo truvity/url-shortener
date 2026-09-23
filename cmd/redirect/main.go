@@ -132,7 +132,7 @@ func run() error {
 		// a server that stops accepting immediately drops requests that were
 		// already in flight.
 		log.InfoContext(groupCtx, "draining", slog.String("server", "api"))
-		return app.ShutdownWithTimeout(20 * time.Second)
+		return app.ShutdownWithTimeout(runtime.Drain(cfg.Drain.Seconds))
 	})
 	group.Go(func() error {
 		log.InfoContext(ctx, "listening", slog.String("address", cfg.Listen.Address))

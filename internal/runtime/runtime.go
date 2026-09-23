@@ -106,3 +106,20 @@ func Serve(ctx context.Context, log *slog.Logger, name string, srv *http.Server,
 	}
 	return serveErr
 }
+
+// Drain turns the configured number of seconds into a duration, falling back
+// to a default when nothing was configured.
+//
+// The fallback is a courtesy for a local run, not a deployment setting. In a
+// deployment the number is supplied, because the grace period the
+// orchestrator grants is derived from the same one: a service that quietly
+// used its own default would be killed at whatever moment that default
+// happened to disagree with the budget, and the symptom is a truncated
+// response rather than anything that names a timeout.
+func Drain(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 20 * time.Second
+	}
+
+	return time.Duration(seconds) * time.Second
+}

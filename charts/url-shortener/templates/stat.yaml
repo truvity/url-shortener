@@ -13,6 +13,14 @@ metadata:
   labels: {{- include "url-shortener.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicas.stat }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      # The default is 25%, which on two replicas means one goes
+      # away first.
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: url-shortener
@@ -26,6 +34,9 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      {{- include "url-shortener.drain" . | nindent 6 }}
+      {{- include "url-shortener.spread" (dict "Release" .Release "component" "stat") | nindent 6 }}
       containers:
         - name: stat
           image: {{ include "url-shortener.image" (dict "Values" .Values "component" "stat") }}
@@ -42,6 +53,7 @@ spec:
           readinessProbe:
             httpGet: { path: /health/ready, port: probes }
             periodSeconds: 5
+          {{- include "url-shortener.preStop" . | nindent 10 }}
           volumeMounts:
             - name: config
               mountPath: /etc/url-shortener

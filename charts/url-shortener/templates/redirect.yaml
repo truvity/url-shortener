@@ -13,6 +13,14 @@ metadata:
   labels: {{- include "url-shortener.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicas.redirect }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      # The default is 25%, which on two replicas means one goes
+      # away first.
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: url-shortener
@@ -29,6 +37,9 @@ spec:
         # the file they started with, and the deploy reads as successful.
         checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      {{- include "url-shortener.drain" . | nindent 6 }}
+      {{- include "url-shortener.spread" (dict "Release" .Release "component" "redirect") | nindent 6 }}
       containers:
         - name: redirect
           image: {{ include "url-shortener.image" (dict "Values" .Values "component" "redirect") }}
@@ -49,6 +60,7 @@ spec:
           readinessProbe:
             httpGet: { path: /health/ready, port: probes }
             periodSeconds: 5
+          {{- include "url-shortener.preStop" . | nindent 10 }}
           volumeMounts:
             - name: config
               mountPath: /etc/url-shortener
@@ -101,7 +113,13 @@ spec:
   hostnames: [{{ . | quote }}]
   {{- end }}
   rules:
-    - matches:
+    {{/*
+    The rule is NAMED. A policy attaches to a rule by name, and a policy
+    whose target names no rule is not refused — it is simply not attached,
+    and the route keeps serving without it.
+    */}}
+    - name: {{ .Values.route.ruleName }}
+      matches:
         - path:
             type: PathPrefix
             value: /r/

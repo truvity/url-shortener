@@ -47,9 +47,62 @@ image:
 log:
   level: info
 
+# The account these workloads run as.
+#
+# The chart grants nothing. It names an account and puts annotations on it;
+# which mechanism binds that account to a cloud role is the platform's, and
+# it differs between clusters in the same estate. A chart that hard-codes one
+# of them can only be installed on half the clusters it should run on, and
+# the failure arrives as a permissions error a long way from the cause.
+serviceAccount:
+  create: true
+  # TWO accounts, for the same reason there are two database credentials:
+  # the migration creates tables and grants rights, the services read and
+  # write rows. Giving both jobs one account is what makes "the service
+  # dropped a table" a sentence anyone can say.
+  #
+  # Empty names mean the release's own, suffixed. Set one to bind to an
+  # account the platform created.
+  app:
+    name: ""
+    annotations: {}
+  migrate:
+    name: ""
+    annotations: {}
+
+# How long a replacement takes, and how long the old one is allowed to
+# finish.
+#
+# ONE number, used three times: the service's own shutdown timeout in its
+# configuration file, the grace period Kubernetes grants, and the pre-stop
+# delay before either starts. They disagree by default, and both ways of
+# disagreeing look like a network fault — a grace period shorter than the
+# timeout kills a draining process, and no pre-stop delay means traffic
+# keeps arriving for as long as it takes the routing layer to notice the
+# endpoint is gone.
+drain:
+  # What the service is given to finish in-flight work.
+  seconds: 20
+  # Fail readiness, then wait this long before the drain starts, so that
+  # whatever routes traffic has removed this endpoint first.
+  preStopSeconds: 5
+
 replicas:
-  redirect: 1
-  stat: 1
+  # Two, because one instance cannot be replaced without a gap whatever the
+  # strategy says. Both components run more than one safely: the redirect
+  # service holds no state, and the counter is a queue-group consumer.
+  redirect: 2
+  stat: 2
+
+# Voluntary disruption, which is not the same thing as a rollout.
+#
+# `maxUnavailable: 0` above makes a ROLLOUT gapless. This makes a node drain
+# gapless too, and they are different events: nothing stops a cluster
+# autoscaler from evicting both replicas at once while every deployment sits
+# idle and healthy.
+disruption:
+  enabled: true
+  maxUnavailable: 1
 
 resources:
   redirect:
@@ -64,6 +117,14 @@ resources:
 # something nobody decided to expose.
 route:
   enabled: false
+  # The name of the rule that serves the application.
+  #
+  # Rules are named because a policy — for sign-in, for CSRF, for rate
+  # limiting — attaches to a rule BY NAME. A policy whose target names no
+  # rule that exists does not fail loudly: it is simply not attached, and the
+  # route keeps serving without it. An unauthenticated route that looks
+  # correct in every rendering is the failure this name exists to prevent.
+  ruleName: app
   parentRef:
     name: ""
     namespace: ""
