@@ -1,0 +1,15 @@
+listen:
+  address: ":8080"
+probes:
+  address: ":7070"
+log:
+  level: info
+database:
+  url: postgres://redirect@url-shortener-pg-ro:5432/url_shortener?sslmode=require
+  passwordEnv: DATABASE_PASSWORD
+  maxConnections: 10
+events:
+  nats:
+    url: nats://nats.nats.svc:4222
+  redirectSubject: url-shortener.redirect
+  requestSubject: url-shortener.log

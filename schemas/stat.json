@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/url-shortener/schemas/stat.json",
+  "title": "stat",
+  "description": "The click counter: consume redirects, count them.",
+  "allOf": [{ "$ref": "https://github.com/truvity/policy/schemas/service.json" }],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["database", "events"],
+  "properties": {
+    "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nats", "consumer"],
+      "properties": {
+        "nats": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json" },
+        "consumer": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json" }
+      }
+    }
+  }
+}

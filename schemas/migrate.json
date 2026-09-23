@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/url-shortener/schemas/migrate.json",
+  "title": "migrate",
+  "description": "The migration job. It does NOT reference the service envelope: a job that runs once and exits is not a service, and probes it never serves would be configuration a deployment can set and watch do nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["database", "ownerRole"],
+  "properties": {
+    "log": { "$ref": "https://github.com/truvity/policy/schemas/fragments/log.json" },
+    "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
+    "ownerRole": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The role the migration becomes before it creates anything, so that tables are owned by the owner rather than by whoever migrated. Removing the migration user must not orphan the schema."
+    },
+    "appRole": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The role the running components use, granted on the app schemas after the migration lands. Unset skips the grant, which is correct where the platform grants it instead."
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/url-shortener/schemas/redirect.json",
+  "title": "redirect",
+  "description": "The redirect service: resolve a short key and emit what happened.",
+  "allOf": [{ "$ref": "https://github.com/truvity/policy/schemas/service.json" }],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["listen", "database", "events"],
+  "properties": {
+    "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nats", "redirectSubject", "requestSubject"],
+      "properties": {
+        "nats": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json" },
+        "redirectSubject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where a resolved redirect is published. One event kind per subject, so a consumer never has to guess what it decoded."
+        },
+        "requestSubject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the request log is published. A separate subject from the redirect, for the same reason."
+        }
+      }
+    }
+  }
+}

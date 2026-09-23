@@ -1,0 +1,7 @@
+log:
+  level: info
+database:
+  url: postgres://migration@url-shortener-pg-rw:5432/url_shortener?sslmode=require
+  passwordEnv: DATABASE_PASSWORD
+ownerRole: url_shortener_owner
+appRole: app

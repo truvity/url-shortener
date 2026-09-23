@@ -97,11 +97,40 @@ export const sharedSchemas: Record<string, object> = {
       }
     }
   },
+  "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json",
+    "title": "nats-consumer",
+    "description": "What a consumer binds to: a stream, a durable name, and the subject it filters. Durable by name, because a consumer that forgets its position on restart replays or loses whatever arrived while it was gone.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "stream",
+      "durable"
+    ],
+    "properties": {
+      "stream": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The stream to consume from. It exists already: a service does not create the stream it reads."
+      },
+      "durable": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The durable consumer name. Shared by every replica of this component, which is what makes them one consumer group rather than several."
+      },
+      "subject": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Filter the stream to this subject. Unset consumes everything the stream holds."
+      }
+    }
+  },
   "https://github.com/truvity/policy/schemas/fragments/nats.json": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/truvity/policy/schemas/fragments/nats.json",
     "title": "nats",
-    "description": "A NATS connection, and the stream this service publishes to or consumes from.",
+    "description": "A NATS connection, and nothing else. What a service does with the connection — publish to a subject, bind a durable consumer to a stream — differs per component and is described beside it: a publisher with a `consumer` field it never reads is a field somebody will eventually set.",
     "type": "object",
     "additionalProperties": false,
     "required": [
@@ -116,22 +145,7 @@ export const sharedSchemas: Record<string, object> = {
       "credentialsFile": {
         "type": "string",
         "minLength": 1,
-        "description": "Path to a credentials file the platform mounts. Unset means no authentication, which is a test configuration."
-      },
-      "stream": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The stream name."
-      },
-      "subject": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The subject published to, or consumed from."
-      },
-      "consumer": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The durable consumer name. Set on a consumer, unset on a publisher."
+        "description": "Path to a credentials file the platform mounts. Unset means no authentication, which is a test configuration and not a deployment."
       }
     }
   },
