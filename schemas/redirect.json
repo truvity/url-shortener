@@ -9,6 +9,7 @@
   "required": ["listen", "database", "events"],
   "properties": {
     "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
+    "tls": { "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json" },
     "events": {
       "type": "object",
       "additionalProperties": false,

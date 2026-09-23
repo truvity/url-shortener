@@ -8,6 +8,8 @@
 package config
 
 import (
+	"github.com/truvity/policy/transport"
+
 	"github.com/truvity/policy/config"
 
 	urlshortener "github.com/truvity/policy/examples/url-shortener"
@@ -64,6 +66,19 @@ type (
 		Seconds int `json:"seconds"`
 	}
 
+	// TLS is the mutually authenticated transport, when the platform
+	// provides one. It is the policy package's own type, so that a service
+	// declaring it also gets the loader and the peer check: a second
+	// description of the same shape is the thing the config contract exists
+	// to prevent.
+	//
+	// It is NOT part of the shared envelope, and that is deliberate. A
+	// migration has no transport to secure, and the counter serves nothing
+	// but its probes. A field every service carries and only some can use is
+	// a field a deployment sets and watches do nothing — which is what the
+	// telemetry block was before it was deleted.
+	TLS = transport.Config
+
 	// Migrate is the migration job: no listener, no probes. A job that runs
 	// once and exits is not a service.
 	Migrate struct {
@@ -79,6 +94,7 @@ type (
 		Probes   Listen   `json:"probes"`
 		Log      Log      `json:"log"`
 		Drain    Drain    `json:"drain"`
+		TLS      TLS      `json:"tls"`
 		Database Postgres `json:"database"`
 		Events   struct {
 			NATS            NATS   `json:"nats"`

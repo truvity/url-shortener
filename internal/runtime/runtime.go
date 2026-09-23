@@ -8,6 +8,10 @@
 package runtime
 
 import (
+	"github.com/truvity/policy/transport"
+
+	"github.com/gofiber/fiber/v3"
+
 	"context"
 	"errors"
 	"log/slog"
@@ -122,4 +126,25 @@ func Drain(seconds int) time.Duration {
 	}
 
 	return time.Duration(seconds) * time.Second
+}
+
+// ListenTLS is the Fiber listener configuration for a service's own port.
+//
+// Fiber serves a supplied tls.Config as given, which is what makes the
+// mounted identity usable: the certificate comes from a callback, so a
+// rotation is picked up without restarting, and the peer check runs inside
+// the handshake rather than as middleware nobody can be sure ran.
+//
+// A nil identity means cleartext, and that is the ordinary case: the chart's
+// default is off, because a service must be installable on a platform that
+// provides no identity at all.
+func ListenTLS(id *transport.Identity) fiber.ListenConfig {
+	cfg := fiber.ListenConfig{DisableStartupMessage: true}
+	if id == nil {
+		return cfg
+	}
+
+	cfg.TLSConfig = id.Server()
+
+	return cfg
 }

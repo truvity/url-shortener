@@ -6,6 +6,8 @@
 package main
 
 import (
+	"github.com/truvity/policy/transport"
+
 	"context"
 	"errors"
 	"flag"
@@ -102,6 +104,13 @@ func run() error {
 		subject:   cfg.Events.RequestSubject,
 	})
 
+	// The mounted identity, if the platform provides one. A nil identity is
+	// not an error: it is the default, and it means cleartext.
+	identity, err := transport.Load(cfg.TLS)
+	if err != nil {
+		return fmt.Errorf("transport identity: %w", err)
+	}
+
 	app := fiber.New()
 	humaAPI := humafiber.New(app, huma.DefaultConfig("URL Shortener", version))
 	redirect.RegisterHumaRoutes(ctx, log, humaAPI, manager, requestLog)
@@ -135,8 +144,11 @@ func run() error {
 		return app.ShutdownWithTimeout(runtime.Drain(cfg.Drain.Seconds))
 	})
 	group.Go(func() error {
-		log.InfoContext(ctx, "listening", slog.String("address", cfg.Listen.Address))
-		if err := app.Listen(cfg.Listen.Address, fiber.ListenConfig{DisableStartupMessage: true}); err != nil {
+		log.InfoContext(ctx, "listening",
+			slog.String("address", cfg.Listen.Address),
+			slog.String("transport", string(identity.Mode())))
+
+		if err := app.Listen(cfg.Listen.Address, runtime.ListenTLS(identity)); err != nil {
 			return fmt.Errorf("serve: %w", err)
 		}
 		return nil

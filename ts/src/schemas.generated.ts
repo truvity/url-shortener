@@ -217,6 +217,92 @@ export const sharedSchemas: Record<string, object> = {
       }
     }
   },
+  "https://github.com/truvity/policy/schemas/fragments/tls.json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/truvity/policy/schemas/fragments/tls.json",
+    "title": "tls",
+    "description": "Mutually authenticated transport, where the platform provides the identity. A workload presents a certificate it did not mint, reloads it without restarting, and admits peers by the account they run as rather than by the address they call from. Absent, or mode 'off', means cleartext: a service must be installable on a platform that provides none of this.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "mode": {
+        "enum": [
+          "off",
+          "permissive",
+          "strict"
+        ],
+        "default": "off",
+        "description": "'off' serves cleartext only. 'permissive' serves BOTH, on two ports, so that an edge can migrate one side at a time without a coordinated window. 'strict' serves only the authenticated port. One listener cannot be both in every runtime, which is why permissive is two ports rather than one that sniffs."
+      },
+      "certFile": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The certificate this workload presents, mounted and rotated by the platform. Re-read when it changes, never cached for the process's lifetime: a one-hour certificate outlives no deployment."
+      },
+      "keyFile": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Its private key. It lives in the pod and never in a secret, so a workload that can read secrets in its namespace still cannot read a neighbour's key."
+      },
+      "caFile": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The authority peers are verified against, distributed by the platform as a trust bundle."
+      },
+      "trustDomain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The root of every identity this service will admit, for example 'example.internal'. A peer whose identity belongs to another trust domain is refused before its account is even considered."
+      },
+      "peers": {
+        "type": "array",
+        "description": "Who may call. Each entry is an ACCOUNT, not an address: an address resolves to whoever holds it today. An empty list admits no one, which is the correct default for a service nobody has been granted.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "namespace",
+            "serviceAccount"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "serviceAccount": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "mode": {
+              "enum": [
+                "permissive",
+                "strict"
+              ]
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        "then": {
+          "required": [
+            "certFile",
+            "keyFile",
+            "caFile",
+            "trustDomain"
+          ]
+        }
+      }
+    ]
+  },
   "https://github.com/truvity/policy/schemas/service.json": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/truvity/policy/schemas/service.json",
