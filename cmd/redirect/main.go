@@ -106,7 +106,7 @@ func run() error {
 
 	// The mounted identity, if the platform provides one. A nil identity is
 	// not an error: it is the default, and it means cleartext.
-	identity, err := transport.Load(cfg.TLS)
+	identity, err := transport.Load(cfg.TLS, log)
 	if err != nil {
 		return fmt.Errorf("transport identity: %w", err)
 	}
@@ -143,14 +143,43 @@ func run() error {
 		log.InfoContext(groupCtx, "draining", slog.String("server", "api"))
 		return app.ShutdownWithTimeout(runtime.Drain(cfg.Drain.Seconds))
 	})
+	// Under `permissive` the service answers on TWO listeners: the
+	// cleartext one its current callers use, and an authenticated one the
+	// callers move to. One listener cannot be both, so an edge migrates in
+	// three steps — this server adds its authenticated port, its callers
+	// move across, and the cleartext one goes.
+	//
+	// Under `strict` there is one listener and it is this one, with TLS.
+	// The protocol changes and the address does not, so nothing downstream
+	// has to be told a new port.
+	if identity.Mode() == transport.Permissive {
+		group.Go(func() error {
+			log.InfoContext(ctx, "listening",
+				slog.String("address", cfg.TLS.Address),
+				slog.String("transport", "authenticated"))
+
+			if err := app.Listen(cfg.TLS.Address, runtime.ListenTLS(identity)); err != nil {
+				return fmt.Errorf("serve authenticated: %w", err)
+			}
+
+			return nil
+		})
+	}
+
 	group.Go(func() error {
+		plain := fiber.ListenConfig{DisableStartupMessage: true}
+		if identity.Mode() == transport.Strict {
+			plain = runtime.ListenTLS(identity)
+		}
+
 		log.InfoContext(ctx, "listening",
 			slog.String("address", cfg.Listen.Address),
 			slog.String("transport", string(identity.Mode())))
 
-		if err := app.Listen(cfg.Listen.Address, runtime.ListenTLS(identity)); err != nil {
+		if err := app.Listen(cfg.Listen.Address, plain); err != nil {
 			return fmt.Errorf("serve: %w", err)
 		}
+
 		return nil
 	})
 	return group.Wait()

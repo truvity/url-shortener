@@ -29,6 +29,22 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
+    {{- if include "url-shortener.tlsOn" . }}
+    tls:
+      mode: {{ .Values.tls.mode }}
+      {{- if eq .Values.tls.mode "permissive" }}
+      address: ":{{ .Values.tls.port }}"
+      {{- end }}
+      certFile: {{ .Values.tls.mountPath }}/tls.crt
+      keyFile: {{ .Values.tls.mountPath }}/tls.key
+      caFile: {{ .Values.tls.mountPath }}/ca.crt
+      trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
+      peers:
+        {{- range .Values.tls.peers.redirect }}
+        - namespace: {{ .namespace }}
+          serviceAccount: {{ .serviceAccount }}
+        {{- end }}
+    {{- end }}
     database:
       url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
       passwordEnv: DATABASE_PASSWORD

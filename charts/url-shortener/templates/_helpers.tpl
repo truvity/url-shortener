@@ -106,3 +106,55 @@ topologySpreadConstraints:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: {{ .component }}
 {{- end -}}
+
+{{/*
+Whether the transport is authenticated at all. Everything TLS-shaped in this
+chart is behind this, so that the default render is byte-identical to one
+from a chart that had never heard of it — which is what a golden proves.
+*/}}
+{{- define "url-shortener.tlsOn" -}}
+{{- if ne .Values.tls.mode "off" }}yes{{ end -}}
+{{- end -}}
+
+{{/*
+The volume the platform mounts the identity into.
+
+An ephemeral CSI volume, not a secret: the key lives in the pod and nowhere
+else, so a workload that can read secrets in its namespace still cannot read
+a neighbour's key. The driver derives the identity from the account this pod
+runs as; nothing here names an identity, because a chart that could name one
+could name somebody else's.
+*/}}
+{{- define "url-shortener.identityVolume" -}}
+{{- if include "url-shortener.tlsOn" . }}
+- name: identity
+  csi:
+    driver: {{ .Values.tls.csiDriver }}
+    readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "url-shortener.identityMount" -}}
+{{- if include "url-shortener.tlsOn" . }}
+- name: identity
+  mountPath: {{ .Values.tls.mountPath }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/*
+The pod's security context.
+
+`fsGroup` is the one that matters here and the one that is easy to omit. A
+CSI driver writes what it mounts owned by root, and a process running as
+anyone else cannot read it. The symptom is a permission error on a
+certificate authority file, several layers away from anything that mentions
+identity, and it appears only once the transport is turned on.
+*/}}
+{{- define "url-shortener.podSecurity" -}}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: {{ .Values.podSecurity.runAsUser }}
+  runAsGroup: {{ .Values.podSecurity.runAsGroup }}
+  fsGroup: {{ .Values.podSecurity.fsGroup }}
+{{- end -}}

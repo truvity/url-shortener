@@ -35,6 +35,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      {{- include "url-shortener.podSecurity" . | nindent 6 }}
       {{- include "url-shortener.drain" . | nindent 6 }}
       {{- include "url-shortener.spread" (dict "Release" .Release "component" "stat") | nindent 6 }}
       containers:
@@ -58,8 +59,10 @@ spec:
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
+            {{- include "url-shortener.identityMount" . | nindent 12 }}
           resources: {{- toYaml .Values.resources.stat | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-config
+        {{- include "url-shortener.identityVolume" . | nindent 8 }}

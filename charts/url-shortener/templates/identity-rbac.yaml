@@ -1,0 +1,40 @@
+{{/*
+Permission for this release's workloads to ASK for their own identity.
+
+The request is made as the workload's own account — that is precisely what
+makes the identity attested rather than claimed — so the account needs
+whatever creating a request takes. Without it the POD is never created, and
+the reason ("error looking up service account", or a forbidden request in the
+driver's log) lands in an event nobody is watching while the install sits
+waiting.
+
+This grants nothing outside the cluster and nothing about anyone else: it
+lets an account ask for a certificate, and what identity it gets back is the
+platform's decision, not this chart's. Set `tls.grantRequest` false where a
+platform grants it centrally.
+*/}}
+{{- if and (include "url-shortener.tlsOn" .) .Values.tls.grantRequest }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "url-shortener.name" . }}-request-identity
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "url-shortener.name" . }}-request-identity
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "url-shortener.name" . }}-request-identity
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "url-shortener.appServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

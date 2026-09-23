@@ -24,6 +24,7 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "url-shortener.migrateServiceAccountName" . }}
+      {{- include "url-shortener.podSecurity" . | nindent 6 }}
       containers:
         - name: migrate
           image: {{ include "url-shortener.image" (dict "Values" .Values "component" "migrate") }}

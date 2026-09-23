@@ -87,6 +87,66 @@ drain:
   # whatever routes traffic has removed this endpoint first.
   preStopSeconds: 5
 
+# Who the process is, inside the pod.
+#
+# The runtime images already run as an unprivileged user; this states it
+# where a reader and an admission policy can both see it, and sets the group
+# that the platform's mounts are made readable to. Without the group, an
+# identity mounted by a CSI driver is owned by root and the process cannot
+# read its own certificate — which surfaces as a permission error on a
+# certificate authority file, a long way from anything that says identity.
+podSecurity:
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+
+# Mutually authenticated transport, where the PLATFORM provides the identity.
+#
+# `off` is the default and always will be. A chart is installable by someone
+# whose platform provides none of this, and a default that assumed one would
+# produce a pod waiting forever for a volume nobody serves. Turning it on is
+# a decision a platform makes for every service at once.
+#
+# What a platform must have before `off` can become anything else:
+#   - something that mounts a certificate whose identity is derived from the
+#     account the pod runs as, by something the pod cannot lie to;
+#   - something that REFUSES a request for an identity other than the
+#     requester's, and nothing else approving requests behind its back;
+#   - an authority that signs it, and a trust bundle to verify peers against;
+#   - rotation, without restarting workloads.
+#
+# The middle one is the one that is missed, and missing it is invisible: the
+# certificates still mount and every log line still says success.
+tls:
+  # off | permissive | strict. `permissive` serves BOTH, on two ports, so one
+  # edge migrates at a time; it is a migration state and should carry a date.
+  mode: "off"
+
+  # The root of every identity this service will admit. A peer from another
+  # trust domain is refused before its account is considered.
+  trustDomain: ""
+
+  # What mounts the identity, and where. The platform owns the first; the
+  # chart only has to agree with it.
+  csiDriver: spiffe.csi.cert-manager.io
+  mountPath: /var/run/identity
+
+  # The identity is requested AS the workload's own account — that is what
+  # makes it attested rather than claimed — so that account needs permission
+  # to ask. Set false where the platform grants this centrally.
+  grantRequest: true
+
+  # The port the authenticated listener uses under `permissive`, beside the
+  # cleartext one. Under `strict` the cleartext port is simply this one's
+  # job, so nothing moves.
+  port: 8443
+
+  # Who may call, per component. An ACCOUNT, never an address: an address
+  # resolves to whoever holds it today. Empty admits nobody, which is the
+  # right default for a service nobody has been granted.
+  peers:
+    redirect: []
+
 replicas:
   # Two, because one instance cannot be replaced without a gap whatever the
   # strategy says. Both components run more than one safely: the redirect

@@ -234,6 +234,11 @@ export const sharedSchemas: Record<string, object> = {
         "default": "off",
         "description": "'off' serves cleartext only. 'permissive' serves BOTH, on two ports, so that an edge can migrate one side at a time without a coordinated window. 'strict' serves only the authenticated port. One listener cannot be both in every runtime, which is why permissive is two ports rather than one that sniffs."
       },
+      "address": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Where the authenticated listener binds under 'permissive', beside the cleartext one. Under 'strict' there is one listener and it is the service's own, so this is unused: the protocol changes, the address does not, and nothing downstream has to be told."
+      },
       "certFile": {
         "type": "string",
         "minLength": 1,

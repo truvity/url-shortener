@@ -522,3 +522,98 @@ func docKind(doc string) string {
 
 	return ""
 }
+
+// THE test for an optional capability: with it off, the render carries no
+// trace of it.
+//
+// This is what lets the default stay off forever. A chart is installed by
+// someone whose platform provides none of this, and if turning the feature
+// off still left a volume, a mount or a key behind, their pod would wait for
+// something nobody serves. A golden would catch it eventually; this says so
+// directly, and names what leaked.
+func TestTransportOffLeavesNoTrace(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	for _, trace := range []string{
+		"csi.cert-manager.io", // the driver
+		"certificaterequests", // the permission to ask
+		"trustDomain",         // the configuration block
+		"identity",            // the volume and its mount
+		"tls:",                // the block itself
+	} {
+		if strings.Contains(out, trace) {
+			t.Errorf("the default render mentions %q; with the transport off it must carry no trace of it", trace)
+		}
+	}
+}
+
+// Turned on, each of those appears — otherwise the test above passes because
+// the feature does not work at all.
+func TestTransportOnRendersWhatThePlatformNeeds(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev",
+		"--set", "tls.mode=strict",
+		"--set", "tls.trustDomain=example.internal",
+		"--set", "tls.peers.redirect[0].namespace=shop",
+		"--set", "tls.peers.redirect[0].serviceAccount=web")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	for _, want := range []string{
+		"spiffe.csi.cert-manager.io",
+		"certificaterequests",
+		"trustDomain: example.internal",
+		"serviceAccount: web",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render is missing %q, so the platform has nothing to act on", want)
+		}
+	}
+}
+
+// A trust domain is required the moment the transport is on. Without it a
+// peer from ANY trust domain is admitted, which is a service that looks
+// authenticated and is not.
+func TestTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev", "--set", "tls.mode=strict")...)
+	if err == nil {
+		t.Fatalf("a render with no trust domain was accepted:\n%s", out)
+	}
+
+	if !strings.Contains(out, "tls.trustDomain is required") {
+		t.Errorf("the refusal does not say what is missing: %s", out)
+	}
+}
+
+// Permissive means two ports, on the pod and on the Service alike. One
+// listener cannot be both, and a Service that exposes only one of them makes
+// the migration state unusable.
+func TestPermissiveServesBothPorts(t *testing.T) {
+	out, err := render(t, defaults("--set", "image.tag=dev",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.trustDomain=example.internal")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	var service string
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if docKind(doc) == "Service" && strings.Contains(docName(doc), "redirect") {
+			service = doc
+		}
+	}
+
+	if service == "" {
+		t.Fatal("no redirect Service rendered")
+	}
+
+	for _, port := range []string{"name: http", "name: https"} {
+		if !strings.Contains(service, port) {
+			t.Errorf("the Service does not carry %q, so one side of the migration is unreachable", port)
+		}
+	}
+}
