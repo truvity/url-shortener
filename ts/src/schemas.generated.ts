@@ -33,6 +33,11 @@ export const sharedSchemas: Record<string, object> = {
         "format": "uri",
         "description": "Override the API endpoint. Unset means the SDK's own resolution for the region."
       },
+      "ca": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Path to a certificate authority bundle the platform mounts, for a store whose endpoint is not signed by a public root. A store inside somebody's own network is the ordinary case, not the exotic one. Unset means the system trust store."
+      },
       "pathStyle": {
         "type": "boolean",
         "default": false,
@@ -142,37 +147,10 @@ export const sharedSchemas: Record<string, object> = {
         "minLength": 1,
         "description": "The server URL, for example nats://nats:4222."
       },
-      "credentialsFile": {
+      "tokenFile": {
         "type": "string",
         "minLength": 1,
-        "description": "Path to a credentials file the platform mounts. Unset means no authentication, which is a test configuration and not a deployment."
-      }
-    }
-  },
-  "https://github.com/truvity/policy/schemas/fragments/otel.json": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/truvity/policy/schemas/fragments/otel.json",
-    "title": "otel",
-    "description": "OpenTelemetry export. Absent means no export, which is a valid configuration and the default for a local run.",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "endpoint": {
-        "type": "string",
-        "format": "uri",
-        "description": "The collector's OTLP endpoint. Unset disables export."
-      },
-      "serviceName": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The service name reported with every span and metric. Defaults to the binary's name."
-      },
-      "sampleRatio": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 1,
-        "default": 1,
-        "description": "Head sampling ratio for traces."
+        "description": "Path to a file holding the token the client authenticates with, mounted by the platform and re-read on every reconnect so that a rotated token is picked up without a restart. It is the workload's own account token: the broker asks an authorisation service who the bearer is, and that service answers from the account rather than from anything the client claims. Unset means no authentication, which is a test configuration and not a deployment."
       }
     }
   },
@@ -238,9 +216,6 @@ export const sharedSchemas: Record<string, object> = {
       },
       "log": {
         "$ref": "https://github.com/truvity/policy/schemas/fragments/log.json"
-      },
-      "otel": {
-        "$ref": "https://github.com/truvity/policy/schemas/fragments/otel.json"
       }
     },
     "required": [

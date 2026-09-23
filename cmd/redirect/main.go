@@ -187,10 +187,11 @@ func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error
 }
 
 func connect(cfg config.NATS) (*nats.Conn, error) {
-	opts := []nats.Option{nats.Name("url-shortener-redirect")}
-	if cfg.CredentialsFile != "" {
-		opts = append(opts, nats.UserCredentials(cfg.CredentialsFile))
+	opts, err := runtime.NATSOptions("url-shortener-redirect", cfg.TokenFile)
+	if err != nil {
+		return nil, err
 	}
+
 	nc, err := nats.Connect(cfg.URL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("connect to the event stream: %w", err)

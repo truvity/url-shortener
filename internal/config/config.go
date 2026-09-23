@@ -44,8 +44,8 @@ type (
 
 	// NATS is a connection, and nothing about what is done with it.
 	NATS struct {
-		URL             string `json:"url"`
-		CredentialsFile string `json:"credentialsFile"`
+		URL       string `json:"url"`
+		TokenFile string `json:"tokenFile"`
 	}
 
 	// Consumer is what a durable consumer binds to.
@@ -53,13 +53,6 @@ type (
 		Stream  string `json:"stream"`
 		Durable string `json:"durable"`
 		Subject string `json:"subject"`
-	}
-
-	// OTel is where telemetry goes, if anywhere.
-	OTel struct {
-		Endpoint    string  `json:"endpoint"`
-		ServiceName string  `json:"serviceName"`
-		SampleRatio float64 `json:"sampleRatio"`
 	}
 
 	// Migrate is the migration job: no listener, no probes. A job that runs
@@ -76,7 +69,6 @@ type (
 		Listen   Listen   `json:"listen"`
 		Probes   Listen   `json:"probes"`
 		Log      Log      `json:"log"`
-		OTel     OTel     `json:"otel"`
 		Database Postgres `json:"database"`
 		Events   struct {
 			NATS            NATS   `json:"nats"`
@@ -90,7 +82,6 @@ type (
 		Listen   Listen   `json:"listen"`
 		Probes   Listen   `json:"probes"`
 		Log      Log      `json:"log"`
-		OTel     OTel     `json:"otel"`
 		Database Postgres `json:"database"`
 		Events   struct {
 			NATS     NATS     `json:"nats"`
