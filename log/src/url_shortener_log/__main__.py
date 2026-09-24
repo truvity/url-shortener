@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 import nats
 from nats.errors import TimeoutError as NATSTimeoutError
 from nats.js.api import AckPolicy, ConsumerConfig
-from truvity_policy import ConfigError
+from truvity_policy import ConfigError, telemetry
 
 from . import archive, config, runtime
 
@@ -67,7 +67,18 @@ def main() -> int:
         print(str(error), file=sys.stderr)  # noqa: T201 — as above
         return 1
 
-    return asyncio.run(run(cfg))
+    # Telemetry, from OpenTelemetry's own environment (decision 0006).
+    # With no endpoint configured the chart sets the exporters to `none`
+    # and this installs nothing, so a laptop and a cluster run the same
+    # code down the same path.
+    shutdown_telemetry = telemetry.start()
+    try:
+        return asyncio.run(run(cfg))
+    finally:
+        # Flush before the process goes. An archiver that dies with a
+        # buffer full of spans describing why is the one case the spans
+        # were for.
+        shutdown_telemetry()
 
 
 async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a composition root IS the wiring

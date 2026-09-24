@@ -10,6 +10,8 @@
  * no database credential — the whole of the ownership rule, seen from the
  * consuming side.
  */
+import { start as startTelemetry } from "@truvity/policy/telemetry";
+
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
@@ -37,7 +39,7 @@ function logLine(level: string, message: string, rest: Record<string, unknown> =
   );
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const path = argument() ?? process.env["CONFIG_FILE"];
   if (!path) {
     process.stderr.write("no configuration file: pass -config or set CONFIG_FILE\n");
@@ -53,6 +55,13 @@ function main(): void {
   }
 
   logLine("info", "starting", { component: "web", version: process.env["VERSION"] ?? "unknown" });
+
+  // Telemetry, from OpenTelemetry's own environment (decision 0006).
+  // With no endpoint configured the chart sets the exporters to `none`
+  // and this installs nothing, so a laptop and a cluster run the same
+  // code down the same path — which is the failure 0006 records, and it
+  // happened in a Node service exactly like this one.
+  const stopTelemetry = await startTelemetry();
 
   const urls = urlsClient(cfg.urls.address);
 
@@ -100,7 +109,10 @@ function main(): void {
       const finish = (): void => {
         if (--left === 0) {
           clearTimeout(done);
-          process.exit(0);
+          // Flush before the process goes. Spans describing a shutdown
+          // are the ones somebody is looking for when they ask why it
+          // shut down, and they are the first to be lost.
+          void stopTelemetry().finally(() => process.exit(0));
         }
       };
       app.close(finish);
@@ -154,4 +166,6 @@ async function serve(
   res.writeHead(404, { "content-type": "text/plain" }).end("not found");
 }
 
-main();
+// The entry is async because telemetry starts before anything serves: a
+// span lost during start-up is one describing the start-up.
+void main();

@@ -8,7 +8,11 @@ dependencies = [
     "boto3>=1.35",
     "nats-py>=2.9",
     "structlog>=24.4",
-    "truvity-policy",
+    # The loader, and the telemetry extra beside it. Telemetry is
+    # configured by OpenTelemetry's own environment (decision 0006); with
+    # no endpoint the chart sets the exporters to `none` and the starter
+    # installs nothing, so this carries no enable flag.
+    "truvity-policy[telemetry]",
 ]
 
 [dependency-groups]

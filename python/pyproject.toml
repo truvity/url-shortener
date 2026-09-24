@@ -13,6 +13,15 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+# Telemetry is an EXTRA, not a dependency. A service that reads a
+# configuration file should not be made to carry an OpenTelemetry SDK it
+# never starts -- and the loader is the part every consumer takes.
+[project.optional-dependencies]
+telemetry = [
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.18",

@@ -36,6 +36,13 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
+    // Telemetry, configured by OpenTelemetry's own environment (decision
+    // 0006). The starter reads those variables itself -- including
+    // OTEL_TRACES_EXPORTER=none, which is what a deployment with no
+    // endpoint sets -- so nothing here tests an enable flag, and the
+    // instrumentation for the web layer comes with it.
+    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.11.0")
+
     // The broker's own client.
     implementation("io.nats:jnats:2.23.0")
 
