@@ -248,3 +248,34 @@ rather than a resource one.
   value: "none"
 {{- end }}
 {{- end -}}
+
+{{/*
+The token a component authenticates to the broker with.
+
+A PROJECTED ServiceAccount token, which the pod cannot forge and which
+expires on its own — not a secret mounted from somewhere, and not a
+credential this chart or its values ever hold. The platform says which
+audience the broker demands; everything else follows from that.
+
+Empty audience renders nothing, which is a broker that admits anonymous
+clients. That is what a local one does, and what a laptop needs.
+*/}}
+{{- define "url-shortener.eventsTokenVolume" -}}
+{{- with .Values.events.auth.audience -}}
+- name: events-token
+  projected:
+    sources:
+      - serviceAccountToken:
+          audience: {{ . | quote }}
+          expirationSeconds: {{ $.Values.events.auth.expirationSeconds | default 3600 }}
+          path: token
+{{- end }}
+{{- end -}}
+
+{{- define "url-shortener.eventsTokenMount" -}}
+{{- with .Values.events.auth.audience -}}
+- name: events-token
+  mountPath: /var/run/events
+  readOnly: true
+{{- end }}
+{{- end -}}

@@ -42,6 +42,20 @@ events:
     stat: stat
     log: log
 
+  # The broker authenticates its clients, or it does not.
+  #
+  # An AUDIENCE, not a credential: the platform projects a ServiceAccount
+  # token for it, the pod cannot forge one, and nothing here is a secret
+  # to leak. Empty means the broker admits anonymous clients, which is
+  # what a local one does -- and what a laptop needs.
+  #
+  # A broker that authenticates and a client that does not send anything
+  # fails as `Authorization Violation` at connect time, which reads like
+  # a broken password rather than a missing mount.
+  auth:
+    audience: ""
+    expirationSeconds: 3600
+
 # Where the request archive goes.
 #
 # The vendor is not in here. An endpoint, a region and a path-style flag

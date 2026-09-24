@@ -57,6 +57,11 @@ data:
     events:
       nats:
         url: {{ .Values.events.url }}
+        {{- with .Values.events.auth.audience }}
+        {{- /* The broker authenticates its clients; the token is
+        a projected ServiceAccount token this pod cannot forge. */}}
+        tokenFile: /var/run/events/token
+        {{- end }}
       redirectSubject: {{ .Values.events.redirectSubject }}
       requestSubject: {{ .Values.events.requestSubject }}
 
@@ -172,6 +177,11 @@ data:
     events:
       nats:
         url: {{ .Values.events.url }}
+        {{- with .Values.events.auth.audience }}
+        {{- /* The broker authenticates its clients; the token is
+        a projected ServiceAccount token this pod cannot forge. */}}
+        tokenFile: /var/run/events/token
+        {{- end }}
       consumer:
         stream: {{ .Values.events.stream }}
         durable: {{ .Values.events.consumers.stat }}
@@ -225,6 +235,11 @@ data:
     events:
       nats:
         url: {{ .Values.events.url }}
+        {{- with .Values.events.auth.audience }}
+        {{- /* The broker authenticates its clients; the token is
+        a projected ServiceAccount token this pod cannot forge. */}}
+        tokenFile: /var/run/events/token
+        {{- end }}
       consumer:
         stream: {{ .Values.events.stream }}
         durable: {{ .Values.events.consumers.log }}

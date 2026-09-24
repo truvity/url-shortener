@@ -124,6 +124,19 @@
               "minLength": 1
             }
           }
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "audience": {
+              "type": "string"
+            },
+            "expirationSeconds": {
+              "type": "integer",
+              "minimum": 600
+            }
+          }
         }
       }
     },

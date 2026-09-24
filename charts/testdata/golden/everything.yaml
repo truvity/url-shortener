@@ -381,6 +381,7 @@ spec:
               sleep:
                 seconds: 7
           volumeMounts:
+            
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -393,6 +394,7 @@ spec:
               cpu: 33m
               memory: 333Mi
       volumes:
+        
         - name: config
           configMap:
             name: example-config
@@ -496,6 +498,7 @@ spec:
               sleep:
                 seconds: 7
           volumeMounts:
+            
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -508,6 +511,7 @@ spec:
               cpu: 11m
               memory: 111Mi
       volumes:
+        
         - name: config
           configMap:
             name: example-config
@@ -601,6 +605,7 @@ spec:
               sleep:
                 seconds: 7
           volumeMounts:
+            
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -613,6 +618,7 @@ spec:
               cpu: 22m
               memory: 222Mi
       volumes:
+        
         - name: config
           configMap:
             name: example-config
@@ -852,8 +858,11 @@ spec:
             type: PathPrefix
             value: /r/
       backendRefs:
-        - name: example-redirect
+        - group: ""
+          kind: Service
+          name: example-redirect
           port: 8080
+          weight: 1
 ---
 # Source: url-shortener/templates/serviceaccount.yaml
 apiVersion: v1
