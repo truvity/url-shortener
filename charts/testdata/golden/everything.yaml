@@ -342,7 +342,7 @@ spec:
               app.kubernetes.io/component: log
       containers:
         - name: log
-          image: registry.example.invalid/example/log@sha256:5555555555555555555555555555555555555555555555555555555555555555
+          image: example.io/shortener/log@sha256:5555555555555555555555555555555555555555555555555555555555555555
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/log.yaml"]
           env:
@@ -450,7 +450,7 @@ spec:
               app.kubernetes.io/component: redirect
       containers:
         - name: redirect
-          image: registry.example.invalid/example/redirect@sha256:2222222222222222222222222222222222222222222222222222222222222222
+          image: example.io/shortener/redirect@sha256:2222222222222222222222222222222222222222222222222222222222222222
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
@@ -554,7 +554,7 @@ spec:
               app.kubernetes.io/component: stat
       containers:
         - name: stat
-          image: registry.example.invalid/example/stat@sha256:4444444444444444444444444444444444444444444444444444444444444444
+          image: example.io/shortener/stat@sha256:4444444444444444444444444444444444444444444444444444444444444444
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/stat.yaml"]
           env:
@@ -649,7 +649,7 @@ spec:
               app.kubernetes.io/component: urls
       containers:
         - name: urls
-          image: registry.example.invalid/example/urls@sha256:3333333333333333333333333333333333333333333333333333333333333333
+          image: example.io/shortener/urls@sha256:3333333333333333333333333333333333333333333333333333333333333333
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
@@ -747,7 +747,7 @@ spec:
               app.kubernetes.io/component: web
       containers:
         - name: web
-          image: registry.example.invalid/example/web@sha256:6666666666666666666666666666666666666666666666666666666666666666
+          image: example.io/shortener/web@sha256:6666666666666666666666666666666666666666666666666666666666666666
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/web.yaml"]
           ports:
@@ -887,7 +887,7 @@ spec:
         fsGroup: 9012
       containers:
         - name: migrate
-          image: registry.example.invalid/example/migrate@sha256:1111111111111111111111111111111111111111111111111111111111111111
+          image: example.io/shortener/migrate@sha256:1111111111111111111111111111111111111111111111111111111111111111
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:

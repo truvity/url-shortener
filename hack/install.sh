@@ -37,6 +37,19 @@ IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-kind.local}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-Never}
 
+# One entry per component, because that is the shape a release stamps into
+# (helmctl merges a manifest of what the build pushed, and refuses to
+# publish a chart where any digest is empty). A local install has no
+# digests and says so by setting tags instead.
+IMAGE_ARGS=()
+for component in migrate redirect urls stat log web; do
+    IMAGE_ARGS+=(
+        --set "images.${component}.registry=${IMAGE_REPOSITORY}"
+        --set "images.${component}.repository=${component}"
+        --set "images.${component}.tag=${IMAGE_TAG}"
+    )
+done
+
 # Anything else the caller wants to set, as helm arguments. A real cluster
 # needs values a local one does not — a storage class, a bucket somebody
 # provisioned, an account annotation — and they belong to whoever is
@@ -116,9 +129,8 @@ echo "==> the application"
 # shellcheck disable=SC2086 # EXTRA is deliberately word-split: it is a list
 # of helm arguments, and quoting it would pass them as one.
 helm upgrade --install "$APP" "$CHARTS/url-shortener" -n "$NS" \
-    --set image.repository="$IMAGE_REPOSITORY" \
-    --set image.tag="$IMAGE_TAG" \
-    --set image.pullPolicy="$IMAGE_PULL_POLICY" \
+    "${IMAGE_ARGS[@]}" \
+    --set pullPolicy="$IMAGE_PULL_POLICY" \
     $LOCAL_STORE_ARGS $EXTRA \
     --set "database.host=${INFRA}-pg-rw" \
     --set "database.owner.passwordSecret=${INFRA}-pg-app" \

@@ -44,7 +44,7 @@ spec:
       containers:
         - name: redirect
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "redirect") }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
             {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}

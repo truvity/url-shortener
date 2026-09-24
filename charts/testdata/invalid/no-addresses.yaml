@@ -1,5 +1,3 @@
 # The addresses are required, because the chart cannot derive them: the
 # database and the stream belong to a different release with a different
 # lifetime. Better a refusal than an install pointed at an empty host.
-image:
-  tag: dev

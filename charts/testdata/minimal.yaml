@@ -14,5 +14,6 @@ events:
 archive:
   bucket:
     name: archive
-image:
-  tag: dev
+# Nothing stamped and no tag: what a `helm install` from a checkout gets,
+# and the case a published chart never reaches because its release refuses
+# to package without digests.

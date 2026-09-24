@@ -1,7 +1,5 @@
 # A route with no parent attaches to nothing, renders as healthy with zero
 # attached routes, and answers 404 with no explanation.
-image:
-  tag: dev
 route:
   enabled: true
 database:

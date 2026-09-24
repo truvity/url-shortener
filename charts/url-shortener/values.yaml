@@ -80,28 +80,33 @@ archive:
     maxRecords: 500
     maxSeconds: 60
 
-image:
-  repository: ghcr.io/truvity/policy/url-shortener
-  # A digest PER COMPONENT, for a deployment that wants one. A tag can move
-  # and a digest cannot, so an image pinned here is one a rollback can
-  # actually reach.
-  #
-  # EMPTY BY DEFAULT, and the chart then uses its own appVersion. The
-  # release does not stamp these: it publishes the charts and the images in
-  # the same run, and a digest only exists once the image is built. A chart
-  # that refused to render without one would be a chart nobody could install
-  # from the registry it was published to — which is exactly how it was
-  # found, by installing it.
-  #
-  # Per component because they are different images. One digest shared by all
-  # six would deploy the same container six times, each named as though it
-  # were something else — and every render would look correct.
-  digests: {}
-  # An explicit tag, for a deployment that wants one. Unset, the chart uses
-  # its own appVersion -- the version the release stamped, which is the one
-  # thing a published chart always knows about the images built beside it.
-  tag: ""
-  pullPolicy: IfNotPresent
+# Where each component's image is.
+#
+# ONE ENTRY PER COMPONENT, and four fields rather than one string, because
+# that is the shape a release stamps into: the build writes a manifest of
+# what it just pushed, `helmctl package --manifest` merges it here, and
+# `--require-image-digests` refuses to publish a chart where any entry's
+# digest is still empty.
+#
+# That last part is why the shape is not a matter of taste. The check reads
+# THIS map and nothing else, so a chart that spelled its images another way
+# would pass it with nothing to check — and publish mutable references
+# under a flag saying it had not. The first version of this chart did
+# exactly that, and the first install of it failed on an image nobody had
+# stamped.
+#
+# Unstamped, the chart falls back to its own appVersion, which is what a
+# `helm install` from a checkout gets. A published chart always carries
+# digests.
+images:
+  migrate: {registry: ghcr.io, repository: truvity/policy/url-shortener/migrate, tag: "", digest: ""}
+  redirect: {registry: ghcr.io, repository: truvity/policy/url-shortener/redirect, tag: "", digest: ""}
+  urls: {registry: ghcr.io, repository: truvity/policy/url-shortener/urls, tag: "", digest: ""}
+  stat: {registry: ghcr.io, repository: truvity/policy/url-shortener/stat, tag: "", digest: ""}
+  log: {registry: ghcr.io, repository: truvity/policy/url-shortener/log, tag: "", digest: ""}
+  web: {registry: ghcr.io, repository: truvity/policy/url-shortener/web, tag: "", digest: ""}
+
+pullPolicy: IfNotPresent
 
 log:
   level: info

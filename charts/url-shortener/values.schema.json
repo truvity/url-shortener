@@ -7,12 +7,12 @@
   "required": [
     "database",
     "events",
-    "image",
     "log",
     "replicas",
     "resources",
     "route",
-    "archive"
+    "archive",
+    "images"
   ],
   "properties": {
     "database": {
@@ -186,38 +186,6 @@
               "minimum": 1
             }
           }
-        }
-      }
-    },
-    "image": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "repository",
-        "pullPolicy"
-      ],
-      "properties": {
-        "repository": {
-          "type": "string",
-          "minLength": 1
-        },
-        "tag": {
-          "type": "string"
-        },
-        "pullPolicy": {
-          "enum": [
-            "Always",
-            "IfNotPresent",
-            "Never"
-          ]
-        },
-        "digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^sha256:[0-9a-f]{64}$"
-          },
-          "description": "One digest per component, keyed by component name. They are different images; a shared digest would deploy the same container under six names."
         }
       }
     },
@@ -493,6 +461,171 @@
           "minimum": 0
         }
       }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "migrate",
+        "redirect",
+        "urls",
+        "stat",
+        "log",
+        "web"
+      ],
+      "properties": {
+        "migrate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "redirect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "urls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "stat": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "web": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "pullPolicy": {
+      "enum": [
+        "Always",
+        "IfNotPresent",
+        "Never"
+      ]
     }
   }
 }

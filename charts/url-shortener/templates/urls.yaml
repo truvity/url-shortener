@@ -44,7 +44,7 @@ spec:
       containers:
         - name: urls
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "urls") }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
             {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}

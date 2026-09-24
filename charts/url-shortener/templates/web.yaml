@@ -38,7 +38,7 @@ spec:
       containers:
         - name: web
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "web") }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/web.yaml"]
           ports:
             - name: http

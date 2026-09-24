@@ -1,8 +1,6 @@
 # The typo case. Every strict schema needs this fixture: it is the failure
 # the strictness exists for, and a schema that stopped being strict would
 # otherwise go unnoticed.
-image:
-  tag: dev
 databse:
   name: url_shortener
 database:

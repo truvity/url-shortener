@@ -30,24 +30,22 @@ perfectly happy to repeat a digest and the chart's own tests only validated
 the configuration files.
 */}}
 {{- define "url-shortener.image" -}}
-{{- $i := .Values.image -}}
-{{- $digest := get (default dict $i.digests) .component -}}
-{{- if $digest -}}
-{{ $i.repository }}/{{ .component }}@{{ $digest }}
+{{- $i := index .root.Values.images .component -}}
+{{- $ref := printf "%s/%s" $i.registry $i.repository -}}
+{{- if $i.digest -}}
+{{ $ref }}@{{ $i.digest }}
 {{- else if $i.tag -}}
-{{ $i.repository }}/{{ .component }}:{{ $i.tag }}
+{{ $ref }}:{{ $i.tag }}
 {{- else if .root.Chart.AppVersion -}}
 {{- /*
-The release's own version, which is the one thing a published chart always
-knows about the images built beside it. It is a TAG, and a tag can move --
-but a release tag in this repository does not, and a chart that refused to
-install without a digest is a chart nobody can install from the registry it
-was published to. A deployment that wants the stronger guarantee sets
-image.digests and gets it.
+Nothing stamped, so the chart's own version — which is what a `helm
+install` from a checkout gets, and the one thing such a chart knows about
+the images built beside it. A PUBLISHED chart never reaches this branch:
+its release refuses to package without a digest per entry.
 */ -}}
-{{ $i.repository }}/{{ .component }}:{{ .root.Chart.AppVersion }}
+{{ $ref }}:{{ .root.Chart.AppVersion }}
 {{- else -}}
-{{ fail (printf "no image for %s: set image.digests.%s, image.tag, or publish this chart with an appVersion" .component .component) }}
+{{ fail (printf "no image for %s: set images.%s.digest, images.%s.tag, or publish this chart with an appVersion" .component .component .component) }}
 {{- end -}}
 {{- end -}}
 

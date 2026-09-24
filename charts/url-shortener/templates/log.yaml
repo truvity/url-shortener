@@ -41,7 +41,7 @@ spec:
       containers:
         - name: log
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "log") }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/log.yaml"]
           {{- with .Values.archive.bucket.credentialsSecret }}
           env:

@@ -160,7 +160,7 @@ func TestNeitherChartRendersTheOthersKinds(t *testing.T) {
 	infrastructure := map[string]bool{"Cluster": true, "Stream": true, "Consumer": true, "Bucket": true}
 	running := map[string]bool{"Deployment": true, "StatefulSet": true, "DaemonSet": true, "CronJob": true}
 
-	app, err := render(t, defaults("--set", "image.tag=dev")...)
+	app, err := render(t, defaults()...)
 	if err != nil {
 		t.Fatalf("the application chart does not render: %v\n%s", err, app)
 	}

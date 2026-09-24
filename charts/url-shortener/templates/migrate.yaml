@@ -28,7 +28,7 @@ spec:
       containers:
         - name: migrate
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "migrate") }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
             {{- include "url-shortener.passwordEnv" .Values.database.owner | nindent 12 }}

@@ -91,7 +91,7 @@ func render(t *testing.T, args ...string) (string, error) {
 // keeps setting a key the binary stopped reading, and the service runs on a
 // default nobody chose, with no signal but behaviour.
 func TestWhatTheChartRendersIsWhatTheBinariesAccept(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
@@ -134,12 +134,12 @@ func rendered() []struct {
 // Different values, so a different chance to be wrong.
 func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 	out, err := render(t, defaults(
-		"--set", "image.digests.migrate=sha256:1111111111111111111111111111111111111111111111111111111111111111",
-		"--set", "image.digests.redirect=sha256:2222222222222222222222222222222222222222222222222222222222222222",
-		"--set", "image.digests.urls=sha256:3333333333333333333333333333333333333333333333333333333333333333",
-		"--set", "image.digests.stat=sha256:4444444444444444444444444444444444444444444444444444444444444444",
-		"--set", "image.digests.log=sha256:5555555555555555555555555555555555555555555555555555555555555555",
-		"--set", "image.digests.web=sha256:6666666666666666666666666666666666666666666666666666666666666666",
+		"--set", "images.migrate.digest=sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		"--set", "images.redirect.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+		"--set", "images.urls.digest=sha256:3333333333333333333333333333333333333333333333333333333333333333",
+		"--set", "images.stat.digest=sha256:4444444444444444444444444444444444444444444444444444444444444444",
+		"--set", "images.log.digest=sha256:5555555555555555555555555555555555555555555555555555555555555555",
+		"--set", "images.web.digest=sha256:6666666666666666666666666666666666666666666666666666666666666666",
 	)...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
@@ -263,12 +263,12 @@ func TestAPublishedChartRendersWithNoImageValues(t *testing.T) {
 // argument for having one.
 func TestEveryComponentGetsItsOwnImage(t *testing.T) {
 	out, err := render(t, defaults(
-		"--set", "image.digests.migrate=sha256:1111111111111111111111111111111111111111111111111111111111111111",
-		"--set", "image.digests.redirect=sha256:2222222222222222222222222222222222222222222222222222222222222222",
-		"--set", "image.digests.urls=sha256:3333333333333333333333333333333333333333333333333333333333333333",
-		"--set", "image.digests.stat=sha256:4444444444444444444444444444444444444444444444444444444444444444",
-		"--set", "image.digests.log=sha256:5555555555555555555555555555555555555555555555555555555555555555",
-		"--set", "image.digests.web=sha256:6666666666666666666666666666666666666666666666666666666666666666",
+		"--set", "images.migrate.digest=sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		"--set", "images.redirect.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+		"--set", "images.urls.digest=sha256:3333333333333333333333333333333333333333333333333333333333333333",
+		"--set", "images.stat.digest=sha256:4444444444444444444444444444444444444444444444444444444444444444",
+		"--set", "images.log.digest=sha256:5555555555555555555555555555555555555555555555555555555555555555",
+		"--set", "images.web.digest=sha256:6666666666666666666666666666666666666666666666666666666666666666",
 	)...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
@@ -296,7 +296,7 @@ func TestEveryComponentGetsItsOwnImage(t *testing.T) {
 // ConfigMap, printed when somebody debugs a deployment, and committed as a
 // fixture; it must survive all three being true.
 func TestNoSecretIsRendered(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestEveryRefusalRefuses(t *testing.T) {
 // promised to the platform. A rename on one side is a pod that never becomes
 // ready, or worse, one that is restarted while healthy.
 func TestProbesUseTheContractPaths(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestProbesUseTheContractPaths(t *testing.T) {
 // handed both the owner's password would look correct in every other test
 // here while giving the request path the right to drop a table.
 func TestTheMigrationAndTheServicesUseDifferentCredentials(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -412,7 +412,7 @@ func TestTheMigrationAndTheServicesUseDifferentCredentials(t *testing.T) {
 // must agree. This is the only place it can be checked: it is a property of
 // what is rendered, not of what runs.
 func TestARolloutHasNoGap(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -450,7 +450,7 @@ func TestARolloutHasNoGap(t *testing.T) {
 // succeeded. The failure looks like a network fault and is attributed to
 // anything but the deploy.
 func TestTheGracePeriodOutlastsTheDrain(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev",
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
 		"--set", "drain.seconds=30", "--set", "drain.preStopSeconds=7")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
@@ -491,7 +491,7 @@ func TestTheGracePeriodOutlastsTheDrain(t *testing.T) {
 // it. An unauthenticated route that renders correctly is the failure this
 // test exists to make impossible.
 func TestEveryRouteRuleIsNamed(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev",
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
 		"--set", "route.enabled=true", "--set", "route.parentRef.name=gw")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
@@ -535,7 +535,7 @@ func TestEveryRouteRuleIsNamed(t *testing.T) {
 // The chart grants nothing; it names an account. Every workload runs as it,
 // so that a platform binding rights to that account binds them once.
 func TestEveryWorkloadNamesTheAccount(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -574,7 +574,7 @@ func docName(doc string) string {
 // reason they do not share a database credential: the migration's rights
 // create and grant, and nothing on the request path should have them.
 func TestTheMigrationAndTheServicesUseDifferentAccounts(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -621,7 +621,7 @@ func TestTheMigrationAndTheServicesUseDifferentAccounts(t *testing.T) {
 // times here — a database, a configuration map, and an account — and each
 // time the symptom was a hook that hung rather than an error naming a cause.
 func TestWhatTheMigrationHookNeedsIsAlsoAHook(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -699,7 +699,7 @@ func docKind(doc string) string {
 // something nobody serves. A golden would catch it eventually; this says so
 // directly, and names what leaked.
 func TestTransportOffLeavesNoTrace(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -720,7 +720,7 @@ func TestTransportOffLeavesNoTrace(t *testing.T) {
 // Turned on, each of those appears — otherwise the test above passes because
 // the feature does not work at all.
 func TestTransportOnRendersWhatThePlatformNeeds(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev",
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
 		"--set", "tls.mode=strict",
 		"--set", "tls.trustDomain=example.internal",
 		"--set", "tls.peers.redirect[0].namespace=shop",
@@ -760,7 +760,7 @@ func TestTransportOnWithNoPeersIsStillValid(t *testing.T) {
 	for _, mode := range []string{"permissive", "strict"} {
 		t.Run(mode, func(t *testing.T) {
 			out, err := render(t, defaults(
-				"--set", "image.tag=dev",
+				"--set", "images.web.tag=dev",
 				"--set", "tls.mode="+mode,
 				"--set", "tls.trustDomain=example.test",
 			)...)
@@ -783,7 +783,7 @@ func TestTransportOnWithNoPeersIsStillValid(t *testing.T) {
 }
 
 func TestTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev", "--set", "tls.mode=strict")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "tls.mode=strict")...)
 	if err == nil {
 		t.Fatalf("a render with no trust domain was accepted:\n%s", out)
 	}
@@ -797,7 +797,7 @@ func TestTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
 // listener cannot be both, and a Service that exposes only one of them makes
 // the migration state unusable.
 func TestPermissiveServesBothPorts(t *testing.T) {
-	out, err := render(t, defaults("--set", "image.tag=dev",
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
 		"--set", "tls.mode=permissive",
 		"--set", "tls.trustDomain=example.internal")...)
 	if err != nil {

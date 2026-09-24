@@ -253,7 +253,7 @@ spec:
               app.kubernetes.io/component: log
       containers:
         - name: log
-          image: ghcr.io/truvity/policy/url-shortener/log:dev
+          image: ghcr.io/truvity/policy/url-shortener/log:0.0.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/etc/url-shortener/log.yaml"]
           ports:
@@ -340,7 +340,7 @@ spec:
               app.kubernetes.io/component: redirect
       containers:
         - name: redirect
-          image: ghcr.io/truvity/policy/url-shortener/redirect:dev
+          image: ghcr.io/truvity/policy/url-shortener/redirect:0.0.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
@@ -434,7 +434,7 @@ spec:
               app.kubernetes.io/component: stat
       containers:
         - name: stat
-          image: ghcr.io/truvity/policy/url-shortener/stat:dev
+          image: ghcr.io/truvity/policy/url-shortener/stat:0.0.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/etc/url-shortener/stat.yaml"]
           env:
@@ -522,7 +522,7 @@ spec:
               app.kubernetes.io/component: urls
       containers:
         - name: urls
-          image: ghcr.io/truvity/policy/url-shortener/urls:dev
+          image: ghcr.io/truvity/policy/url-shortener/urls:0.0.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
@@ -611,7 +611,7 @@ spec:
               app.kubernetes.io/component: web
       containers:
         - name: web
-          image: ghcr.io/truvity/policy/url-shortener/web:dev
+          image: ghcr.io/truvity/policy/url-shortener/web:0.0.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/etc/url-shortener/web.yaml"]
           ports:
@@ -715,7 +715,7 @@ spec:
         fsGroup: 65532
       containers:
         - name: migrate
-          image: ghcr.io/truvity/policy/url-shortener/migrate:dev
+          image: ghcr.io/truvity/policy/url-shortener/migrate:0.0.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
