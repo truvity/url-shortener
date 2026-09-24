@@ -21,15 +21,23 @@ own UI expects.
 A digest when there is one, and a tag only when there is not. An image that
 can move under a running deployment is one nobody can roll back to, so the
 release stamps a digest and this template prefers it.
+
+ONE DIGEST PER COMPONENT. This chart deploys six of them, and they are six
+different images — a single `image.digest` for all of them would deploy the
+same container six times, each under a name suggesting otherwise. It read
+that way until a real cluster was in front of it, because a render is
+perfectly happy to repeat a digest and the chart's own tests only validated
+the configuration files.
 */}}
 {{- define "url-shortener.image" -}}
 {{- $i := .Values.image -}}
-{{- if $i.digest -}}
-{{ $i.repository }}/{{ .component }}@{{ $i.digest }}
+{{- $digest := get (default dict $i.digests) .component -}}
+{{- if $digest -}}
+{{ $i.repository }}/{{ .component }}@{{ $digest }}
 {{- else if $i.tag -}}
 {{ $i.repository }}/{{ .component }}:{{ $i.tag }}
 {{- else -}}
-{{ fail "image.digest or image.tag must be set: an image reference with neither is not a deployable thing" }}
+{{ fail (printf "no image for %s: set image.digests.%s (what a release stamps) or image.tag" .component .component) }}
 {{- end -}}
 {{- end -}}
 

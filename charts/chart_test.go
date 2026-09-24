@@ -133,7 +133,12 @@ func rendered() []struct {
 // Different values, so a different chance to be wrong.
 func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 	out, err := render(t, defaults(
-		"--set", "image.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000",
+		"--set", "image.digests.migrate=sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		"--set", "image.digests.redirect=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+		"--set", "image.digests.urls=sha256:3333333333333333333333333333333333333333333333333333333333333333",
+		"--set", "image.digests.stat=sha256:4444444444444444444444444444444444444444444444444444444444444444",
+		"--set", "image.digests.log=sha256:5555555555555555555555555555555555555555555555555555555555555555",
+		"--set", "image.digests.web=sha256:6666666666666666666666666666666666666666666666666666666666666666",
 	)...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
@@ -208,6 +213,46 @@ func firstDifference(want, got string) string {
 		}
 	}
 	return "  (the files differ only in length)"
+}
+
+// Six components are six DIFFERENT images.
+//
+// The chart used to take one `image.digest` and apply it to all of them,
+// which renders perfectly and deploys the same container six times, each
+// under a name suggesting otherwise. Nothing caught it: a render repeats a
+// digest happily, and the configuration tests only read the ConfigMap.
+//
+// It took a real cluster to make the question come up at all, which is the
+// argument for having one.
+func TestEveryComponentGetsItsOwnImage(t *testing.T) {
+	out, err := render(t, defaults(
+		"--set", "image.digests.migrate=sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		"--set", "image.digests.redirect=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+		"--set", "image.digests.urls=sha256:3333333333333333333333333333333333333333333333333333333333333333",
+		"--set", "image.digests.stat=sha256:4444444444444444444444444444444444444444444444444444444444444444",
+		"--set", "image.digests.log=sha256:5555555555555555555555555555555555555555555555555555555555555555",
+		"--set", "image.digests.web=sha256:6666666666666666666666666666666666666666666666666666666666666666",
+	)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	seen := map[string]string{}
+	for _, line := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "image: ") {
+			continue
+		}
+		ref := strings.TrimPrefix(trimmed, "image: ")
+		digest := ref[strings.Index(ref, "@")+1:]
+		if previous, ok := seen[digest]; ok && previous != ref {
+			t.Errorf("two components share the digest %s:\n  %s\n  %s", digest, previous, ref)
+		}
+		seen[digest] = ref
+	}
+	if len(seen) < 6 {
+		t.Errorf("expected six distinct images, found %d: %v", len(seen), seen)
+	}
 }
 
 // No secret is ever rendered. A configuration file is mounted from a

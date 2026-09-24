@@ -82,9 +82,14 @@ archive:
 
 image:
   repository: ghcr.io/truvity/policy/url-shortener
-  # The release stamps a digest here. A tag is a moving target, and an image
-  # that can move under a running deployment is one nobody can roll back to.
-  digest: ""
+  # The release stamps a digest PER COMPONENT here. A tag is a moving target,
+  # and an image that can move under a running deployment is one nobody can
+  # roll back to.
+  #
+  # Per component because they are different images. One digest shared by all
+  # six would deploy the same container six times, each named as though it
+  # were something else — and every render would look correct.
+  digests: {}
   tag: ""
   pullPolicy: IfNotPresent
 

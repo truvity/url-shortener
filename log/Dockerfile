@@ -22,7 +22,13 @@
 FROM cgr.dev/chainguard/python:latest
 
 # Installed, not built. See above.
-COPY build/site-packages /app
+#
+# TARGETARCH is set by the builder for each platform it is producing, and the
+# build script laid down one tree per architecture — so a multi-architecture
+# image is assembled by COPYING the right one, with nothing executing and no
+# emulation anywhere.
+ARG TARGETARCH
+COPY build/site-packages-$TARGETARCH /app
 
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \

@@ -1,4 +1,9 @@
 # Only what the build produced belongs in the context. The sources are
 # already inside the wheels.
+#
+# One tree per architecture, so the pattern has to match all of them — the
+# earlier `!build/site-packages` stopped matching the moment the build became
+# multi-architecture, and the failure is a checksum error naming a path that
+# is plainly on disk.
 *
-!build/site-packages
+!build/site-packages-*

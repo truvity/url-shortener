@@ -201,9 +201,6 @@
           "type": "string",
           "minLength": 1
         },
-        "digest": {
-          "type": "string"
-        },
         "tag": {
           "type": "string"
         },
@@ -213,6 +210,14 @@
             "IfNotPresent",
             "Never"
           ]
+        },
+        "digests": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "description": "One digest per component, keyed by component name. They are different images; a shared digest would deploy the same container under six names."
         }
       }
     },

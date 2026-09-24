@@ -25,6 +25,24 @@ helm() { command helm --kube-context "$KCTX" "$@"; }
 NS=${NS:-shortener}
 INFRA=${INFRA:-infra}
 APP=${APP:-example}
+
+# Where the images come from, and how they are named.
+#
+# The local box loads them into the node and never pulls, so `kind.local` and
+# `latest` are right there and wrong anywhere else. A real cluster pulls from
+# a registry, by a version somebody released. Both are values because the
+# difference between a local run and a real one should be arguments rather
+# than a second script.
+IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-kind.local}
+IMAGE_TAG=${IMAGE_TAG:-latest}
+IMAGE_PULL_POLICY=${IMAGE_PULL_POLICY:-Never}
+
+# Anything else the caller wants to set, as helm arguments. A real cluster
+# needs values a local one does not — a storage class, a bucket somebody
+# provisioned, an account annotation — and they belong to whoever is
+# installing rather than to this script.
+EXTRA=${EXTRA:-}
+
 CHARTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../charts" && pwd)"
 
 # The secret holding the runtime role's password. Neither chart generates it:
@@ -40,16 +58,36 @@ RUNTIME_SECRET="${INFRA}-pg-runtime"
 BUCKET="${BUCKET:-url-shortener-archive}"
 BUCKET_SECRET="${INFRA}-archive"
 
+# Where the local store is, when there is one. On a real cluster the bucket
+# is reached by the SDK's own resolution and the workload's own identity, so
+# none of this is set — which is the bucket fragment's documented default.
+LOCAL_STORE_ARGS=""
+if kubectl get namespace object-store >/dev/null 2>&1; then
+    LOCAL_STORE_ARGS="--set archive.bucket.endpoint=http://s3.object-store.svc:4566"
+    LOCAL_STORE_ARGS="$LOCAL_STORE_ARGS --set archive.bucket.region=us-east-1"
+    LOCAL_STORE_ARGS="$LOCAL_STORE_ARGS --set archive.bucket.pathStyle=true"
+    LOCAL_STORE_ARGS="$LOCAL_STORE_ARGS --set archive.bucket.credentialsSecret=$BUCKET_SECRET"
+fi
+
 kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
 
-echo "==> the archive's bucket"
-kubectl -n object-store exec deploy/s3 -- awslocal s3 mb "s3://$BUCKET" >/dev/null 2>&1 || true
+# The local box runs its own object store and this creates the bucket in it.
+# A real cluster's bucket was provisioned by whoever owns the account, which
+# is the store rule the platform contract states: a service does not create
+# its own store, and neither does its installer.
+if kubectl get namespace object-store >/dev/null 2>&1; then
+    echo "==> the archive's bucket, in the local store"
+    kubectl -n object-store exec deploy/s3 -- awslocal s3 mb "s3://$BUCKET" >/dev/null 2>&1 || true
+else
+    echo "==> no local object store: expecting $BUCKET to exist already"
+fi
 
-if ! kubectl -n "$NS" get secret "$BUCKET_SECRET" >/dev/null 2>&1; then
-    # The local store accepts anything; a real one would not, and the shape
-    # is the same either way — the chart takes the NAME of a secret, the
-    # configuration file takes the NAMES of two variables, and no value
-    # appears in anything that is rendered or committed.
+# Static credentials for the LOCAL store only. A real cluster gives its
+# workloads an identity instead, and the configuration's `credentialsEnv`
+# stays unset — which is the better answer and the one the bucket fragment
+# documents, because an ambient credential leaves nothing to leak.
+if kubectl get namespace object-store >/dev/null 2>&1 &&
+    ! kubectl -n "$NS" get secret "$BUCKET_SECRET" >/dev/null 2>&1; then
     kubectl -n "$NS" create secret generic "$BUCKET_SECRET" \
         --from-literal=accessKeyID=test \
         --from-literal=secretAccessKey=test
@@ -75,19 +113,18 @@ kubectl -n "$NS" wait "cluster/${INFRA}-pg" --for=condition=Ready --timeout=6m
 kubectl -n "$NS" wait "stream/${INFRA}-events" --for=condition=Ready --timeout=3m
 
 echo "==> the application"
+# shellcheck disable=SC2086 # EXTRA is deliberately word-split: it is a list
+# of helm arguments, and quoting it would pass them as one.
 helm upgrade --install "$APP" "$CHARTS/url-shortener" -n "$NS" \
-    --set image.repository="${IMAGE_REPOSITORY:-kind.local}" \
-    --set image.tag="${IMAGE_TAG:-latest}" \
-    --set image.pullPolicy="${IMAGE_PULL_POLICY:-Never}" \
+    --set image.repository="$IMAGE_REPOSITORY" \
+    --set image.tag="$IMAGE_TAG" \
+    --set image.pullPolicy="$IMAGE_PULL_POLICY" \
+    $LOCAL_STORE_ARGS $EXTRA \
     --set "database.host=${INFRA}-pg-rw" \
     --set "database.owner.passwordSecret=${INFRA}-pg-app" \
     --set "database.app.passwordSecret=$RUNTIME_SECRET" \
     --set events.url=nats://nats.nats.svc:4222 \
     --set "archive.bucket.name=$BUCKET" \
-    --set archive.bucket.endpoint=http://s3.object-store.svc:4566 \
-    --set archive.bucket.region=us-east-1 \
-    --set archive.bucket.pathStyle=true \
-    --set "archive.bucket.credentialsSecret=$BUCKET_SECRET" \
     --set archive.batch.maxRecords=5 \
     --set archive.batch.maxSeconds=5 \
     --wait --timeout 8m
