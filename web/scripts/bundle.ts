@@ -20,6 +20,12 @@ await build({
   bundle: true,
   platform: "node",
   format: "esm",
+  // The line the IMAGE runs, which is not the line this script runs on.
+  // `yarn <script>` executes under yarn's own Node — the package set pulls
+  // one in beside the declared one — so the target is stated here rather
+  // than inherited from whatever is executing. It is the same distinction
+  // as a build tool's own runtime versus the one it compiles for, met for
+  // the third time in a third ecosystem.
   target: "node26",
   outfile: "dist/server/main.js",
   // Bundled, not marked external: the point is an image with nothing in it

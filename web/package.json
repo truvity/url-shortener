@@ -5,9 +5,6 @@
   "description": "The front end: list what the URL service owns, and add to it.",
   "license": "MIT",
   "type": "module",
-  "engines": {
-    "node": ">=26"
-  },
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "build": "vite build && node scripts/bundle.ts",
