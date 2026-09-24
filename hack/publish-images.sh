@@ -15,6 +15,11 @@
 # install and then never start.
 #
 # Prints one `component=digest` line per image, which is what a caller pins.
+#
+# `DRY_RUN=1` builds every image for every architecture and pushes nothing,
+# so the whole path can be run before a tag rather than by one. Release
+# machinery that can only be tested by tagging is tested the one way that
+# costs a version.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -24,6 +29,19 @@ VERSION=${VERSION:?set VERSION, e.g. 0.2.0}
 PLATFORMS=${PLATFORMS:-linux/amd64,linux/arm64}
 ARCHES=${ARCHES:-amd64 arm64}
 BUILDER=${BUILDER:-policy-multiarch}
+DRY_RUN=${DRY_RUN:-}
+
+# What a build does with its result: push it, or keep it as a local OCI
+# layout and report a placeholder digest.
+if [ -n "$DRY_RUN" ]; then
+    out="$(mktemp -d)"
+    push() { echo "--output" "type=oci,dest=$out/$1.tar"; }
+    ko_push=--push=false
+    digest_of() { echo "dry-run"; }
+else
+    push() { echo "--push"; }
+    ko_push=--push=true
+fi
 
 # A container-driver builder, because the default one cannot produce an image
 # for a platform it is not running on even when nothing in the build
@@ -31,33 +49,35 @@ BUILDER=${BUILDER:-policy-multiarch}
 docker buildx inspect "$BUILDER" >/dev/null 2>&1 ||
     docker buildx create --name "$BUILDER" --driver docker-container >/dev/null
 
-digest_of() {
-    docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' 2>/dev/null |
-        python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])'
-}
+if [ -z "$DRY_RUN" ]; then
+    digest_of() {
+        docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' 2>/dev/null |
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])'
+    }
+fi
 
 echo "==> the Go components" >&2
 export KO_DOCKER_REPO="$REPOSITORY"
 for component in migrate redirect urls; do
-    ko build -B --platform "$PLATFORMS" --tags "$VERSION" "./cmd/$component" >/dev/null
+    ko build -B "$ko_push" --platform "$PLATFORMS" --tags "$VERSION" "./cmd/$component" >/dev/null
     echo "$component=$(digest_of "$REPOSITORY/$component:$VERSION")"
 done
 
 echo "==> the Python component" >&2
 ARCHES="$ARCHES" bash log/hack/build.sh >&2
 docker buildx build --builder "$BUILDER" --platform "$PLATFORMS" \
-    --tag "$REPOSITORY/log:$VERSION" --push log >&2
+    --tag "$REPOSITORY/log:$VERSION" $(push log) log >&2
 echo "log=$(digest_of "$REPOSITORY/log:$VERSION")"
 
 echo "==> the Kotlin component" >&2
 ( cd stat && gradle bootJar --console=plain --quiet ) >&2
 docker buildx build --builder "$BUILDER" --platform "$PLATFORMS" \
-    --tag "$REPOSITORY/stat:$VERSION" --push stat >&2
+    --tag "$REPOSITORY/stat:$VERSION" $(push stat) stat >&2
 echo "stat=$(digest_of "$REPOSITORY/stat:$VERSION")"
 
 echo "==> the TypeScript component" >&2
 ( cd ../../ts && yarn install --immutable && yarn build ) >&2
 ( cd web && yarn install --immutable && yarn build ) >&2
 docker buildx build --builder "$BUILDER" --platform "$PLATFORMS" \
-    --tag "$REPOSITORY/web:$VERSION" --push web >&2
+    --tag "$REPOSITORY/web:$VERSION" $(push web) web >&2
 echo "web=$(digest_of "$REPOSITORY/web:$VERSION")"
