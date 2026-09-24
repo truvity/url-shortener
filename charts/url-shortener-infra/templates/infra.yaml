@@ -97,6 +97,22 @@ spec:
       - name: {{ .Values.postgres.runtimeRole }}
         ensure: present
         login: true
+        {{- /*
+        connectionLimit and inherit are DECLARED, not left to default.
+
+        The API server fills them in from the CRD's schema, so a chart
+        that omits them renders a role that never matches what is
+        stored: a continuous difference in every renderer that compares
+        the two, for a role nobody changed. Telling the comparer to
+        ignore them would silence the real changes underneath them too.
+
+        Written out with the operator's own defaults, so this changes
+        nothing about the role and only states which values this chart
+        wants. -1 is no limit; inheriting is how the role picks up what
+        the migration grants it.
+        */}}
+        connectionLimit: -1
+        inherit: true
         passwordSecret:
           name: {{ required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent a password" .Values.postgres.runtimePasswordSecret }}
 ---

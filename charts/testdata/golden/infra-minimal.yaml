@@ -20,6 +20,8 @@ spec:
       - name: url_shortener_app
         ensure: present
         login: true
+        connectionLimit: -1
+        inherit: true
         passwordSecret:
           name: example-pg-runtime
 

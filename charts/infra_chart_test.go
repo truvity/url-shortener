@@ -240,3 +240,53 @@ func documents(t *testing.T, out string) []map[string]any {
 	}
 	return docs
 }
+
+// The managed role declares the fields the API server would otherwise fill
+// in for it.
+//
+// A CRD's schema carries defaults, and the API server applies them on the
+// way in. A chart that leaves them out therefore renders a role that never
+// matches the one that is stored, and every renderer comparing desired to
+// live reports a difference — permanently, on a resource nobody has
+// touched. The usual reflex is to tell the comparer to ignore those
+// fields, which also hides the real changes underneath them.
+//
+// Declaring the operator's own defaults changes nothing about the role. It
+// only says which values this chart wants, somewhere a reader can see them.
+//
+// Found on a cluster: a database that was Healthy and OutOfSync at the same
+// time, differing on exactly these two keys.
+func TestTheManagedRoleDeclaresWhatTheAPIDefaults(t *testing.T) {
+	out, err := renderInfra(t, infraDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	var cluster map[string]any
+	for _, doc := range strings.Split(out, "\n---") {
+		var m map[string]any
+		if err := yaml.Unmarshal([]byte(doc), &m); err != nil || m == nil {
+			continue
+		}
+		if m["kind"] == "Cluster" {
+			cluster = m
+			break
+		}
+	}
+	if cluster == nil {
+		t.Fatal("no Cluster in the render")
+	}
+
+	managed, _ := cluster["spec"].(map[string]any)["managed"].(map[string]any)
+	roles, _ := managed["roles"].([]any)
+	if len(roles) != 1 {
+		t.Fatalf("expected one managed role, got %d", len(roles))
+	}
+
+	role, _ := roles[0].(map[string]any)
+	for _, key := range []string{"connectionLimit", "inherit"} {
+		if _, declared := role[key]; !declared {
+			t.Errorf("the role leaves %q to the API server, which stores a value the chart never renders — a permanent difference on a role nobody changed", key)
+		}
+	}
+}
