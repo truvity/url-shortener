@@ -252,6 +252,48 @@ func TestAPublishedChartRendersWithNoImageValues(t *testing.T) {
 	}
 }
 
+// A route attaches to the parent it was GIVEN, kind included.
+//
+// A Gateway is not the only thing a route can attach to, and the default
+// is silently wrong on a cluster that serves routes from something else.
+// The failure has no good signal: the route is ACCEPTED, its status says
+// so and goes on saying so, and the service answers 404. The only other
+// tell is the listener reporting zero attached routes, which nobody
+// watches.
+//
+// Found in a cluster, by a 404 on a service whose pods were all healthy.
+func TestTheRouteAttachesToTheParentItWasGiven(t *testing.T) {
+	out, err := render(t, defaults(
+		"--set", "route.enabled=true",
+		"--set", "route.hostname=example.test",
+		"--set", "route.parentRef.name=business",
+		"--set", "route.parentRef.kind=ListenerSet",
+		"--set", "route.parentRef.group=gateway.networking.x-k8s.io",
+		"--set", "route.parentRef.namespace=gateways",
+	)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	route := docOfKind(t, out, "HTTPRoute")
+	parents, ok := route["spec"].(map[string]any)["parentRefs"].([]any)
+	if !ok || len(parents) != 1 {
+		t.Fatalf("expected exactly one parent, got %#v", route["spec"])
+	}
+
+	parent, _ := parents[0].(map[string]any)
+	for key, want := range map[string]string{
+		"name":      "business",
+		"kind":      "ListenerSet",
+		"group":     "gateway.networking.x-k8s.io",
+		"namespace": "gateways",
+	} {
+		if got := parent[key]; got != want {
+			t.Errorf("parentRef.%s = %v, want %v", key, got, want)
+		}
+	}
+}
+
 // Six components are six DIFFERENT images.
 //
 // The chart used to take one `image.digest` and apply it to all of them,

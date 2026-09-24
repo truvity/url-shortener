@@ -123,6 +123,19 @@ metadata:
 spec:
   parentRefs:
     - name: {{ required "route.parentRef.name is required when route.enabled is true: a route that names no parent attaches nowhere" .Values.route.parentRef.name }}
+      {{- /*
+      The parent's KIND, because a Gateway is not the only thing a route
+      can attach to and the default is silently wrong where it is not.
+      A route naming a kind nothing serves is ACCEPTED -- the status says
+      so, and keeps saying so -- and answers 404. The only other signal is
+      the listener reporting zero attached routes, which nobody watches.
+      */}}
+      {{- with .Values.route.parentRef.group }}
+      group: {{ . }}
+      {{- end }}
+      {{- with .Values.route.parentRef.kind }}
+      kind: {{ . }}
+      {{- end }}
       {{- with .Values.route.parentRef.namespace }}
       namespace: {{ . }}
       {{- end }}

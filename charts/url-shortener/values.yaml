@@ -267,6 +267,17 @@ route:
   ruleName: app
   parentRef:
     name: ""
+    # The parent's kind and group. Empty means the API's own defaults --
+    # a Gateway in `gateway.networking.k8s.io` -- which is right for a
+    # cluster that serves routes from Gateways and silently wrong for one
+    # that has moved them somewhere else.
+    #
+    # Silently, because a route whose parent does not exist is still
+    # ACCEPTED: the status says so and goes on saying so, and the service
+    # answers 404 with nothing pointing at the cause. The only other
+    # signal is the listener reporting zero attached routes.
+    group: ""
+    kind: ""
     namespace: ""
     sectionName: ""
   hostname: ""
