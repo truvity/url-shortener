@@ -28,6 +28,7 @@ import (
 	"gorm.io/gorm"
 
 	policyconfig "github.com/truvity/policy/config"
+	policytelemetry "github.com/truvity/policy/telemetry"
 
 	"github.com/truvity/policy/examples/url-shortener/internal/api"
 	"github.com/truvity/policy/examples/url-shortener/internal/business/redirect"
@@ -62,6 +63,25 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Telemetry, from OpenTelemetry's own environment (decision 0006).
+	// With no endpoint configured this installs exporters that do nothing,
+	// so a laptop and a cluster run the same code down the same path.
+	shutdownTelemetry, err := policytelemetry.Start(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// A short grace of its own: the context above is already cancelled
+		// by the time this runs, and a flush on a cancelled context sends
+		// nothing -- which loses exactly the spans that describe the
+		// shutdown somebody is looking into.
+		flush, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(flush); err != nil {
+			log.WarnContext(ctx, "telemetry did not flush", slog.String("error", err.Error()))
+		}
+	}()
 
 	log.InfoContext(ctx, "starting", slog.String("component", "redirect"),
 		slog.String("version", version), slog.String("commit", commit))
@@ -112,6 +132,8 @@ func run() error {
 	}
 
 	app := fiber.New()
+	// A span per request, and the incoming trace continued.
+	app.Use(api.Tracing())
 	humaAPI := humafiber.New(app, huma.DefaultConfig("URL Shortener", version))
 	redirect.RegisterHumaRoutes(ctx, log, humaAPI, manager, requestLog)
 	app.Get(api.PathVersion, api.NewVersionHandler("redirect", &api.Version{Version: version, Commit: commit}))
