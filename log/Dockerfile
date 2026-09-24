@@ -27,6 +27,11 @@ FROM cgr.dev/chainguard/python:latest
 # build script laid down one tree per architecture — so a multi-architecture
 # image is assembled by COPYING the right one, with nothing executing and no
 # emulation anywhere.
+#
+# A release publishes every architecture, always: a published artifact is
+# consumed by machines whose architecture the publisher does not know. A
+# local build is host-only because it loads into one node. See
+# hack/publish-images.sh.
 ARG TARGETARCH
 COPY build/site-packages-$TARGETARCH /app
 
