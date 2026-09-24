@@ -21,13 +21,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"golang.org/x/sync/errgroup"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 
-	policyconfig "github.com/truvity/policy/config"
+	"github.com/truvity/policy/transport"
 
 	"github.com/truvity/policy/examples/url-shortener/internal/business/stat"
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
 	"github.com/truvity/policy/examples/url-shortener/internal/config"
 	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
 )
@@ -60,12 +57,6 @@ func run() error {
 	log.InfoContext(ctx, "starting", slog.String("component", "stat"),
 		slog.String("version", version), slog.String("commit", commit))
 
-	db, closeDB, err := openDatabase(log, cfg.Database)
-	if err != nil {
-		return err
-	}
-	defer closeDB()
-
 	nc, err := connect(cfg.Events.NATS)
 	if err != nil {
 		return err
@@ -77,11 +68,19 @@ func run() error {
 		return fmt.Errorf("open jetstream: %w", err)
 	}
 
-	storeClient, err := store.NewClient(ctx, log, db)
+	// The identity this process was mounted, if the platform provides one.
+	// The counter serves nothing, so this is used only as a CLIENT — it
+	// presents the certificate and checks who answered.
+	identity, err := transport.Load(cfg.TLS, log)
 	if err != nil {
-		return fmt.Errorf("build the store client: %w", err)
+		return fmt.Errorf("transport identity: %w", err)
 	}
-	handler := stat.NewHandler(ctx, log, stat.NewManager(ctx, log, storeClient))
+
+	// The counter holds no database credential. It asks the service that
+	// owns the table, which is the whole of the ownership rule: a component
+	// that cannot write the table cannot write it wrongly.
+	counter := stat.NewRemote(runtime.RPCClient(identity, 10*time.Second), cfg.Urls.Address)
+	handler := stat.NewHandler(ctx, log, stat.NewManager(ctx, log, counter))
 
 	// The stream exists already — a component does not create the stream it
 	// reads, because two components disagreeing about a stream's retention is
@@ -120,14 +119,13 @@ func run() error {
 	}
 	defer consuming.Stop()
 
-	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return err
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			return fmt.Errorf("database: %w", err)
-		}
+	probes := runtime.Probes(cfg.Probes.Address, func(_ context.Context) error {
+		// The stream, and nothing else. Readiness reports whether this
+		// component can do its work, and it cannot consume without the
+		// broker — but a URL service that is down is not this component's
+		// outage to report. A probe that checked it would take the counter
+		// out of rotation for somebody else's problem, and the messages
+		// would pile up in the stream either way.
 		if !nc.IsConnected() {
 			return errors.New("not connected to the event stream")
 		}
@@ -147,29 +145,6 @@ func run() error {
 	return group.Wait()
 }
 
-func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
-	dsn, err := dsn(pg)
-	if err != nil {
-		return nil, nil, err
-	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		// The library logs through the service's logger, not its own.
-		// See runtime.GormLogger.
-		Logger: runtime.GormLogger(log, time.Second),
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("connect to the database: %w", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("reach the connection pool: %w", err)
-	}
-	if pg.MaxConnections > 0 {
-		sqlDB.SetMaxOpenConns(pg.MaxConnections)
-	}
-	return db, func() { _ = sqlDB.Close() }, nil
-}
-
 func connect(cfg config.NATS) (*nats.Conn, error) {
 	opts, err := runtime.NATSOptions("url-shortener-stat", cfg.TokenFile)
 	if err != nil {
@@ -181,15 +156,4 @@ func connect(cfg config.NATS) (*nats.Conn, error) {
 		return nil, fmt.Errorf("connect to the event stream: %w", err)
 	}
 	return nc, nil
-}
-
-func dsn(pg config.Postgres) (string, error) {
-	if pg.PasswordEnv == "" {
-		return pg.URL, nil
-	}
-	password, err := policyconfig.Secret(pg.PasswordEnv)
-	if err != nil {
-		return "", err
-	}
-	return injectPassword(pg.URL, password)
 }

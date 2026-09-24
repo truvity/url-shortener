@@ -190,6 +190,13 @@ tls:
   # right default for a service nobody has been granted.
   peers:
     redirect: []
+    # Callers of the service that owns the tables, from OUTSIDE this release.
+    #
+    # The release's own counter is granted by the chart, because the chart is
+    # what wired it. A chart whose default configuration cannot talk to
+    # itself is a chart that installs and then sits refused at the handshake,
+    # naming a certificate rather than a list nobody filled in.
+    urls: []
 
 replicas:
   # Two, because one instance cannot be replaced without a gap whatever the
@@ -198,6 +205,7 @@ replicas:
   redirect: 2
   stat: 2
   log: 2
+  urls: 2
 
 # Voluntary disruption, which is not the same thing as a rollout.
 #
@@ -216,6 +224,8 @@ resources:
     requests: { cpu: 50m, memory: 64Mi }
   log:
     requests: { cpu: 50m, memory: 128Mi }
+  urls:
+    requests: { cpu: 50m, memory: 64Mi }
   migrate:
     requests: { cpu: 50m, memory: 64Mi }
 

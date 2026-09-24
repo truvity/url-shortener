@@ -12,13 +12,25 @@ and says what happened; something else counts that.
 | Component | Kind | Does |
 |---|---|---|
 | `cmd/migrate` | job, Go | brings the schema up to date, then exits |
+| `cmd/urls` | service, Go | **owns the URL tables**; answers Connect, gRPC and gRPC-Web |
 | `cmd/redirect` | service, Go | resolves a key, redirects, publishes what happened |
-| `cmd/stat` | service, Go | consumes redirects, counts them |
+| `cmd/stat` | service, Go | consumes redirects, asks `urls` to count them |
 | `log/` | service, **Python** | consumes request records, archives them as NDJSON |
 
-More arrives: an owning service for the URLs themselves with a typed RPC
-boundary, and a web front end. The pieces here are the ones that make a
+A web front end arrives next. The pieces here are the ones that make a
 working shortener without a user interface.
+
+**All three shapes are in here on purpose**, because the interesting part of
+the rule is which to reach for:
+
+- `stat` → `urls` is an **RPC**, because the table is somebody's property.
+  The counter holds an address and no database credential at all.
+- `redirect` → `stat` and `log` is an **event**, because a redirect is a fact
+  and who cares about it is none of the publisher's business.
+- `redirect` → the table is a **direct read**, and it is the deliberate
+  exception: the redirect path is the hot path, and a second network hop on
+  it is not worth what it buys. It is written down here so the next reader
+  does not take it for an oversight.
 
 The archiver is not written in Go, and that is the point of it rather than a
 detail. It reads a configuration file this chart rendered, validated against
@@ -51,6 +63,10 @@ visible in one place:
   service usually has none, and these produce none.
 - **SIGTERM drains.** Both servers, and both consumers, which finish the
   messages they already pulled rather than abandoning them to redelivery.
+- **One service owns each table.** Everything that writes the URL tables
+  asks `urls`; the counter's configuration has no `database` block, and a
+  test asserts that it does not — the ownership rule usually shows up as an
+  absence rather than as a line of code.
 - **A store is an endpoint, not a vendor.** The archiver reaches its bucket
   through a name, a region and a path-style flag, so the same configuration
   shape reaches a cloud service, a store inside the cluster or the local

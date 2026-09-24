@@ -10,6 +10,18 @@
 # the second one waits for them to become real before it installs anything.
 set -euo pipefail
 
+# The cluster this example is installed into, BY NAME.
+#
+# Not "whatever context happens to be current". `kind create cluster` points
+# the current context at whatever it just made, so a second box created in
+# another terminal silently moves every `kubectl` in this script — and the
+# symptom is "namespaces not found" for a namespace that is right there, in
+# the cluster you thought you were talking to. It also means this script
+# cannot be aimed at a real cluster by accident.
+KCTX=${KCTX:-kind-policy}
+kubectl() { command kubectl --context "$KCTX" "$@"; }
+helm() { command helm --kube-context "$KCTX" "$@"; }
+
 NS=${NS:-shortener}
 INFRA=${INFRA:-infra}
 APP=${APP:-example}

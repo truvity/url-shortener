@@ -1,4 +1,4 @@
-{{/*
+{{- /*
 One ConfigMap per binary, holding exactly the file that binary validates
 against its own schema at start-up.
 
@@ -39,11 +39,16 @@ data:
       keyFile: {{ .Values.tls.mountPath }}/tls.key
       caFile: {{ .Values.tls.mountPath }}/ca.crt
       trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
-      peers:
-        {{- range .Values.tls.peers.redirect }}
-        - namespace: {{ .namespace }}
-          serviceAccount: {{ .serviceAccount }}
-        {{- end }}
+      {{- /*
+      toYaml, so that an EMPTY list renders as `[]` rather than as a key with
+      nothing under it. The second is YAML null, the service refuses it at
+      start-up ("tls.peers: got null, want array"), and the pod crash-loops —
+      and the state that triggers it is the DEFAULT, because an empty
+      allow-list is what a service nobody has been granted looks like. The
+      values schema pins each entry to exactly the two keys below, so nothing
+      unexpected can be passed through here.
+      */}}
+      peers:{{ toYaml (.Values.tls.peers.redirect | default list) | nindent 8 }}
     {{- end }}
     database:
       url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
@@ -55,6 +60,57 @@ data:
       redirectSubject: {{ .Values.events.redirectSubject }}
       requestSubject: {{ .Values.events.requestSubject }}
 
+  urls.yaml: |
+    listen:
+      address: ":8080"
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.log.level }}
+    drain:
+      seconds: {{ .Values.drain.seconds }}
+    {{- if include "url-shortener.tlsOn" . }}
+    tls:
+      mode: {{ .Values.tls.mode }}
+      {{- if eq .Values.tls.mode "permissive" }}
+      address: ":{{ .Values.tls.port }}"
+      {{- end }}
+      certFile: {{ .Values.tls.mountPath }}/tls.crt
+      keyFile: {{ .Values.tls.mountPath }}/tls.key
+      caFile: {{ .Values.tls.mountPath }}/ca.crt
+      trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
+      {{- /*
+      toYaml, so that an EMPTY list renders as `[]` rather than as a key with
+      nothing under it. The second is YAML null, the service refuses it at
+      start-up ("tls.peers: got null, want array"), and the pod crash-loops —
+      and the state that triggers it is the DEFAULT, because an empty
+      allow-list is what a service nobody has been granted looks like. The
+      values schema pins each entry to exactly the two keys below, so nothing
+      unexpected can be passed through here.
+      */}}
+      {{- /*
+      This release's OWN counter, and then whoever the operator added.
+
+      The chart knows its internal callers — it is the thing that wired the
+      counter to this service — so it grants them, and `tls.peers.urls` is
+      for callers OUTSIDE the release. Leaving the internal one to the
+      operator would mean a chart whose default configuration cannot talk to
+      itself: every install of `strict` comes up with the counter refused at
+      the handshake, and the error names a certificate rather than a list
+      nobody filled in. Measured on a cluster, not imagined.
+      */}}
+      peers:
+        - namespace: {{ .Release.Namespace }}
+          serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
+        {{- with .Values.tls.peers.urls }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    {{- end }}
+    database:
+      url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+      maxConnections: 20
+
   stat.yaml: |
     probes:
       address: ":7070"
@@ -62,9 +118,57 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
-    database:
-      url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
-      passwordEnv: DATABASE_PASSWORD
+    {{- if include "url-shortener.tlsOn" . }}
+    tls:
+      {{- /*
+      `strict` whenever the transport is on at all, including while the rest
+      of the release is `permissive` — and that is not a copy-paste slip.
+
+      The counter SERVES nothing. For a component that only calls out there
+      is no third state: it either presents an identity or it does not, and
+      `permissive` is meaningless because there is no second listener to put
+      anywhere. Rendering it here produced a crash loop with an error about
+      a listener address on a component that has none.
+
+      `permissive` exists so an edge can migrate one CALLER at a time. This
+      chart wires both ends of this call, so there is no caller to wait for.
+      */}}
+      mode: strict
+      certFile: {{ .Values.tls.mountPath }}/tls.crt
+      keyFile: {{ .Values.tls.mountPath }}/tls.key
+      caFile: {{ .Values.tls.mountPath }}/ca.crt
+      trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
+      {{- /*
+      Who this component will ACCEPT AN ANSWER FROM — which is NOT the same
+      question as who may call the URL service, and must not share a list
+      with it. One is "may this caller in", the other is "is the thing that
+      answered the service I meant to reach"; a client that checked only the
+      certificate chain would accept any workload in the trust domain that
+      happened to answer on that address.
+
+      It is the account the URL service runs as. In this chart every
+      component shares one application account, so that is this release's;
+      a deployment that gave each component its own would name the URL
+      service's here, and the two lists would stop looking alike.
+      */}}
+      peers:
+        - namespace: {{ .Release.Namespace }}
+          serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
+    {{- end }}
+    urls:
+      {{- /*
+      Which PORT depends on the URL service's mode, because that is what
+      decides where its authenticated listener is: under `strict` it is the
+      ordinary port speaking TLS, and under `permissive` it is a second one
+      beside the cleartext original.
+      */}}
+      {{- if eq .Values.tls.mode "strict" }}
+      address: https://{{ include "url-shortener.name" . }}-urls:8080
+      {{- else if eq .Values.tls.mode "permissive" }}
+      address: https://{{ include "url-shortener.name" . }}-urls:{{ .Values.tls.port }}
+      {{- else }}
+      address: http://{{ include "url-shortener.name" . }}-urls:8080
+      {{- end }}
     events:
       nats:
         url: {{ .Values.events.url }}

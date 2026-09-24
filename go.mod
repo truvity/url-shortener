@@ -9,6 +9,7 @@ go 1.27.0
 replace github.com/truvity/policy => ../..
 
 require (
+	connectrpc.com/connect v1.21.0
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/nats-io/nats.go v1.54.0
@@ -16,6 +17,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/truvity/policy v0.0.0-20260923133553-7af306cdbbcb
 	golang.org/x/sync v0.23.0
+	google.golang.org/protobuf v1.36.11
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )

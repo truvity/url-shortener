@@ -2,9 +2,8 @@ probes:
   address: ":7070"
 log:
   level: info
-database:
-  url: postgres://stat@url-shortener-pg-rw:5432/url_shortener?sslmode=require
-  passwordEnv: DATABASE_PASSWORD
+urls:
+  address: http://url-shortener-urls:8080
 events:
   nats:
     url: nats://nats.nats.svc:4222

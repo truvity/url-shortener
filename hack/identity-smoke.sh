@@ -10,6 +10,18 @@
 # success from every other angle.
 set -euo pipefail
 
+# The cluster this example is installed into, BY NAME.
+#
+# Not "whatever context happens to be current". `kind create cluster` points
+# the current context at whatever it just made, so a second box created in
+# another terminal silently moves every `kubectl` in this script — and the
+# symptom is "namespaces not found" for a namespace that is right there, in
+# the cluster you thought you were talking to. It also means this script
+# cannot be aimed at a real cluster by accident.
+KCTX=${KCTX:-kind-policy}
+kubectl() { command kubectl --context "$KCTX" "$@"; }
+helm() { command helm --kube-context "$KCTX" "$@"; }
+
 NS=${NS:-shortener}
 APP=${APP:-example}
 TRUST_DOMAIN=${TRUST_DOMAIN:-policy.local}
@@ -139,4 +151,61 @@ if ! grep -q '"serviceAccount":"stranger"' <<<"$said"; then
     exit 1
 fi
 
-echo "identity smoke passed: the platform attested it, the service checked it, and the stranger was closed"
+# The other half of the rule, and the half the probes above cannot reach: a
+# CLIENT presenting an identity.
+#
+# Everything so far tests a server's decision about a caller. But the counter
+# calls the URL service, and under `strict` there is no cleartext port to
+# fall back to — so if the client did not present its certificate, or the
+# server did not admit it, the count simply stops moving. That failure is
+# silent from every angle except this one.
+echo "==> the whole release on strict, and the counter still counting"
+helm upgrade "$APP" "$CHARTS/url-shortener" -n "$NS" --reuse-values \
+    --set tls.mode=strict \
+    --set "tls.trustDomain=$TRUST_DOMAIN" \
+    --wait --timeout 5m >/dev/null
+
+KEY="mtl$(printf '%05d' $((RANDOM % 100000)))"
+LONG="https://example.com/strict/$KEY"
+ID=$(printf '%s' "$LONG" | sha256sum | cut -d' ' -f1)
+
+kubectl -n "$NS" exec "${INFRA:-infra}-pg-1" -c postgres -- \
+    psql -qtAX -d url_shortener -c \
+    "INSERT INTO urls.urls (id, url_key, long_url, created_at)
+     VALUES ('$ID', '$KEY', '$LONG', now()) ON CONFLICT (id) DO NOTHING;" >/dev/null
+
+# Published straight to the stream rather than driven through the redirect
+# service. Under `strict` that service REQUIRES a client certificate, so
+# nothing outside the mesh of identities can call it — which is the rule
+# working, and also why this step cannot use curl.
+kubectl -n nats exec deploy/nats-box -- nats --server nats://nats:4222 \
+    pub url-shortener.redirect \
+    "{\"url_key\":\"$KEY\",\"long_url\":\"$LONG\",\"timestamp\":\"2026-01-01T00:00:00Z\"}" \
+    -H X-Detail-Type:URLRedirect >/dev/null
+
+count=0
+for _ in $(seq 1 30); do
+    count=$(kubectl -n "$NS" exec "${INFRA:-infra}-pg-1" -c postgres -- \
+        psql -qtAX -d url_shortener -c \
+        "SELECT click_count FROM stats.stats WHERE id = '$ID';" | tr -d '[:space:]')
+    [ "${count:-0}" -ge 1 ] 2>/dev/null && break
+    sleep 2
+done
+
+if [ "${count:-0}" -lt 1 ]; then
+    echo "IDENTITY: the counter never reached the URL service over mutual TLS" >&2
+    echo "          a client that does not present its identity fails exactly here, silently" >&2
+    kubectl -n "$NS" logs -l app.kubernetes.io/component=stat --tail=20 >&2
+    kubectl -n "$NS" logs -l app.kubernetes.io/component=urls --tail=20 >&2
+    exit 1
+fi
+echo "    the counter reached it and the count moved to $count"
+
+# The box is left as it was found. `strict` takes the cleartext port away,
+# so anything that port-forwards — the other smoke test, a person having a
+# look — would find a service that refuses them and no obvious reason why.
+echo "==> putting the transport back"
+helm upgrade "$APP" "$CHARTS/url-shortener" -n "$NS" --reuse-values \
+    --set tls.mode=off --wait --timeout 5m >/dev/null
+
+echo "identity smoke passed: the platform attested it, the service checked it, the stranger was closed, and a client presented its own"

@@ -1,0 +1,112 @@
+// The URL service's boundary.
+//
+// One service owns the `urls` tables. Everything else asks it — that is the
+// rule this file exists to make real, and the reason a schema lives in the
+// repository with a build configuration beside it. A `.proto` with nothing
+// configured to generate from it is a schema nobody reads and a client
+// somebody hand-wrote.
+//
+// See docs/contracts/service.md §8 for when an RPC is the right shape and
+// when an event is.
+syntax = "proto3";
+
+package urlshortener.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1";
+
+// A shortened URL, as this service reports it.
+message Url {
+  // The short code a visitor asks for.
+  string key = 1;
+  // Where it sends them.
+  string long_url = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  // Set once a key is retired. A key is never reused, so a retired one is
+  // still present and still refuses.
+  google.protobuf.Timestamp deleted_at = 5;
+  // After this, the key answers "gone" rather than redirecting.
+  google.protobuf.Timestamp expires_at = 6;
+  // How many times it has been followed.
+  int64 click_count = 7;
+}
+
+message CreateRequest {
+  string key = 1;
+  string long_url = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+message CreateResponse {
+  Url url = 1;
+}
+
+message GetRequest {
+  string key = 1;
+}
+message GetResponse {
+  Url url = 1;
+}
+
+message UpdateRequest {
+  string key = 1;
+  // Unset leaves the current value. Proto3 optional is what makes "leave it
+  // alone" expressible at all — without it an empty string is indistinguish-
+  // able from a request to blank the field.
+  optional string long_url = 2;
+  optional google.protobuf.Timestamp expires_at = 3;
+}
+message UpdateResponse {
+  Url url = 1;
+}
+
+message DeleteRequest {
+  string key = 1;
+}
+message DeleteResponse {}
+
+message RestoreRequest {
+  string key = 1;
+}
+message RestoreResponse {
+  Url url = 1;
+}
+
+message ResolveRequest {
+  string key = 1;
+}
+message ResolveResponse {
+  string long_url = 1;
+}
+
+message RecordClickRequest {
+  // The long URL, because that is what the event carries and what the
+  // counter is keyed by. A caller that had the key would have had to resolve
+  // it first, which is a second call to learn something it already knows.
+  string long_url = 1;
+}
+message RecordClickResponse {
+  int64 click_count = 1;
+}
+
+// UrlsService owns the URL tables. Nothing else writes them.
+service UrlsService {
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Restore(RestoreRequest) returns (RestoreResponse);
+
+  // Resolve is the redirect path's question, and it is here for completeness
+  // rather than because the redirect service calls it: that service reads
+  // the table directly, because a redirect is the one hot path where a
+  // second network hop is not worth what it buys. The contrast is the point
+  // — see the example's README.
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+
+  // RecordClick is what the counter calls. It is an RPC rather than a write
+  // because the table belongs to this service; the CLICK itself arrives as
+  // an event, which is the other half of the same rule.
+  rpc RecordClick(RecordClickRequest) returns (RecordClickResponse);
+}

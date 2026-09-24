@@ -2,21 +2,51 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/url-shortener/schemas/stat.json",
   "title": "stat",
-  "description": "The click counter: consume redirects, count them.",
-  "allOf": [{ "$ref": "https://github.com/truvity/policy/schemas/service.json" }],
+  "description": "The click counter: consume redirects, and ask the service that owns the table to count them.",
+  "allOf": [
+    {
+      "$ref": "https://github.com/truvity/policy/schemas/service.json"
+    }
+  ],
   "type": "object",
   "unevaluatedProperties": false,
-  "required": ["database", "events"],
+  "required": [
+    "events",
+    "urls"
+  ],
   "properties": {
-    "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
+    "urls": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is the tls block's business.",
+      "required": [
+        "address"
+      ],
+      "properties": {
+        "address": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "events": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nats", "consumer"],
+      "required": [
+        "nats",
+        "consumer"
+      ],
       "properties": {
-        "nats": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json" },
-        "consumer": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json" }
+        "nats": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json"
+        },
+        "consumer": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json"
+        }
       }
+    },
+    "tls": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"
     }
   }
 }

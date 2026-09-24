@@ -1,0 +1,15 @@
+# The schema's own rules, checked before anything is generated from it.
+#
+# Lint and breaking-change detection are the reason a schema lives in a
+# repository rather than in a wiki: a field renumbered by hand is a wire
+# incompatibility that no compiler catches and no test reaches, because both
+# sides are regenerated from the same file in the same commit.
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

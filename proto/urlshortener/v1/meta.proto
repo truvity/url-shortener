@@ -1,0 +1,28 @@
+// What a binary is, asked over the same transport as everything else.
+//
+// It replaces an untyped JSON endpoint that other components fetched and
+// parsed by hand. A version string is a small thing to make typed, and that
+// is rather the point: the alternative is one hand-written client per
+// consumer, each with its own idea of the shape.
+syntax = "proto3";
+
+package urlshortener.v1;
+
+option go_package = "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1";
+
+message GetVersionRequest {}
+message GetVersionResponse {
+  // What the component calls itself.
+  string component = 1;
+  // The tag it was built from, or a placeholder in a checkout — a checkout
+  // is not a release.
+  string version = 2;
+  // The commit, where the build stamped one.
+  string commit = 3;
+}
+
+// MetaService answers questions about the process rather than about the
+// data. Every component that serves RPC serves it.
+service MetaService {
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+}

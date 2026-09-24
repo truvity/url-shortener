@@ -1,0 +1,22 @@
+# What is generated, and where it lands.
+#
+# Generated code is COMMITTED, and `just drift` fails on a diff — the same
+# rule the shared schemas follow. The alternative is a build step between a
+# checkout and a compiler, which is a step that has to work on every machine
+# forever, and the first thing it breaks is the editor.
+version: v2
+clean: true
+managed:
+  enabled: false
+plugins:
+  # The messages.
+  - local: protoc-gen-go
+    out: internal/gen
+    opt: paths=source_relative
+  # The client and the server. ONE handler serves Connect, gRPC and gRPC-Web,
+  # which is why there is no second plugin here for the other two.
+  - local: protoc-gen-connect-go
+    out: internal/gen
+    opt: paths=source_relative
+inputs:
+  - directory: proto

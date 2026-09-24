@@ -120,6 +120,7 @@ func rendered() []struct {
 		{"migrate.yaml", func() []byte { return config.Read("migrate.json") }},
 		{"redirect.yaml", func() []byte { return config.Read("redirect.json") }},
 		{"stat.yaml", func() []byte { return config.Read("stat.json") }},
+		{"urls.yaml", func() []byte { return config.Read("urls.json") }},
 		{"log.yaml", func() []byte {
 			return config.ReadPython("log/src/url_shortener_log/log.schema.json")
 		}},
@@ -594,6 +595,44 @@ func TestTransportOnRendersWhatThePlatformNeeds(t *testing.T) {
 // A trust domain is required the moment the transport is on. Without it a
 // peer from ANY trust domain is admitted, which is a service that looks
 // authenticated and is not.
+// Transport on with NOBODY on any allow-list renders configuration the
+// binaries accept.
+//
+// That combination is the DEFAULT — an empty list is what a service nobody
+// has been granted looks like — and it was broken: `peers:` followed by an
+// empty range renders a key with nothing under it, which is YAML null, not
+// an empty list. Every binary refused it at start-up with "tls.peers: got
+// null, want array" and crash-looped, and the chart rendered, installed and
+// reported progress the whole time.
+//
+// A render test would not have caught it; this validates what each binary
+// would actually read.
+func TestTransportOnWithNoPeersIsStillValid(t *testing.T) {
+	for _, mode := range []string{"permissive", "strict"} {
+		t.Run(mode, func(t *testing.T) {
+			out, err := render(t, defaults(
+				"--set", "image.tag=dev",
+				"--set", "tls.mode="+mode,
+				"--set", "tls.trustDomain=example.test",
+			)...)
+			if err != nil {
+				t.Fatalf("the chart does not render: %v\n%s", err, out)
+			}
+			for _, tc := range rendered() {
+				t.Run(tc.file, func(t *testing.T) {
+					// The assertion is the binary's own: validate what
+					// the chart rendered with the schema the process
+					// reads at start-up. A string check on the rendered
+					// YAML would be checking indentation, which is not
+					// what broke.
+					doc := conformance.ConfigMapData(t, []byte(out), tc.file)
+					conformance.ValidDocument(t, doc, tc.schema())
+				})
+			}
+		})
+	}
+}
+
 func TestTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
 	out, err := render(t, defaults("--set", "image.tag=dev", "--set", "tls.mode=strict")...)
 	if err == nil {

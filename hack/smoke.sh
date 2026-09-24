@@ -11,6 +11,18 @@
 # checked by rendering a chart, and every one of them has broken here.
 set -euo pipefail
 
+# The cluster this example is installed into, BY NAME.
+#
+# Not "whatever context happens to be current". `kind create cluster` points
+# the current context at whatever it just made, so a second box created in
+# another terminal silently moves every `kubectl` in this script — and the
+# symptom is "namespaces not found" for a namespace that is right there, in
+# the cluster you thought you were talking to. It also means this script
+# cannot be aimed at a real cluster by accident.
+KCTX=${KCTX:-kind-policy}
+kubectl() { command kubectl --context "$KCTX" "$@"; }
+helm() { command helm --kube-context "$KCTX" "$@"; }
+
 NS=${NS:-shortener}
 INFRA=${INFRA:-infra}
 APP=${APP:-example}
@@ -95,6 +107,48 @@ fi
 
 echo "    click_count = $count"
 
+# HOW it moved, not just that it did. The counter holds no database
+# credential any more, so the only way that number changed is an RPC to the
+# service that owns the table — but a smoke test that stops at the number
+# would pass just the same if somebody gave the counter its password back.
+echo "==> the counter asked rather than wrote"
+# Captured first, then searched. `kubectl ... | grep -q` looks right and is
+# not: grep exits at the first match, kubectl is killed by SIGPIPE, and
+# `pipefail` reports the 141 — so the check fails hardest exactly when it
+# should pass. The same trap already cost this example a working key
+# generator; see the note above KEY.
+urlslog=$(kubectl -n "$NS" logs -l app.kubernetes.io/component=urls --tail=200 2>/dev/null || true)
+if ! printf '%s' "$urlslog" | grep -q '"procedure":"/urlshortener.v1.UrlsService/RecordClick"'; then
+    echo "SMOKE: the URL service never served RecordClick, so the count came from somewhere else" >&2
+    printf '%s\n' "$urlslog" | tail -30 >&2
+    exit 1
+fi
+echo "    UrlsService/RecordClick was served"
+
+# A Connect unary call is an ordinary POST with a JSON body. That is a claim
+# the RPC guide makes about this shape, and it is worth proving rather than
+# repeating: it is the difference between a boundary anyone can ask a
+# question of and one that needs a generated client.
+echo "==> the same boundary answers a plain POST"
+kubectl -n "$NS" port-forward "svc/${APP}-urls" 18090:8080 >/dev/null 2>&1 &
+urlsforward=$!
+trap 'kill $forward $urlsforward 2>/dev/null || true' EXIT
+
+for _ in $(seq 1 30); do
+    curl -fsS -o /dev/null -X POST -H 'Content-Type: application/json' -d '{}' \
+        "http://127.0.0.1:18090/urlshortener.v1.MetaService/GetVersion" 2>/dev/null && break
+    sleep 1
+done
+
+version=$(curl -fsS -X POST -H 'Content-Type: application/json' -d '{}' \
+    "http://127.0.0.1:18090/urlshortener.v1.MetaService/GetVersion")
+
+if ! printf '%s' "$version" | grep -q '"component":"urls"'; then
+    echo "SMOKE: GetVersion answered '$version', which does not name the component" >&2
+    exit 1
+fi
+echo "    $version"
+
 echo "==> waiting for the archive"
 # The other consumer of the same stream, and the one that proves the rest of
 # the contracts hold for a component that is not written in Go: it read the
@@ -133,4 +187,4 @@ if ! printf '%s' "$body" | grep -q '"subject":"url-shortener.log"'; then
 fi
 
 echo "    $newest holds $(printf '%s\n' "$body" | grep -c . ) record(s)"
-echo "smoke passed: migrate, redirect, the broker, the counter and the archive all did their part"
+echo "smoke passed: migrate, the boundary, redirect, the broker, the counter and the archive all did their part"

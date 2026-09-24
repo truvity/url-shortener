@@ -316,12 +316,9 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://github.com/truvity/policy/schemas/service.json",
         "title": "service",
-        "description": "The envelope every service's configuration carries. A service references this from its own schema with allOf, and adds its own properties beside it.",
+        "description": "The envelope every service's configuration carries. A service references this from its own schema with allOf, and adds its own properties beside it. What is in here is what EVERY component has, including a job that exits and a consumer that answers nothing: somewhere to report health, a log level, and a shutdown budget. A listener is not one of those — see docs/contracts/config.md.",
         "type": "object",
         "properties": {
-            "listen": {
-                "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
-            },
             "probes": {
                 "$ref": "https://github.com/truvity/policy/schemas/fragments/probes.json"
             },

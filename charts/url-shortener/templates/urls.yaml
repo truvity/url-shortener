@@ -1,0 +1,99 @@
+{{/*
+The service that owns the URL tables.
+
+It is the only component that writes them. The counter asks it, and the
+redirect service reads them directly on the hot path — which is a documented
+exception rather than an oversight, and is the reason both shapes are in this
+example. See the README.
+
+It serves ONE handler that speaks Connect, gRPC and gRPC-Web on the same
+port, so a browser, an in-cluster client and a curl all reach the same
+methods. There is nothing here about protocols because the port does not
+know: they are distinguished by content type, in the handler.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener.name" . }}-urls
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas.urls }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: urls
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener.labels" . | nindent 8 }}
+        app.kubernetes.io/component: urls
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      {{- include "url-shortener.podSecurity" . | nindent 6 }}
+      {{- include "url-shortener.drain" . | nindent 6 }}
+      {{- include "url-shortener.spread" (dict "Release" .Release "component" "urls") | nindent 6 }}
+      containers:
+        - name: urls
+          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "urls") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/etc/url-shortener/urls.yaml"]
+          env:
+            {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+            {{- if include "url-shortener.tlsOn" . }}
+            {{- if eq .Values.tls.mode "permissive" }}
+            - name: https
+              containerPort: {{ .Values.tls.port }}
+            {{- end }}
+            {{- end }}
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          {{- include "url-shortener.preStop" . | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            {{- include "url-shortener.identityMount" . | nindent 12 }}
+          resources: {{- toYaml .Values.resources.urls | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener.name" . }}-config
+        {{- include "url-shortener.identityVolume" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "url-shortener.name" . }}-urls
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: urls
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    {{- if and (include "url-shortener.tlsOn" .) (eq .Values.tls.mode "permissive") }}
+    - name: https
+      port: {{ .Values.tls.port }}
+      targetPort: https
+    {{- end }}

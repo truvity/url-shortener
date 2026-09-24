@@ -88,6 +88,7 @@ describe("validate", () => {
     expect(() =>
       validate(
         {
+          listen: { address: ":8080" },
           probes: { address: ":7070" },
           baseURL: "https://example.com",
           database: { url: "postgres://shortener@db:5432/shortener" },

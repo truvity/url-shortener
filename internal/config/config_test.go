@@ -1,6 +1,9 @@
 package config_test
 
 import (
+	"bytes"
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -23,6 +26,7 @@ func TestEveryConfigurationTypeMatchesItsSchema(t *testing.T) {
 		"migrate":  {config.Migrate{}, "migrate.json"},
 		"redirect": {config.Redirect{}, "redirect.json"},
 		"stat":     {config.Stat{}, "stat.json"},
+		"urls":     {config.Urls{}, "urls.json"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			conformance.TypeMatchesSchema(t, tc.value, config.Read(tc.schema))
@@ -66,7 +70,50 @@ func TestTheExampleConfigurationsLoad(t *testing.T) {
 		if cfg.Events.Consumer.Durable == "" {
 			t.Error("the durable consumer name did not decode")
 		}
+		if cfg.Urls.Address == "" {
+			t.Error("the URL service's address did not decode")
+		}
 	})
+
+	t.Run("urls", func(t *testing.T) {
+		cfg, err := config.LoadUrls("testdata/urls.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Listen.Address == "" {
+			t.Error("listen.address did not decode")
+		}
+		if cfg.Database.URL == "" {
+			t.Error("the database URL did not decode")
+		}
+	})
+}
+
+// The counter carries no database credential at all, and that is asserted
+// rather than left to a reading of the type.
+//
+// It is the ownership rule showing up as an absence, which is the shape it
+// usually takes: the table belongs to the URL service, the counter asks it,
+// and the credential this component would otherwise hold — with whatever
+// rights that credential carried — simply does not exist here.
+func TestTheCounterCannotReachTheDatabase(t *testing.T) {
+	var schema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal(config.Read("stat.json"), &schema); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := schema.Properties["database"]; ok {
+		t.Error("stat.json describes a database: the counter does not own the table")
+	}
+	// Structural rather than a search for the word, because every `$ref` in
+	// this file is a URL and would match one.
+	if bytes.Contains(config.Read("stat.json"), []byte("fragments/postgres.json")) {
+		t.Error("stat.json references the postgres fragment: the counter asks the URL service instead")
+	}
+	if _, ok := reflect.TypeOf(config.Stat{}).FieldByName("Database"); ok {
+		t.Error("config.Stat has a Database field: the counter asks the URL service instead")
+	}
 }
 
 // A password written into the file is refused, and the error does not repeat

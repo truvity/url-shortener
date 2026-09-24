@@ -111,6 +111,64 @@ func Serve(ctx context.Context, log *slog.Logger, name string, srv *http.Server,
 	return serveErr
 }
 
+// RPCClient is the HTTP client an in-cluster gRPC caller needs, with or
+// without an identity.
+//
+// Both halves are here because getting either wrong fails in the confusing
+// direction. Without an identity, a gRPC call over the DEFAULT client is
+// sent as HTTP/1.1, the server refuses it, and the error names a protocol
+// rather than a setting — so cleartext HTTP/2 has to be asked for. With an
+// identity, the certificate has to be presented or the server closes the
+// connection at the handshake, which reads as the network being down.
+func RPCClient(id *transport.Identity, timeout time.Duration) *http.Client {
+	// With an identity, HTTP/2 is negotiated by ALPN — the transport
+	// package's client config already asks for it — and the certificate
+	// this process was mounted is presented on every connection.
+	if id.Mode() != transport.Off {
+		return &http.Client{
+			Timeout:   timeout,
+			Transport: &http.Transport{TLSClientConfig: id.Client()},
+		}
+	}
+
+	protocols := new(http.Protocols)
+	protocols.SetUnencryptedHTTP2(true)
+
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: &http.Transport{Protocols: protocols},
+	}
+}
+
+// ServeTLS is Serve for a listener that presents an identity.
+//
+// A separate function rather than a flag, because the two differ in a way a
+// flag would hide: ListenAndServeTLS is given empty paths, which tells the
+// standard library to use the certificate in TLSConfig instead of reading
+// files. That is what lets a rotated certificate be picked up — the
+// transport package hands back a config with GetCertificate on it, and a
+// server that had been given file paths would keep serving the first one it
+// read until it restarted.
+func ServeTLS(ctx context.Context, log *slog.Logger, name string, srv *http.Server, grace time.Duration) error {
+	var once sync.Once
+	var serveErr error
+
+	go func() {
+		<-ctx.Done()
+		stopping, cancel := context.WithTimeout(context.WithoutCancel(ctx), grace)
+		defer cancel()
+		log.InfoContext(ctx, "draining", slog.String("server", name))
+		if err := srv.Shutdown(stopping); err != nil {
+			log.ErrorContext(ctx, "drain did not finish", slog.String("server", name), slog.Any("error", err))
+		}
+	}()
+
+	if err := srv.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		once.Do(func() { serveErr = err })
+	}
+	return serveErr
+}
+
 // Drain turns the configured number of seconds into a duration, falling back
 // to a default when nothing was configured.
 //

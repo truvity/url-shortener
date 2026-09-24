@@ -3,19 +3,40 @@
   "$id": "https://example.com/url-shortener/schemas/redirect.json",
   "title": "redirect",
   "description": "The redirect service: resolve a short key and emit what happened.",
-  "allOf": [{ "$ref": "https://github.com/truvity/policy/schemas/service.json" }],
+  "allOf": [
+    {
+      "$ref": "https://github.com/truvity/policy/schemas/service.json"
+    }
+  ],
   "type": "object",
   "unevaluatedProperties": false,
-  "required": ["listen", "database", "events"],
+  "required": [
+    "listen",
+    "database",
+    "events"
+  ],
   "properties": {
-    "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
-    "tls": { "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json" },
+    "listen": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
+    },
+    "database": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json"
+    },
+    "tls": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"
+    },
     "events": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nats", "redirectSubject", "requestSubject"],
+      "required": [
+        "nats",
+        "redirectSubject",
+        "requestSubject"
+      ],
       "properties": {
-        "nats": { "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json" },
+        "nats": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/nats.json"
+        },
         "redirectSubject": {
           "type": "string",
           "minLength": 1,

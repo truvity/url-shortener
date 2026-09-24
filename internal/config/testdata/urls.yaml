@@ -1,0 +1,12 @@
+listen:
+  address: ":8080"
+probes:
+  address: ":7070"
+log:
+  level: info
+drain:
+  seconds: 20
+database:
+  url: postgres://urls@url-shortener-pg-rw:5432/url_shortener?sslmode=require
+  passwordEnv: DATABASE_PASSWORD
+  maxConnections: 20
