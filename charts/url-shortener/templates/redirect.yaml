@@ -77,6 +77,7 @@ spec:
           {{- include "url-shortener.preStop" . | nindent 10 }}
           volumeMounts:
             {{- include "url-shortener.eventsTokenMount" . | nindent 12 }}
+            {{- with include "url-shortener.databaseCertMount" . }}{{ . | nindent 12 }}{{- end }}
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -84,6 +85,7 @@ spec:
           resources: {{- toYaml .Values.resources.redirect | nindent 12 }}
       volumes:
         {{- include "url-shortener.eventsTokenVolume" . | nindent 8 }}
+        {{- with include "url-shortener.databaseCertVolume" . }}{{ . | nindent 8 }}{{- end }}
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-config

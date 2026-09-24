@@ -1,0 +1,172 @@
+{{- if eq .Values.tier "primary" }}
+{{- $c := .Values.cloud }}
+{{- $bucket := required "cloud.bucket is required for a primary install: the chart is told the store's name and derives nothing" $c.bucket }}
+{{- $iam := required "cloud.iamName is required for a primary install" $c.iamName }}
+{{- $account := required "cloud.serviceAccount is required for a primary install: the trust below is scoped to it" $c.serviceAccount }}
+{{/*
+The objects this install owns.
+
+They are here, in the chart, because they are functions of THIS release in
+THIS namespace. A stack that runs per cluster cannot provide them: there is
+no "the install" at that level, so it serves the deployment and leaves
+every engineer's copy and every CI run with nothing. That was tried, and
+that is what happened.
+
+They are AWS resources and the chart does not pretend otherwise. What
+keeps that honest is the tier above: an install that is not a primary
+renders none of this, so the chart still renders — and is still read,
+tested and reviewed — on a cluster that has never heard of any of these
+kinds.
+*/}}
+apiVersion: s3.services.k8s.aws/v1alpha1
+kind: Bucket
+metadata:
+  name: {{ $bucket }}
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    {{- /*
+    RETAINED, and ADOPTED where it already exists.
+
+    A primary keeps its data whatever happens to the row that describes
+    it -- deleting an install must not be a way to delete an archive. And
+    an S3 name is global, so a second CreateBucket for a bucket that is
+    already ours is either a conflict or, with the adoption annotation,
+    the same bucket under a new writer. This chart is the new writer: the
+    bucket it names was made by something else first.
+    */}}
+    services.k8s.aws/deletion-policy: retain
+    services.k8s.aws/adoption-policy: adopt-or-create
+    services.k8s.aws/adoption-fields: '{"name": {{ $bucket | quote }}}'
+spec:
+  name: {{ $bucket }}
+  tagging:
+    tagSet:
+      - key: tenancy.truvity.io/install
+        value: {{ .Release.Name }}
+      - key: truvity.io/preserve
+        value: "true"
+---
+{{/*
+Write-only on the bucket's CONTENTS, and list on the bucket itself.
+
+The service appends and nothing here can purge: no GetObject and no
+DeleteObject, so emptying this store is a deliberate act elsewhere and
+never a side effect of an install.
+
+ListBucket is the second statement and carries no read of any record. It
+is here because a writer that BATCHES has to answer "can I reach the
+store" before it accepts one, and HeadBucket -- the only non-destructive
+way to ask -- is authorized as ListBucket ON THE BUCKET. Note the
+resource has no trailing `/*`: granted on the contents it reads as a
+permission and authorizes nothing, and the writer 403s at start-up with a
+policy that looks right in every review.
+*/}}
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Policy
+metadata:
+  name: {{ $iam }}
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  name: {{ $iam }}
+  description: {{ printf "%s: append-only on the archive store" .Release.Name | quote }}
+  policyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {"Effect": "Allow", "Action": ["s3:PutObject"], "Resource": "arn:aws:s3:::{{ $bucket }}/*"},
+        {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": "arn:aws:s3:::{{ $bucket }}"}
+      ]
+    }
+---
+{{/*
+The role, trusted by EXACTLY this cluster, namespace and account.
+
+Pod Identity stamps the cluster as the source and session-tags the
+namespace and the account, so the conditions below are what make this a
+workload identity rather than a role any pod in the account can assume.
+A trust that names the cluster and stops there is not an identity, it is
+a shared secret with extra steps.
+*/}}
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: {{ $iam }}
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  name: {{ $iam }}
+  description: {{ printf "%s: workload role for the application account" .Release.Name | quote }}
+  {{- with $c.permissionsBoundary }}
+  permissionsBoundary: {{ . | quote }}
+  {{- end }}
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": {"Service": "pods.eks.amazonaws.com"},
+        "Action": ["sts:AssumeRole", "sts:TagSession"],
+        "Condition": {"StringEquals": {
+          "aws:SourceAccount": {{ required "cloud.accountID is required for a primary install" $c.accountID | quote }},
+          "aws:SourceArn": "arn:aws:eks:{{ required "cloud.region is required for a primary install" $c.region }}:{{ $c.accountID }}:cluster/{{ required "cloud.clusterName is required for a primary install" $c.clusterName }}",
+          "aws:RequestTag/kubernetes-namespace": {{ .Release.Namespace | quote }},
+          "aws:RequestTag/kubernetes-service-account": {{ $account | quote }}
+        }}
+      }]
+    }
+  tags:
+    - key: cluster
+      value: {{ $c.clusterName | quote }}
+  policyRefs:
+    - from:
+        name: {{ $iam }}
+---
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: PodIdentityAssociation
+metadata:
+  name: {{ $iam }}
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  clusterName: {{ $c.clusterName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  serviceAccount: {{ $account | quote }}
+  roleARN: "arn:aws:iam::{{ $c.accountID }}:role/{{ $iam }}"
+---
+{{/*
+Egress to the store, for the component that writes it, and for no other.
+
+A name-based egress rule is a cloud-specific kind, and this is the reason
+the tier exists rather than a reason to keep it out of the chart: the
+flow it describes belongs to this install, so a per-cluster stack could
+never scope it to one.
+*/}}
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-store-egress
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [log]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - domainNames: ["*.amazonaws.com"]
+      ports:
+        - port: 443
+          protocol: TCP
+{{- end }}

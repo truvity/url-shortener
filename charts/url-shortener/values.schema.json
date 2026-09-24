@@ -45,6 +45,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auth": {
+              "type": "string",
+              "enum": [
+                "password",
+                "certificate"
+              ]
+            },
             "passwordSecret": {
               "type": "string",
               "minLength": 1
@@ -67,13 +74,23 @@
               "type": "string",
               "minLength": 1
             },
-            "passwordSecret": {
+            "auth": {
               "type": "string",
-              "minLength": 1
+              "enum": [
+                "password",
+                "certificate"
+              ]
+            },
+            "passwordSecret": {
+              "type": "string"
             },
             "passwordKey": {
               "type": "string",
               "minLength": 1
+            },
+            "certificateSecret": {
+              "type": "string",
+              "description": "Secret holding the client certificate and the CA the server is verified against. Used when auth is `certificate`."
             }
           }
         }

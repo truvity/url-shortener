@@ -1,4 +1,86 @@
 ---
+# Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: example-identity
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  name: example-identity
+  description: "example: workload role for the application account"
+  permissionsBoundary: "arn:aws:iam::example-account-id:policy/example-boundary"
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": {"Service": "pods.eks.amazonaws.com"},
+        "Action": ["sts:AssumeRole", "sts:TagSession"],
+        "Condition": {"StringEquals": {
+          "aws:SourceAccount": "example-account-id",
+          "aws:SourceArn": "arn:aws:eks:example-region:example-account-id:cluster/example-cluster",
+          "aws:RequestTag/kubernetes-namespace": "default",
+          "aws:RequestTag/kubernetes-service-account": "example-account"
+        }}
+      }]
+    }
+  tags:
+    - key: cluster
+      value: "example-cluster"
+  policyRefs:
+    - from:
+        name: example-identity
+
+---
+# Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: example-store-egress
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: example
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [log]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - domainNames: ["*.amazonaws.com"]
+      ports:
+        - port: 443
+          protocol: TCP
+
+---
+# Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: s3.services.k8s.aws/v1alpha1
+kind: Bucket
+metadata:
+  name: example-archive
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+  annotations:
+    services.k8s.aws/deletion-policy: retain
+    services.k8s.aws/adoption-policy: adopt-or-create
+    services.k8s.aws/adoption-fields: '{"name": "example-archive"}'
+spec:
+  name: example-archive
+  tagging:
+    tagSet:
+      - key: tenancy.truvity.io/install
+        value: example
+      - key: truvity.io/preserve
+        value: "true"
+
+---
 # Source: url-shortener-infra/templates/infra.yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -44,6 +126,42 @@ spec:
         inherit: true
         passwordSecret:
           name: example-pg-runtime
+
+---
+# Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: PodIdentityAssociation
+metadata:
+  name: example-identity
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  clusterName: "example-cluster"
+  namespace: "default"
+  serviceAccount: "example-account"
+  roleARN: "arn:aws:iam::example-account-id:role/example-identity"
+
+---
+# Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Policy
+metadata:
+  name: example-identity
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  name: example-identity
+  description: "example: append-only on the archive store"
+  policyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {"Effect": "Allow", "Action": ["s3:PutObject"], "Resource": "arn:aws:s3:::example-archive/*"},
+        {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": "arn:aws:s3:::example-archive"}
+      ]
+    }
 
 ---
 # Source: url-shortener-infra/templates/infra.yaml

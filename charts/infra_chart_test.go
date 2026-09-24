@@ -290,3 +290,95 @@ func TestTheManagedRoleDeclaresWhatTheAPIDefaults(t *testing.T) {
 		}
 	}
 }
+
+// A test install provisions NOTHING of its own.
+//
+// This is the property that makes one chart serve three kinds of install.
+// An engineer's namespace typically grants the built-in `admin` role,
+// which covers no custom resources at all — so a chart that mints them
+// under every tier is one that engineer cannot install, and the failure
+// arrives as a permissions error naming a kind rather than a tier.
+//
+// It is also what keeps the cloud objects honest in a repository that is
+// read far more often than it is deployed: they render only where a
+// platform asked for them.
+func TestATestInstallMintsNothing(t *testing.T) {
+	out, err := renderInfra(t, infraDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	for _, kind := range []string{"Bucket", "Policy", "Role", "PodIdentityAssociation", "ApplicationNetworkPolicy"} {
+		if strings.Contains(out, "kind: "+kind) {
+			t.Errorf("a test install renders a %s; it runs as the namespace's standing identity and mints nothing", kind)
+		}
+	}
+}
+
+// A primary install provisions the objects it owns, and every name is given.
+func TestAPrimaryInstallMintsWhatItOwns(t *testing.T) {
+	out, err := renderInfra(t, infraDefaults(
+		"--set", "tier=primary",
+		"--set", "cloud.bucket=a-bucket",
+		"--set", "cloud.iamName=an-identity",
+		"--set", "cloud.clusterName=a-cluster",
+		"--set", "cloud.accountID=example-account-id",
+		"--set", "cloud.region=a-region",
+		"--set", "cloud.serviceAccount=an-account",
+	)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	for _, kind := range []string{"Bucket", "Policy", "Role", "PodIdentityAssociation", "ApplicationNetworkPolicy"} {
+		if !strings.Contains(out, "kind: "+kind) {
+			t.Errorf("a primary install renders no %s", kind)
+		}
+	}
+
+	// ListBucket on the BUCKET, with no trailing /*. Granted on the
+	// contents it reads as a permission and authorises nothing: the
+	// writer's start-up check 403s against a policy that looks right in
+	// every review. Found exactly that way.
+	if !strings.Contains(out, `"Resource": "arn:aws:s3:::a-bucket"`) {
+		t.Error("ListBucket is not granted on the bucket itself, so HeadBucket is refused")
+	}
+	// And it still cannot read or purge a single record.
+	for _, forbidden := range []string{"s3:GetObject", "s3:DeleteObject", "s3:DeleteBucket"} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("the archive role is granted %s; it appends and nothing more", forbidden)
+		}
+	}
+}
+
+// The runtime role's certificate is named for the ROLE.
+//
+// Postgres identifies a certificate's bearer by its common name. Named for
+// the release, the service or the host, the certificate is valid, trusted
+// and authenticates as nobody — the handshake succeeds and the connection
+// is refused, a long way from the cause.
+func TestTheRuntimeCertificateIsNamedForTheRole(t *testing.T) {
+	out, err := renderInfra(t,
+		"--set", "postgres.auth=certificate",
+		"--set", "postgres.clientIssuer.name=an-issuer",
+	)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	if !strings.Contains(out, "commonName: url_shortener_app") {
+		t.Error("the certificate's common name is not the role, so it authenticates as nobody")
+	}
+	// The password is REMOVED, not merely unused. A role that still has
+	// one is a role that can still be reached with it.
+	if !strings.Contains(out, "disablePassword: true") {
+		t.Error("the role keeps a password beside its certificate")
+	}
+	if strings.Contains(out, "passwordSecret:") {
+		t.Error("the role still names a password secret")
+	}
+	// And the server is told to demand it, or something will fall back.
+	if !strings.Contains(out, "hostssl url_shortener url_shortener_app all cert") {
+		t.Error("no pg_hba rule demands the certificate, so a password path remains open")
+	}
+}

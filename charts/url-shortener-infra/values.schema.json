@@ -8,6 +8,42 @@
     "events"
   ],
   "properties": {
+    "tier": {
+      "type": "string",
+      "enum": [
+        "test",
+        "primary"
+      ],
+      "description": "Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns."
+    },
+    "cloud": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The objects a primary install owns. Every name is given, never derived. Unused on a test install.",
+      "properties": {
+        "bucket": {
+          "type": "string"
+        },
+        "iamName": {
+          "type": "string"
+        },
+        "clusterName": {
+          "type": "string"
+        },
+        "accountID": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "serviceAccount": {
+          "type": "string"
+        },
+        "permissionsBoundary": {
+          "type": "string"
+        }
+      }
+    },
     "postgres": {
       "type": "object",
       "additionalProperties": false,
@@ -40,9 +76,16 @@
           "type": "string",
           "minLength": 1
         },
-        "runtimePasswordSecret": {
+        "auth": {
           "type": "string",
-          "minLength": 1
+          "enum": [
+            "password",
+            "certificate"
+          ],
+          "description": "How the runtime role proves who it is."
+        },
+        "runtimePasswordSecret": {
+          "type": "string"
         },
         "labels": {
           "type": "object",
@@ -89,6 +132,23 @@
             },
             "caSecretName": {
               "type": "string"
+            }
+          }
+        },
+        "clientIssuer": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The issuer that signs the runtime role's client certificate. Required when auth is `certificate`.",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
             }
           }
         }

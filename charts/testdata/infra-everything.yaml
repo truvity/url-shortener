@@ -5,6 +5,19 @@
 # it is unset in every render an example ever does. This fixture is the only
 # thing standing between "the platform passes it" and "the platform passes
 # it and it goes nowhere".
+# A primary install, because that is the tier where the cloud objects
+# exist at all. A fixture pinned to `test` would render none of them and
+# prove nothing about the values that describe them.
+tier: primary
+cloud:
+  bucket: example-archive
+  iamName: example-identity
+  clusterName: example-cluster
+  accountID: example-account-id
+  region: example-region
+  serviceAccount: example-account
+  permissionsBoundary: arn:aws:iam::example-account-id:policy/example-boundary
+
 postgres:
   instances: 3
   storage: 20Gi

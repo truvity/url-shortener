@@ -22,12 +22,27 @@ database:
   # No value appears in this file or in anything it renders.
   owner:
     role: url_shortener_owner
+    # The owner keeps a password: the operator issues it with the
+    # bootstrap, and only the migration ever holds it.
+    auth: password
     passwordSecret: ""
     passwordKey: password
   app:
     role: url_shortener_app
+    # How this role proves who it is. `password` names a secret below;
+    # `certificate` names one holding a client certificate the database's
+    # own CA issued, and no password exists at all.
+    #
+    # It must agree with what the infrastructure chart provisioned for the
+    # same role. Disagreeing is not refused anywhere: the role has one
+    # credential, the service presents the other, and the failure arrives
+    # as an authentication error that names neither.
+    auth: password
     passwordSecret: ""
     passwordKey: password
+    # Used when auth is `certificate`: the secret cert-manager wrote, and
+    # the CA the SERVER is verified against.
+    certificateSecret: ""
 
 events:
   url: ""
