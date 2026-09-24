@@ -44,6 +44,16 @@ Mode = Literal["off", "permissive", "strict"]
 _SCHEME = "spiffe"
 _PATH_LENGTH = 4
 
+# Stated rather than inherited, and the same floor the Go package sets.
+#
+# `create_default_context` already refuses anything below TLS 1.2, so this
+# raises the floor by one version — but the reason to write it down is that
+# the default is a property of the interpreter, and a service's transport
+# floor should not change because a base image did. Both ends of every
+# connection here are workloads this platform issued identities to, so there
+# is nothing old to be compatible with.
+_MINIMUM_VERSION = ssl.TLSVersion.TLSv1_3
+
 
 class TransportError(Exception):
     """A configuration that cannot be loaded, or a peer that is not admitted.
@@ -112,6 +122,7 @@ class Identity:
         MUST call once the connection is up.
         """
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self._ca_file)
+        context.minimum_version = _MINIMUM_VERSION
         context.check_hostname = False
         context.verify_mode = ssl.CERT_REQUIRED
         context.load_cert_chain(self._cert_file, self._key_file)
@@ -133,6 +144,7 @@ class Identity:
         docs/canon/python.md.
         """
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, cafile=self._ca_file)
+        context.minimum_version = _MINIMUM_VERSION
         context.verify_mode = ssl.CERT_REQUIRED
         context.load_cert_chain(self._cert_file, self._key_file)
         return context

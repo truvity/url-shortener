@@ -307,6 +307,16 @@ def call(authority: Path, name: str, port: int) -> bytes:
         return connection.recv(16)
 
 
+def test_both_contexts_refuse_anything_below_tls_1_3(authority: Path) -> None:
+    # Stated rather than inherited: the default is a property of the
+    # interpreter, and a service's transport floor should not change because
+    # a base image did. The Go package sets the same floor.
+    identity = load(fragment(authority, "server", []))
+    assert identity is not None
+    assert identity.client_context().minimum_version is ssl.TLSVersion.TLSv1_3
+    assert identity.server_context().minimum_version is ssl.TLSVersion.TLSv1_3
+
+
 def test_an_admitted_account_gets_through(authority: Path, server: tuple[int, list[str]]) -> None:
     port, decisions = server
     assert call(authority, "admitted", port) == b"yes"
