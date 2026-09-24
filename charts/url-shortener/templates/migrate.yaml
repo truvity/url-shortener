@@ -27,7 +27,7 @@ spec:
       {{- include "url-shortener.podSecurity" . | nindent 6 }}
       containers:
         - name: migrate
-          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "migrate") }}
+          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "migrate") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:

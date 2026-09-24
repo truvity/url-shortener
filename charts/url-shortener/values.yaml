@@ -82,14 +82,24 @@ archive:
 
 image:
   repository: ghcr.io/truvity/policy/url-shortener
-  # The release stamps a digest PER COMPONENT here. A tag is a moving target,
-  # and an image that can move under a running deployment is one nobody can
-  # roll back to.
+  # A digest PER COMPONENT, for a deployment that wants one. A tag can move
+  # and a digest cannot, so an image pinned here is one a rollback can
+  # actually reach.
+  #
+  # EMPTY BY DEFAULT, and the chart then uses its own appVersion. The
+  # release does not stamp these: it publishes the charts and the images in
+  # the same run, and a digest only exists once the image is built. A chart
+  # that refused to render without one would be a chart nobody could install
+  # from the registry it was published to — which is exactly how it was
+  # found, by installing it.
   #
   # Per component because they are different images. One digest shared by all
   # six would deploy the same container six times, each named as though it
   # were something else — and every render would look correct.
   digests: {}
+  # An explicit tag, for a deployment that wants one. Unset, the chart uses
+  # its own appVersion -- the version the release stamped, which is the one
+  # thing a published chart always knows about the images built beside it.
   tag: ""
   pullPolicy: IfNotPresent
 

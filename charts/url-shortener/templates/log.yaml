@@ -40,7 +40,7 @@ spec:
       {{- include "url-shortener.spread" (dict "Release" .Release "component" "log") | nindent 6 }}
       containers:
         - name: log
-          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "log") }}
+          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "log") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/log.yaml"]
           {{- with .Values.archive.bucket.credentialsSecret }}

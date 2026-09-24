@@ -37,7 +37,7 @@ spec:
       {{- include "url-shortener.spread" (dict "Release" .Release "component" "web") | nindent 6 }}
       containers:
         - name: web
-          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "web") }}
+          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "web") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/web.yaml"]
           ports:

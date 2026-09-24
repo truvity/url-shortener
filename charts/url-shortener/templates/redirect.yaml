@@ -43,7 +43,7 @@ spec:
       {{- include "url-shortener.spread" (dict "Release" .Release "component" "redirect") | nindent 6 }}
       containers:
         - name: redirect
-          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "redirect") }}
+          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "redirect") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:

@@ -43,7 +43,7 @@ spec:
       {{- include "url-shortener.spread" (dict "Release" .Release "component" "urls") | nindent 6 }}
       containers:
         - name: urls
-          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "urls") }}
+          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "urls") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:

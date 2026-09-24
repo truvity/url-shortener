@@ -216,6 +216,42 @@ func firstDifference(want, got string) string {
 	return "  (the files differ only in length)"
 }
 
+// A PUBLISHED chart installs with no image values at all.
+//
+// This is the test that was missing, and its absence was not visible from
+// inside the repository: every other test here supplies a tag or a set of
+// digests, so every one of them passed while the chart as published could
+// not render a single Deployment. It was found by installing it — the
+// release publishes the charts and the images in the same run, a digest
+// only exists once the image is built, and the chart's values therefore
+// reach the registry empty.
+//
+// What a published chart always knows is the version its release stamped.
+// That is what it falls back to, and this asserts the fallback resolves to
+// a reference for every component rather than to a refusal.
+func TestAPublishedChartRendersWithNoImageValues(t *testing.T) {
+	out, err := render(t, defaults()...)
+	if err != nil {
+		t.Fatalf("a chart with no image values must still render; this is what a consumer gets:\n%v\n%s", err, out)
+	}
+
+	seen := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "image: ") {
+			continue
+		}
+		ref := strings.TrimPrefix(trimmed, "image: ")
+		if !strings.Contains(ref, ":") && !strings.Contains(ref, "@") {
+			t.Errorf("%q names no version at all", ref)
+		}
+		seen[ref] = true
+	}
+	if len(seen) != 6 {
+		t.Errorf("expected six image references, found %d: %v", len(seen), seen)
+	}
+}
+
 // Six components are six DIFFERENT images.
 //
 // The chart used to take one `image.digest` and apply it to all of them,

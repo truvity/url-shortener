@@ -36,8 +36,18 @@ the configuration files.
 {{ $i.repository }}/{{ .component }}@{{ $digest }}
 {{- else if $i.tag -}}
 {{ $i.repository }}/{{ .component }}:{{ $i.tag }}
+{{- else if .root.Chart.AppVersion -}}
+{{- /*
+The release's own version, which is the one thing a published chart always
+knows about the images built beside it. It is a TAG, and a tag can move --
+but a release tag in this repository does not, and a chart that refused to
+install without a digest is a chart nobody can install from the registry it
+was published to. A deployment that wants the stronger guarantee sets
+image.digests and gets it.
+*/ -}}
+{{ $i.repository }}/{{ .component }}:{{ .root.Chart.AppVersion }}
 {{- else -}}
-{{ fail (printf "no image for %s: set image.digests.%s (what a release stamps) or image.tag" .component .component) }}
+{{ fail (printf "no image for %s: set image.digests.%s, image.tag, or publish this chart with an appVersion" .component .component) }}
 {{- end -}}
 {{- end -}}
 
