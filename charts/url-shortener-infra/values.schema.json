@@ -76,16 +76,9 @@
           "type": "string",
           "minLength": 1
         },
-        "auth": {
-          "type": "string",
-          "enum": [
-            "password",
-            "certificate"
-          ],
-          "description": "How the runtime role proves who it is."
-        },
         "runtimePasswordSecret": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "labels": {
           "type": "object",
@@ -132,23 +125,6 @@
             },
             "caSecretName": {
               "type": "string"
-            }
-          }
-        },
-        "clientIssuer": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "The issuer that signs the runtime role's client certificate. Required when auth is `certificate`.",
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "enum": [
-                "Issuer",
-                "ClusterIssuer"
-              ]
             }
           }
         }

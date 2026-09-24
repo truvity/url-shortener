@@ -71,14 +71,12 @@ spec:
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
-            {{- with include "url-shortener.databaseCertMount" . }}{{ . | nindent 12 }}{{- end }}
             {{- include "url-shortener.identityMount" . | nindent 12 }}
           resources: {{- toYaml .Values.resources.urls | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-config
-        {{- with include "url-shortener.databaseCertVolume" . }}{{ . | nindent 8 }}{{- end }}
         {{- include "url-shortener.identityVolume" . | nindent 8 }}
 ---
 apiVersion: v1

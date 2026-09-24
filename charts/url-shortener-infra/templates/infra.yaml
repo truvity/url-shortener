@@ -31,28 +31,6 @@ spec:
   instances: {{ .Values.postgres.instances }}
   storage:
     size: {{ .Values.postgres.storage }}
-  {{- if eq .Values.postgres.auth "certificate" }}
-  {{- /*
-  The server is TOLD to demand a certificate from this role.
-
-  Issuing one is not enough on its own: a role that may still present a
-  password is a role that will, the first time something falls back to
-  one, and the fallback is invisible because it succeeds. `cert` is the
-  method, so a connection without a certificate is refused rather than
-  downgraded.
-
-  `hostssl`, not `host`: the certificate is carried by the TLS handshake,
-  so a rule that would match a cleartext connection can never be
-  satisfied by one and only confuses the reader.
-
-  This entry is narrow on purpose -- this database, this role. The
-  operator keeps its own rules for replication and for the owner, and
-  appends these; a broad rule here would quietly widen those.
-  */}}
-  postgresql:
-    pg_hba:
-      - hostssl {{ .Values.postgres.database }} {{ .Values.postgres.runtimeRole }} all cert
-  {{- end }}
   bootstrap:
     initdb:
       database: {{ .Values.postgres.database }}
@@ -135,18 +113,8 @@ spec:
         */}}
         connectionLimit: -1
         inherit: true
-        {{- if eq .Values.postgres.auth "certificate" }}
-        {{- /*
-        No password AT ALL, and that is the point of this mode rather
-        than a detail of it. A role that still has one is a role that can
-        still be reached with it, whatever the server is configured to
-        prefer -- so the credential is not replaced here, it is removed.
-        */}}
-        disablePassword: true
-        {{- else }}
         passwordSecret:
           name: {{ required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent a password" .Values.postgres.runtimePasswordSecret }}
-        {{- end }}
 ---
 {{/*
 One stream, several subjects. The redirect service publishes to two of them
@@ -182,41 +150,3 @@ spec:
   servers:
     - {{ .Values.events.url }}
   {{- end }}
-{{- if eq .Values.postgres.auth "certificate" }}
----
-{{/*
-The runtime role's credential, and nothing generated it.
-
-Postgres identifies a certificate's bearer by its COMMON NAME, so the
-common name must be the role and not the release, the service or the
-host. A certificate that is valid, trusted and named anything else
-authenticates as nobody: the handshake succeeds and the connection is
-refused, which reads as a permissions problem a long way from the cause.
-
-The issuer must sign from the database's own client CA. The server
-verifies against that CA and no other, so a certificate from the
-cluster's general-purpose issuer is refused at connect with an error
-about an unknown authority -- correct, and unhelpful if you were
-expecting it to work.
-
-Renewal is the issuer's, which is the whole reason this is preferable to
-a password: nothing here expires quietly and nothing has to be rotated
-by hand.
-*/}}
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: {{ .Release.Name }}-pg-runtime
-  labels:
-    app.kubernetes.io/name: url-shortener-infra
-    app.kubernetes.io/instance: {{ .Release.Name }}
-spec:
-  secretName: {{ .Release.Name }}-pg-runtime
-  commonName: {{ .Values.postgres.runtimeRole }}
-  usages:
-    - client auth
-  issuerRef:
-    name: {{ required "postgres.clientIssuer.name is required when auth is certificate: it must sign from the database's own client CA" .Values.postgres.clientIssuer.name }}
-    kind: {{ .Values.postgres.clientIssuer.kind }}
-    group: cert-manager.io
-{{- end }}

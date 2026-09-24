@@ -60,13 +60,11 @@ Takes the role block (.Values.database.owner or .Values.database.app), so the
 migration and the services cannot accidentally be handed the same credential.
 */}}
 {{- define "url-shortener.passwordEnv" -}}
-{{- if ne .auth "certificate" -}}
 - name: DATABASE_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ required "passwordSecret is required for a role that authenticates with a password" .passwordSecret }}
+      name: {{ .passwordSecret }}
       key: {{ .passwordKey | default "password" }}
-{{- end }}
 {{- end -}}
 
 {{/*
@@ -278,45 +276,6 @@ clients. That is what a local one does, and what a laptop needs.
 {{- with .Values.events.auth.audience -}}
 - name: events-token
   mountPath: /var/run/events
-  readOnly: true
-{{- end }}
-{{- end -}}
-
-{{/*
-The application role's connection string, and how it proves who it is.
-
-With a certificate there is no password anywhere in this path: not in the
-file, not in a variable, not in a Secret the pod reads as one. `sslmode`
-becomes verify-full rather than require, because a client certificate
-proves the CLIENT to the server and does nothing in the other direction
--- require encrypts and verifies nobody, which is the asymmetry that makes
-"we use TLS" mean less than people think.
-*/}}
-{{- define "url-shortener.databaseURL" -}}
-{{- $db := .Values.database -}}
-{{- if eq $db.app.auth "certificate" -}}
-postgres://{{ $db.app.role }}@{{ $db.host }}:5432/{{ $db.name }}?sslmode=verify-full&sslcert=/etc/url-shortener/db/tls.crt&sslkey=/etc/url-shortener/db/tls.key&sslrootcert=/etc/url-shortener/db/ca.crt
-{{- else -}}
-postgres://{{ $db.app.role }}@{{ $db.host }}:5432/{{ $db.name }}?sslmode=require
-{{- end -}}
-{{- end }}
-
-{{/*
-The certificate, mounted read-only, and only where a role uses one.
-*/}}
-{{- define "url-shortener.databaseCertVolume" -}}
-{{- if eq .Values.database.app.auth "certificate" -}}
-- name: database-identity
-  secret:
-    secretName: {{ required "database.app.certificateSecret is required when database.app.auth is certificate" .Values.database.app.certificateSecret }}
-    defaultMode: 0400
-{{- end }}
-{{- end -}}
-
-{{- define "url-shortener.databaseCertMount" -}}
-{{- if eq .Values.database.app.auth "certificate" -}}
-- name: database-identity
-  mountPath: /etc/url-shortener/db
   readOnly: true
 {{- end }}
 {{- end -}}

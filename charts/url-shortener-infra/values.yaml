@@ -67,34 +67,17 @@ postgres:
   # migration ever uses it.
   ownerRole: url_shortener_owner
 
-  # The role the services run as, and HOW it proves who it is.
+  # The role the services run as, and the NAME of the basic-auth secret
+  # holding its password. The secret is created outside this chart, for the
+  # same reason the application chart takes a name rather than a value.
   #
-  #   password     the NAME of a basic-auth secret somebody else made.
-  #                Works on any cluster, and needs a provider: something
-  #                has to generate the password and put it there. The
-  #                platform can; nothing does it for a test install, which
-  #                then fails on a secret that is simply absent.
-  #
-  #   certificate  a client certificate issued from the CA the database
-  #                operator already runs. Nothing generates it, nothing
-  #                rotates it by hand, no tier needs a provider, and there
-  #                is no password to leak or to print.
-  #
-  # `password` is the default only because `certificate` needs a
-  # certificate issuer in the cluster, and a default that requires one
-  # would make a bare install fail on a dependency this example does not
-  # otherwise have.
+  # A client certificate would be better -- nothing to generate, nothing to
+  # rotate by hand, nothing to leak -- and `contracts/platform.md` says so.
+  # It is not offered here yet: the operator mints no certificate for a
+  # managed role, and wiring one up needs an issuer signing from the
+  # database's own client CA, which is a platform's to provide.
   runtimeRole: url_shortener_app
-  auth: password
-  # Required when auth is `password`, and unused when it is not.
   runtimePasswordSecret: ""
-  # Required when auth is `certificate`: the issuer that signs it. It must
-  # sign from the database's OWN client CA, because the server verifies
-  # against that and nothing else -- a certificate from any other issuer
-  # is refused at connect with an error about an unknown authority.
-  clientIssuer:
-    name: ""
-    kind: Issuer
 
   # ---- Below here is the PLATFORM's half, and every key is one of the
   # decisions docs/contracts/platform.md §9 already calls the platform's

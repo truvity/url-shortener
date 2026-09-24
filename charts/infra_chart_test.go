@@ -350,35 +350,3 @@ func TestAPrimaryInstallMintsWhatItOwns(t *testing.T) {
 		}
 	}
 }
-
-// The runtime role's certificate is named for the ROLE.
-//
-// Postgres identifies a certificate's bearer by its common name. Named for
-// the release, the service or the host, the certificate is valid, trusted
-// and authenticates as nobody — the handshake succeeds and the connection
-// is refused, a long way from the cause.
-func TestTheRuntimeCertificateIsNamedForTheRole(t *testing.T) {
-	out, err := renderInfra(t,
-		"--set", "postgres.auth=certificate",
-		"--set", "postgres.clientIssuer.name=an-issuer",
-	)
-	if err != nil {
-		t.Fatalf("the chart does not render: %v\n%s", err, out)
-	}
-
-	if !strings.Contains(out, "commonName: url_shortener_app") {
-		t.Error("the certificate's common name is not the role, so it authenticates as nobody")
-	}
-	// The password is REMOVED, not merely unused. A role that still has
-	// one is a role that can still be reached with it.
-	if !strings.Contains(out, "disablePassword: true") {
-		t.Error("the role keeps a password beside its certificate")
-	}
-	if strings.Contains(out, "passwordSecret:") {
-		t.Error("the role still names a password secret")
-	}
-	// And the server is told to demand it, or something will fall back.
-	if !strings.Contains(out, "hostssl url_shortener url_shortener_app all cert") {
-		t.Error("no pg_hba rule demands the certificate, so a password path remains open")
-	}
-}
