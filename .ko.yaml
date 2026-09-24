@@ -23,8 +23,3 @@ builds:
     env: [CGO_ENABLED=0]
     flags: [-trimpath]
     ldflags: [-s -w]
-  - id: stat
-    main: ./cmd/stat
-    env: [CGO_ENABLED=0]
-    flags: [-trimpath]
-    ldflags: [-s -w]

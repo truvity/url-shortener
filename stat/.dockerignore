@@ -1,0 +1,3 @@
+# Only the jar belongs in the context. The sources are already inside it.
+*
+!build/libs/stat.jar

@@ -1,0 +1,51 @@
+# What the FRAMEWORK needs to know, which is deliberately almost nothing.
+#
+# The service's own configuration is a file validated against a schema — see
+# Config.kt. This file exists to point the framework's own machinery at the
+# shape the service contract asks for, and nothing here is a setting a
+# deployment changes.
+spring:
+  main:
+    banner-mode: off
+
+management:
+  server:
+    # Probes on their OWN listener. The port that serves traffic is the port
+    # an ingress, a mesh or a curl can reach, and a readiness endpoint
+    # reachable from outside the cluster is one anybody can use to take a
+    # service out of rotation. This component serves no traffic at all and
+    # still owes the platform this.
+    port: 7070
+  endpoints:
+    web:
+      # `/health/live` and `/health/ready`, which is what the contract asks
+      # for and what every other component in this example answers on.
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        # Liveness checks NOTHING. A liveness probe that checks a dependency
+        # restarts a healthy process because something else is down.
+        live:
+          include: ping
+        # Readiness is whether this component can consume.
+        ready:
+          include: broker
+      show-details: never
+
+server:
+  # The application serves no HTTP of its own: it consumes a stream and
+  # calls an RPC. `-1` turns its listener off while leaving the PROBE
+  # listener below running on its own port.
+  #
+  # Not `web-application-type: none`, which was the first attempt and is
+  # subtly wrong: with no web server at all the process starts, consumes
+  # once, and exits — and the probe listener never starts either, so the
+  # symptom is a pod that reports "drained" a second after it reported
+  # "consuming".
+  port: -1
+  shutdown: graceful

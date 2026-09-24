@@ -142,30 +142,6 @@ type (
 			RequestSubject  string `json:"requestSubject"`
 		} `json:"events"`
 	}
-
-	// Stat counts what the redirect service published.
-	//
-	// It has NO database block. The table belongs to the URL service and the
-	// counter asks it — so the credential this component would otherwise
-	// hold, and the rights that credential would carry, simply do not exist
-	// here. That is the ownership rule showing up as an absence, which is
-	// the shape it usually takes.
-	Stat struct {
-		Probes Listen `json:"probes"`
-		Log    Log    `json:"log"`
-		Drain  Drain  `json:"drain"`
-		// The counter SERVES nothing but its probes, and still carries a
-		// transport block: it is the example's first in-cluster RPC client,
-		// and a client presents an identity too. The same block does both
-		// jobs, which is why `transport.Load` returns something that can
-		// answer `Server()` and `Client()`.
-		TLS    TLS    `json:"tls"`
-		Urls   Client `json:"urls"`
-		Events struct {
-			NATS     NATS     `json:"nats"`
-			Consumer Consumer `json:"consumer"`
-		} `json:"events"`
-	}
 )
 
 // LoadMigrate reads the migration job's configuration file, validates it
@@ -187,11 +163,4 @@ func LoadRedirect(path string) (Redirect, error) {
 func LoadUrls(path string) (Urls, error) {
 	var c Urls
 	return c, config.Load(path, Read("urls.json"), &c)
-}
-
-// LoadStat reads the stat service's configuration file and validates it
-// against the service's schema.
-func LoadStat(path string) (Stat, error) {
-	var c Stat
-	return c, config.Load(path, Read("stat.json"), &c)
 }

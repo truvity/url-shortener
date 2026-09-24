@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  JSON, to stderr, at one level.
+
+  stderr rather than stdout because stdout is the program's product and
+  stderr is its commentary. This program's product is rows in somebody
+  else's table, so it writes nothing to stdout at all — which the framework
+  does not do by default, and is the one thing this file is here to change.
+
+  The structured format is the framework's own, so there is no encoder
+  dependency to keep in step with it.
+-->
+<configuration>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+            <format>ecs</format>
+        </encoder>
+    </appender>
+
+    <root level="${LOG_LEVEL:-info}">
+        <appender-ref ref="STDERR"/>
+    </root>
+</configuration>

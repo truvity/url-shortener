@@ -14,7 +14,7 @@ and says what happened; something else counts that.
 | `cmd/migrate` | job, Go | brings the schema up to date, then exits |
 | `cmd/urls` | service, Go | **owns the URL tables**; answers Connect, gRPC and gRPC-Web |
 | `cmd/redirect` | service, Go | resolves a key, redirects, publishes what happened |
-| `cmd/stat` | service, Go | consumes redirects, asks `urls` to count them |
+| `stat/` | service, **Kotlin** | consumes redirects, asks `urls` to count them |
 | `log/` | service, **Python** | consumes request records, archives them as NDJSON |
 
 A web front end arrives next. The pieces here are the ones that make a
@@ -32,8 +32,8 @@ the rule is which to reach for:
   it is not worth what it buys. It is written down here so the next reader
   does not take it for an oversight.
 
-The archiver is not written in Go, and that is the point of it rather than a
-detail. It reads a configuration file this chart rendered, validated against
+Two of these are not written in Go, and that is the point of them rather than
+a detail. It reads a configuration file this chart rendered, validated against
 a schema it carries itself; it serves the same probes on the same port; it
 drains on SIGTERM within the same number the chart gives the platform; and
 its deployment is [twenty lines that never mention the

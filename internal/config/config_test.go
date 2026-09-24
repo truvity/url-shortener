@@ -3,7 +3,6 @@ package config_test
 import (
 	"bytes"
 	"encoding/json"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -25,7 +24,6 @@ func TestEveryConfigurationTypeMatchesItsSchema(t *testing.T) {
 	}{
 		"migrate":  {config.Migrate{}, "migrate.json"},
 		"redirect": {config.Redirect{}, "redirect.json"},
-		"stat":     {config.Stat{}, "stat.json"},
 		"urls":     {config.Urls{}, "urls.json"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -59,19 +57,6 @@ func TestTheExampleConfigurationsLoad(t *testing.T) {
 		}
 		if cfg.Probes.Address == "" {
 			t.Error("probes.address did not decode")
-		}
-	})
-
-	t.Run("stat", func(t *testing.T) {
-		cfg, err := config.LoadStat("testdata/stat.yaml")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if cfg.Events.Consumer.Durable == "" {
-			t.Error("the durable consumer name did not decode")
-		}
-		if cfg.Urls.Address == "" {
-			t.Error("the URL service's address did not decode")
 		}
 	})
 
@@ -111,9 +96,9 @@ func TestTheCounterCannotReachTheDatabase(t *testing.T) {
 	if bytes.Contains(config.Read("stat.json"), []byte("fragments/postgres.json")) {
 		t.Error("stat.json references the postgres fragment: the counter asks the URL service instead")
 	}
-	if _, ok := reflect.TypeOf(config.Stat{}).FieldByName("Database"); ok {
-		t.Error("config.Stat has a Database field: the counter asks the URL service instead")
-	}
+	// The Go type is gone with the Go component — the counter is Kotlin
+	// now — but the SCHEMA is still this repository's, and the chart still
+	// renders against it. The rule outlives the language.
 }
 
 // A password written into the file is refused, and the error does not repeat
