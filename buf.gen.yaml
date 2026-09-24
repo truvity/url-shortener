@@ -18,5 +18,19 @@ plugins:
   - local: protoc-gen-connect-go
     out: internal/gen
     opt: paths=source_relative
+  # TypeScript. ONE plugin, not two: connect-es v2 builds a client from the
+  # service descriptor this emits, so the separate connect plugin the v1
+  # line needed is gone. Generated into the front end's source tree, and
+  # committed, for the same reason the Go code is — a build step between a
+  # checkout and a compiler breaks the editor first.
+  - local: protoc-gen-es
+    out: web/src/gen
+    opt:
+      - target=ts
+      # `.ts`, not `.js`. The front end's server runs TypeScript directly —
+      # Node strips the types and resolves the path it is GIVEN — so an
+      # import ending in `.js` points at a file that was never emitted. The
+      # bundler is happy either way; the runtime is not.
+      - import_extension=ts
 inputs:
   - directory: proto

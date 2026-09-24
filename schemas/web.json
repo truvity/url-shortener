@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/url-shortener/schemas/web.json",
+  "title": "web",
+  "description": "The front end: serve the page, and ask the service that owns the tables. It writes nothing and holds no database credential.",
+  "allOf": [{ "$ref": "https://github.com/truvity/policy/schemas/service.json" }],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["listen", "urls", "assets"],
+  "properties": {
+    "listen": { "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json" },
+    "tls": { "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json" },
+    "urls": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is the tls block's business.",
+      "required": ["address"],
+      "properties": {
+        "address": { "type": "string", "minLength": 1 }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the built page is. A path rather than an embedded bundle, because the assets are the one thing in this image that a CDN might serve instead.",
+      "required": ["directory"],
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

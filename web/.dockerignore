@@ -1,0 +1,3 @@
+# Only what the build produced. The sources are already inside the bundle.
+*
+!dist

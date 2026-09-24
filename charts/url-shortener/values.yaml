@@ -206,6 +206,7 @@ replicas:
   stat: 2
   log: 2
   urls: 2
+  web: 2
 
 # Voluntary disruption, which is not the same thing as a rollout.
 #
@@ -226,6 +227,8 @@ resources:
     requests: { cpu: 50m, memory: 128Mi }
   urls:
     requests: { cpu: 50m, memory: 64Mi }
+  web:
+    requests: { cpu: 50m, memory: 96Mi }
   migrate:
     requests: { cpu: 50m, memory: 64Mi }
 

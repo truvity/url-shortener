@@ -121,6 +121,7 @@ func rendered() []struct {
 		{"redirect.yaml", func() []byte { return config.Read("redirect.json") }},
 		{"stat.yaml", func() []byte { return config.Read("stat.json") }},
 		{"urls.yaml", func() []byte { return config.Read("urls.json") }},
+		{"web.yaml", func() []byte { return config.Read("web.json") }},
 		{"log.yaml", func() []byte {
 			return config.ReadPython("log/src/url_shortener_log/log.schema.json")
 		}},

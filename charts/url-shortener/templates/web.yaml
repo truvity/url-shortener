@@ -1,0 +1,80 @@
+{{/*
+The front end.
+
+It serves a page and asks the service that owns the tables. It writes
+nothing and holds no database credential — the ownership rule seen from the
+consuming side, and the reason this deployment has no password environment
+block while the two Go services do.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener.name" . }}-web
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas.web }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      {{- include "url-shortener.podSecurity" . | nindent 6 }}
+      {{- include "url-shortener.drain" . | nindent 6 }}
+      {{- include "url-shortener.spread" (dict "Release" .Release "component" "web") | nindent 6 }}
+      containers:
+        - name: web
+          image: {{ include "url-shortener.image" (dict "Values" .Values "component" "web") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/etc/url-shortener/web.yaml"]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          {{- include "url-shortener.preStop" . | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            {{- include "url-shortener.identityMount" . | nindent 12 }}
+          resources: {{- toYaml .Values.resources.web | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener.name" . }}-config
+        {{- include "url-shortener.identityVolume" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "url-shortener.name" . }}-web
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -249,6 +249,10 @@
         "urls": {
           "type": "integer",
           "minimum": 0
+        },
+        "web": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -270,6 +274,9 @@
           "type": "object"
         },
         "urls": {
+          "type": "object"
+        },
+        "web": {
           "type": "object"
         }
       }

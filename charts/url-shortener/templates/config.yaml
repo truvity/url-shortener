@@ -177,6 +177,44 @@ data:
         durable: {{ .Values.events.consumers.stat }}
         subject: {{ .Values.events.redirectSubject }}
 
+  web.yaml: |
+    listen:
+      address: ":8080"
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.log.level }}
+    drain:
+      seconds: {{ .Values.drain.seconds }}
+    {{- if include "url-shortener.tlsOn" . }}
+    tls:
+      {{- /*
+      `strict` whenever the transport is on, for the same reason the counter
+      renders it: the front end SERVES a page but it does not serve this
+      boundary, and for the call it makes there is no third state. Its own
+      listener is the browser's, and the browser is outside the mesh of
+      workload identities — that edge is the gateway's to terminate.
+      */}}
+      mode: strict
+      certFile: {{ .Values.tls.mountPath }}/tls.crt
+      keyFile: {{ .Values.tls.mountPath }}/tls.key
+      caFile: {{ .Values.tls.mountPath }}/ca.crt
+      trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
+      peers:
+        - namespace: {{ .Release.Namespace }}
+          serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
+    {{- end }}
+    urls:
+      {{- if eq .Values.tls.mode "strict" }}
+      address: https://{{ include "url-shortener.name" . }}-urls:8080
+      {{- else if eq .Values.tls.mode "permissive" }}
+      address: https://{{ include "url-shortener.name" . }}-urls:{{ .Values.tls.port }}
+      {{- else }}
+      address: http://{{ include "url-shortener.name" . }}-urls:8080
+      {{- end }}
+    assets:
+      directory: /app/assets
+
   log.yaml: |
     probes:
       address: ":7070"

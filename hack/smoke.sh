@@ -149,6 +149,36 @@ if ! printf '%s' "$version" | grep -q '"component":"urls"'; then
 fi
 echo "    $version"
 
+# The front end, which is the fourth language in this example and the second
+# consumer of the boundary. It holds no database credential either: the page
+# it serves is assembled from an answer the URL service gave it.
+echo "==> the page, and what it asked for"
+kubectl -n "$NS" port-forward "svc/${APP}-web" 18100:8080 >/dev/null 2>&1 &
+webforward=$!
+trap 'kill $forward $urlsforward $webforward 2>/dev/null || true' EXIT
+
+for _ in $(seq 1 30); do
+    curl -fsS -o /dev/null "http://127.0.0.1:18100/" 2>/dev/null && break
+    sleep 1
+done
+
+page=$(curl -fsS "http://127.0.0.1:18100/")
+if ! printf '%s' "$page" | grep -q 'id="root"'; then
+    echo "SMOKE: the front end did not serve its page" >&2
+    exit 1
+fi
+
+# The part worth asserting: the page's own server asked the URL service and
+# got THIS key back. A front end that served a page and reached nothing
+# would pass the check above.
+answer=$(curl -fsS "http://127.0.0.1:18100/api/url?key=$KEY")
+if ! printf '%s' "$answer" | grep -q "$LONG_URL"; then
+    echo "SMOKE: the front end answered '$answer', which does not carry the URL it asked about" >&2
+    kubectl -n "$NS" logs -l app.kubernetes.io/component=web --tail=20 >&2
+    exit 1
+fi
+echo "    $answer"
+
 echo "==> waiting for the archive"
 # The other consumer of the same stream, and the one that proves the rest of
 # the contracts hold for a component that is not written in Go: it read the
@@ -187,4 +217,4 @@ if ! printf '%s' "$body" | grep -q '"subject":"url-shortener.log"'; then
 fi
 
 echo "    $newest holds $(printf '%s\n' "$body" | grep -c . ) record(s)"
-echo "smoke passed: migrate, the boundary, redirect, the broker, the counter and the archive all did their part"
+echo "smoke passed: migrate, the boundary, redirect, the page, the broker, the counter and the archive all did their part"
