@@ -19,6 +19,10 @@ FROM cgr.dev/chainguard/node:latest
 
 USER 65532:65532
 
-COPY dist /app
+# The COPY path is from the REPOSITORY ROOT, not from this directory, and
+# that is deliberate: the release stages this file into GoReleaser's build
+# context keeping its path, and the local build runs with the same context.
+# One build of this image rather than two that can disagree.
+COPY examples/url-shortener/web/dist /app
 
 ENTRYPOINT ["node", "/app/server/main.js"]

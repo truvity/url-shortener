@@ -19,6 +19,11 @@ FROM cgr.dev/chainguard/jre:latest
 # reader and an admission policy can both see it.
 USER 65532:65532
 
-COPY build/libs/stat.jar /app/stat.jar
+# The COPY path is from the REPOSITORY ROOT, not from this directory, and
+# that is deliberate: the release stages this file into GoReleaser's build
+# context keeping its path, and the local build runs the same
+# configuration. One build of this image rather than two that can disagree.
+#
+COPY examples/url-shortener/stat/build/libs/stat.jar /app/stat.jar
 
 ENTRYPOINT ["java", "-jar", "/app/stat.jar"]

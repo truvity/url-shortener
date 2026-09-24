@@ -33,7 +33,12 @@ FROM cgr.dev/chainguard/python:latest
 # local build is host-only because it loads into one node. See
 # hack/publish-images.sh.
 ARG TARGETARCH
-COPY build/site-packages-$TARGETARCH /app
+# The COPY path is from the REPOSITORY ROOT, not from this directory, and
+# that is deliberate: the release stages this file into GoReleaser's build
+# context keeping its path, and the local build runs the same
+# configuration. One build of this image rather than two that can disagree.
+#
+COPY examples/url-shortener/log/build/site-packages-$TARGETARCH /app
 
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \

@@ -26,12 +26,15 @@ cd "$(dirname "$0")/.."
 
 # Architectures to build, as Docker names them. The default is the host's,
 # because a local run wants one tree and wants it quickly.
-host="$(uname -m)"
-case "$host" in
-    x86_64) host=amd64 ;;
-    aarch64 | arm64) host=arm64 ;;
-esac
-ARCHES=${ARCHES:-$host}
+# EVERY architecture by default, because this tree is what the release's
+# image copies in and a release is always multi-architecture. The default
+# used to be the host's, which is correct for a fast local iteration and
+# silently wrong for everything else: the release built one tree and then
+# failed copying the other, which is the good outcome -- the bad one is a
+# default that quietly produces half a release.
+#
+# ARCHES is still the override, for exactly that fast local iteration.
+ARCHES=${ARCHES:-amd64 arm64}
 
 rm -rf build
 mkdir -p build/dist
