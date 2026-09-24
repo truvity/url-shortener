@@ -1,0 +1,121 @@
+# One value set to something other than its default, so that a render which
+# silently stopped reading a key shows up as a diff rather than as a
+# deployment quietly running on a default nobody chose.
+#
+# This is the half of golden testing that earns its keep. A `minimal` render
+# proves the chart works; this proves the chart is still WIRED — every value
+# below has to appear somewhere in the output, and a template that dropped
+# one would otherwise pass every test in this package.
+database:
+  host: pg.example.svc
+  name: shortener
+  owner:
+    role: owner_role
+    passwordSecret: owner-secret
+    passwordKey: owner-key
+  app:
+    role: app_role
+    passwordSecret: app-secret
+    passwordKey: app-key
+
+events:
+  url: nats://broker.example.svc:4222
+  redirectSubject: example.redirect
+  requestSubject: example.log
+  stream: EXAMPLE
+  consumers:
+    stat: example-stat
+    log: example-log
+
+archive:
+  bucket:
+    name: example-archive
+    region: eu-west-1
+    endpoint: https://s3.example.invalid
+    ca: /var/run/store/ca.crt
+    pathStyle: true
+    credentialsSecret: archive-secret
+    accessKeyIDKey: id-key
+    secretAccessKeyKey: secret-key
+  prefix: example/requests
+  batch:
+    maxRecords: 7
+    maxSeconds: 11
+
+image:
+  repository: registry.example.invalid/example
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  tag: ""
+  pullPolicy: Always
+
+log:
+  level: debug
+
+serviceAccount:
+  create: true
+  app:
+    name: app-account
+    annotations:
+      example.invalid/role: app
+  migrate:
+    name: migrate-account
+    annotations:
+      example.invalid/role: migrate
+
+drain:
+  seconds: 33
+  preStopSeconds: 7
+
+podSecurity:
+  runAsUser: 1234
+  runAsGroup: 5678
+  fsGroup: 9012
+
+tls:
+  mode: permissive
+  trustDomain: example.invalid
+  csiDriver: example.csi.invalid
+  mountPath: /var/run/example-identity
+  grantRequest: true
+  port: 9443
+  peers:
+    redirect:
+      - namespace: other
+        serviceAccount: caller
+    urls:
+      - namespace: other
+        serviceAccount: reader
+
+replicas:
+  redirect: 3
+  stat: 4
+  log: 5
+  urls: 6
+  web: 7
+
+disruption:
+  enabled: true
+  maxUnavailable: 2
+
+resources:
+  redirect:
+    requests: { cpu: 11m, memory: 111Mi }
+  stat:
+    requests: { cpu: 22m, memory: 222Mi }
+  log:
+    requests: { cpu: 33m, memory: 333Mi }
+  urls:
+    requests: { cpu: 44m, memory: 444Mi }
+  web:
+    requests: { cpu: 55m, memory: 555Mi }
+  migrate:
+    requests: { cpu: 66m, memory: 666Mi }
+
+route:
+  enabled: true
+  ruleName: example-rule
+  parentRef:
+    name: example-gateway
+    namespace: gateways
+    sectionName: https
+  hostname: shortener.example.invalid

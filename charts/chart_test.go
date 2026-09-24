@@ -1,6 +1,7 @@
 package charts_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,6 +143,71 @@ func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 			conformance.ValidDocument(t, conformance.ConfigMapData(t, []byte(out), tc.file), tc.schema())
 		})
 	}
+}
+
+// What the chart renders, byte for byte, for two sets of values.
+//
+// The goldens are the check that nothing moved that nobody meant to move. A
+// test that asserts a particular key is a test that says nothing about the
+// other four hundred lines; a golden says something about all of them, and
+// says it in a review rather than in a cluster.
+//
+// TWO cases, because they fail on different things. `minimal` is what the
+// defaults render to, so a changed default shows up here. `everything` sets
+// every value to something other than its default, so a template that
+// stopped reading one shows up as a diff — which nothing else in this
+// package would catch.
+//
+// Regenerate with `just golden` after reading the diff, never before.
+func TestWhatTheChartRenders(t *testing.T) {
+	for _, name := range []string{"minimal", "everything"} {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, "-f", filepath.Join("testdata", name+".yaml"))
+			if err != nil {
+				t.Fatalf("the chart does not render: %v\n%s", err, out)
+			}
+
+			path := filepath.Join("testdata", "golden", name+".yaml")
+			if os.Getenv("UPDATE_GOLDEN") != "" {
+				if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				t.Skip("golden updated")
+			}
+
+			want, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("%v — run `just golden` to create it", err)
+			}
+			if string(want) != out {
+				t.Errorf("the render moved. Read the diff, then `just golden`:\n%s",
+					firstDifference(string(want), out))
+			}
+		})
+	}
+}
+
+// firstDifference reports the first line that differs, with its number.
+//
+// The whole render is thousands of lines, and a test that printed all of it
+// is a test whose output people stop reading — which is the same as not
+// having one.
+func firstDifference(want, got string) string {
+	wantLines := strings.Split(want, "\n")
+	gotLines := strings.Split(got, "\n")
+	for i := 0; i < len(wantLines) || i < len(gotLines); i++ {
+		w, g := "", ""
+		if i < len(wantLines) {
+			w = wantLines[i]
+		}
+		if i < len(gotLines) {
+			g = gotLines[i]
+		}
+		if w != g {
+			return fmt.Sprintf("  line %d\n  want: %q\n  got:  %q", i+1, w, g)
+		}
+	}
+	return "  (the files differ only in length)"
 }
 
 // No secret is ever rendered. A configuration file is mounted from a

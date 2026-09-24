@@ -1,0 +1,18 @@
+# The least a deployment can say: the things the chart refuses to guess.
+#
+# Everything else is a default, and the golden beside this is what those
+# defaults render to — so a changed default is a diff in a review rather
+# than a surprise in a cluster.
+database:
+  host: pg
+  owner:
+    passwordSecret: owner
+  app:
+    passwordSecret: app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+image:
+  tag: dev

@@ -1,0 +1,739 @@
+---
+# Source: url-shortener/templates/poddisruptionbudget.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: redirect
+
+---
+# Source: url-shortener/templates/poddisruptionbudget.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: stat
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-app
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+
+---
+# Source: url-shortener/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+data:
+  redirect.yaml: |
+    listen:
+      address: ":8080"
+    probes:
+      address: ":7070"
+    log:
+      level: info
+    drain:
+      seconds: 20
+    database:
+      url: postgres://url_shortener_app@pg:5432/url_shortener?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+      maxConnections: 10
+    events:
+      nats:
+        url: nats://nats:4222
+      redirectSubject: url-shortener.redirect
+      requestSubject: url-shortener.log
+
+  urls.yaml: |
+    listen:
+      address: ":8080"
+    probes:
+      address: ":7070"
+    log:
+      level: info
+    drain:
+      seconds: 20
+    database:
+      url: postgres://url_shortener_app@pg:5432/url_shortener?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+      maxConnections: 20
+
+  stat.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: info
+    drain:
+      seconds: 20
+    urls:
+      address: http://example-urls:8080
+    events:
+      nats:
+        url: nats://nats:4222
+      consumer:
+        stream: URL_SHORTENER
+        durable: stat
+        subject: url-shortener.redirect
+
+  web.yaml: |
+    listen:
+      address: ":8080"
+    probes:
+      address: ":7070"
+    log:
+      level: info
+    drain:
+      seconds: 20
+    urls:
+      address: http://example-urls:8080
+    assets:
+      directory: /app/assets
+
+  log.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: info
+    drain:
+      seconds: 20
+    events:
+      nats:
+        url: nats://nats:4222
+      consumer:
+        stream: URL_SHORTENER
+        durable: log
+        subject: url-shortener.log
+    archive:
+      bucket:
+        name: archive
+      prefix: url-shortener/requests
+      batch:
+        maxRecords: 500
+        maxSeconds: 60
+
+---
+# Source: url-shortener/templates/redirect.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/component: redirect
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: url-shortener/templates/urls.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/component: urls
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: url-shortener/templates/web.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: url-shortener/templates/log.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-log
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: log
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: log
+      annotations:
+        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+    spec:
+      serviceAccountName: example-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: log
+      containers:
+        - name: log
+          image: ghcr.io/truvity/policy/url-shortener/log:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/etc/url-shortener/log.yaml"]
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-config
+        
+
+---
+# Source: url-shortener/templates/redirect.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      # The default is 25%, which on two replicas means one goes
+      # away first.
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: redirect
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: redirect
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+    spec:
+      serviceAccountName: example-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: redirect
+      containers:
+        - name: redirect
+          image: ghcr.io/truvity/policy/url-shortener/redirect:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/etc/url-shortener/redirect.yaml"]
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app
+                  key: password
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            # Nothing but the process. A liveness probe that checks a
+            # dependency restarts a healthy process and makes an outage worse.
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-config
+        
+
+---
+# Source: url-shortener/templates/stat.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      # The default is 25%, which on two replicas means one goes
+      # away first.
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: stat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: stat
+      annotations:
+        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+    spec:
+      serviceAccountName: example-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: stat
+      containers:
+        - name: stat
+          image: ghcr.io/truvity/policy/url-shortener/stat:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/etc/url-shortener/stat.yaml"]
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app
+                  key: password
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-config
+        
+
+---
+# Source: url-shortener/templates/urls.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The replacement is READY before the incumbent is touched.
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: urls
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: urls
+      annotations:
+        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+    spec:
+      serviceAccountName: example-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: urls
+      containers:
+        - name: urls
+          image: ghcr.io/truvity/policy/url-shortener/urls:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/etc/url-shortener/urls.yaml"]
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app
+                  key: password
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-config
+        
+
+---
+# Source: url-shortener/templates/web.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+    spec:
+      serviceAccountName: example-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: web
+      containers:
+        - name: web
+          image: ghcr.io/truvity/policy/url-shortener/web:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/etc/url-shortener/web.yaml"]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-config
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-migrate
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    # Before the migration's own configuration at -5, and well before the
+    # Job at 0.
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+
+---
+# Source: url-shortener/templates/migrate-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-migrate-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  migrate.yaml: |
+    log:
+      level: info
+    database:
+      url: postgres://url_shortener_owner@pg:5432/url_shortener?sslmode=require
+      passwordEnv: DATABASE_PASSWORD
+    ownerRole: url_shortener_owner
+    appRole: url_shortener_app
+
+---
+# Source: url-shortener/templates/migrate.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example-migrate
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      restartPolicy: Never
+      serviceAccountName: example-migrate
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: migrate
+          image: ghcr.io/truvity/policy/url-shortener/migrate:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/etc/url-shortener/migrate.yaml"]
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: owner
+                  key: password
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-migrate-config
+
