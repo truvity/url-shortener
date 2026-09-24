@@ -29,6 +29,13 @@ dev = [
     "ruff>=0.8",
     "types-jsonschema>=4.23",
     "types-pyyaml>=6.0",
+    # The telemetry extra, so the type checker can see it. It stays an
+    # EXTRA at runtime -- a consumer taking the loader alone should not
+    # carry an SDK it never starts -- but a checker that cannot resolve
+    # the import reports it as missing, and a repository whose gate is
+    # green only where somebody happened to install it is not a gate.
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
 ]
 
 [build-system]
