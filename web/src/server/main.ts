@@ -130,6 +130,42 @@ function port(address: string): number {
   return Number.parseInt(address.replace(/^.*:/, ""), 10);
 }
 
+// present is the one shape this front end sees, and it is NOT the protobuf
+// message. Timestamps become strings and a 64-bit count becomes a number,
+// because JSON has no Timestamp and JavaScript has no int64 — handing the
+// wire type straight to the page gives it a BigInt that JSON.stringify
+// refuses, which fails at the boundary rather than where it was decided.
+function present(url:
+  | { key?: string; longUrl?: string; clickCount?: bigint; createdAt?: { seconds?: bigint }; deletedAt?: { seconds?: bigint } }
+  | undefined): { key: string; longUrl: string; clicks: number; createdAt: string | null; deleted: boolean } {
+  const stamp = (t?: { seconds?: bigint }): string | null =>
+    t?.seconds === undefined ? null : new Date(Number(t.seconds) * 1000).toISOString();
+  return {
+    key: url?.key ?? "",
+    longUrl: url?.longUrl ?? "",
+    clicks: Number(url?.clickCount ?? 0),
+    createdAt: stamp(url?.createdAt),
+    deleted: url?.deletedAt !== undefined,
+  };
+}
+
+// readBody collects a request body with a CEILING on it. Without one a
+// single request can make this process hold as much memory as somebody
+// cares to send it.
+async function readBody(req: IncomingMessage): Promise<string> {
+  const LIMIT = 64 * 1024;
+  let size = 0;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > LIMIT) {
+      throw new Error("the request body is larger than this endpoint accepts");
+    }
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function serve(
   req: IncomingMessage,
   res: ServerResponse,
@@ -151,6 +187,57 @@ async function serve(
       logLine("error", "the URL service refused", { detail: (error as Error).message });
       res.writeHead(502, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "the URL service could not answer" }));
+    }
+    return;
+  }
+
+  // The listing, the create and the retire. Together with the lookup above
+  // they are the whole surface this page needs, and each is one call to the
+  // service that owns the table — this server holds no database credential
+  // and could not read it directly if it wanted to.
+  if (url.pathname === "/api/urls" && req.method === "GET") {
+    try {
+      const answer = await urls.list({
+        pageSize: Number(url.searchParams.get("pageSize") ?? 0),
+        pageToken: url.searchParams.get("pageToken") ?? "",
+        includeDeleted: url.searchParams.get("includeDeleted") === "true",
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ urls: answer.urls.map(present), nextPageToken: answer.nextPageToken }));
+    } catch (error) {
+      logLine("error", "the URL service refused a listing", { detail: (error as Error).message });
+      res.writeHead(502, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "the URL service could not answer" }));
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/urls" && req.method === "POST") {
+    try {
+      const body = JSON.parse(await readBody(req)) as { key?: string; longUrl?: string };
+      const answer = await urls.create({ key: body.key ?? "", longUrl: body.longUrl ?? "" });
+      res.writeHead(201, { "content-type": "application/json" });
+      res.end(JSON.stringify(present(answer.url)));
+    } catch (error) {
+      // The service's refusals are the caller's to see — a key already
+      // taken, a URL that is not one — so the message goes back rather
+      // than being flattened into "could not answer".
+      logLine("warn", "the URL service refused a create", { detail: (error as Error).message });
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: (error as Error).message }));
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/urls/") && req.method === "DELETE") {
+    const key = decodeURIComponent(url.pathname.slice("/api/urls/".length));
+    try {
+      await urls.delete({ key });
+      res.writeHead(204).end();
+    } catch (error) {
+      logLine("warn", "the URL service refused a delete", { detail: (error as Error).message });
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: (error as Error).message }));
     }
     return;
   }

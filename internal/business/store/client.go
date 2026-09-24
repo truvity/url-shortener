@@ -123,6 +123,48 @@ func (c *Client) GetURL(ctx context.Context, urlKey string) (*URLInfo, error) {
 	}, nil
 }
 
+// ListURLs returns a page of URLs, newest first, and the key to resume from.
+//
+// Paged by KEYSET rather than by offset. An offset re-reads and discards
+// everything before it, so the last page of a large table is the most
+// expensive one and the cost grows with the data — and rows inserted while
+// somebody pages shift every later offset, which silently skips records.
+// Ordering by a unique column and resuming after the last one seen has
+// neither problem.
+//
+// `url_key` is the cursor because it is unique and the table is ordered by
+// it. Created-at would read better and is not unique, so two rows sharing a
+// timestamp would either repeat or vanish at a page boundary.
+func (c *Client) ListURLs(ctx context.Context, limit int, after string, includeDeleted bool) ([]URLInfo, error) {
+	query := c.db.WithContext(ctx).Model(&models.URL{}).Order("url_key asc").Limit(limit)
+	if after != "" {
+		query = query.Where("url_key > ?", after)
+	}
+	if !includeDeleted {
+		query = query.Where("deleted_at IS NULL")
+	}
+
+	var urls []models.URL
+	if err := query.Find(&urls).Error; err != nil {
+		return nil, fmt.Errorf("failed to list URLs: %w", err)
+	}
+
+	infos := make([]URLInfo, 0, len(urls))
+	for _, url := range urls {
+		infos = append(infos, URLInfo{
+			Code:      url.URLKey,
+			URLKey:    url.URLKey,
+			LongURL:   url.LongURL,
+			CreatedAt: url.CreatedAt,
+			UpdatedAt: url.UpdatedAt,
+			DeletedAt: url.DeletedAt,
+			ExpiresAt: url.ExpiresAt,
+		})
+	}
+
+	return infos, nil
+}
+
 // GetURLString retrieves long URL string by url_key (for redirect)
 func (c *Client) GetURLString(ctx context.Context, urlKey string) (string, error) {
 	info, err := c.GetURL(ctx, urlKey)

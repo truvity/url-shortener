@@ -23,7 +23,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file urlshortener/v1/urls.proto.
  */
 export const file_urlshortener_v1_urls: GenFile = /*@__PURE__*/
-  fileDesc("Chp1cmxzaG9ydGVuZXIvdjEvdXJscy5wcm90bxIPdXJsc2hvcnRlbmVyLnYxIvkBCgNVcmwSCwoDa2V5GAEgASgJEhAKCGxvbmdfdXJsGAIgASgJEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmRlbGV0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2NsaWNrX2NvdW50GAcgASgDIl4KDUNyZWF0ZVJlcXVlc3QSCwoDa2V5GAEgASgJEhAKCGxvbmdfdXJsGAIgASgJEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjMKDkNyZWF0ZVJlc3BvbnNlEiEKA3VybBgBIAEoCzIULnVybHNob3J0ZW5lci52MS5VcmwiGQoKR2V0UmVxdWVzdBILCgNrZXkYASABKAkiMAoLR2V0UmVzcG9uc2USIQoDdXJsGAEgASgLMhQudXJsc2hvcnRlbmVyLnYxLlVybCKEAQoNVXBkYXRlUmVxdWVzdBILCgNrZXkYASABKAkSFQoIbG9uZ191cmwYAiABKAlIAIgBARIzCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBQgsKCV9sb25nX3VybEINCgtfZXhwaXJlc19hdCIzCg5VcGRhdGVSZXNwb25zZRIhCgN1cmwYASABKAsyFC51cmxzaG9ydGVuZXIudjEuVXJsIhwKDURlbGV0ZVJlcXVlc3QSCwoDa2V5GAEgASgJIhAKDkRlbGV0ZVJlc3BvbnNlIh0KDlJlc3RvcmVSZXF1ZXN0EgsKA2tleRgBIAEoCSI0Cg9SZXN0b3JlUmVzcG9uc2USIQoDdXJsGAEgASgLMhQudXJsc2hvcnRlbmVyLnYxLlVybCIdCg5SZXNvbHZlUmVxdWVzdBILCgNrZXkYASABKAkiIwoPUmVzb2x2ZVJlc3BvbnNlEhAKCGxvbmdfdXJsGAEgASgJIiYKElJlY29yZENsaWNrUmVxdWVzdBIQCghsb25nX3VybBgBIAEoCSIqChNSZWNvcmRDbGlja1Jlc3BvbnNlEhMKC2NsaWNrX2NvdW50GAEgASgDMqYECgtVcmxzU2VydmljZRJJCgZDcmVhdGUSHi51cmxzaG9ydGVuZXIudjEuQ3JlYXRlUmVxdWVzdBofLnVybHNob3J0ZW5lci52MS5DcmVhdGVSZXNwb25zZRJACgNHZXQSGy51cmxzaG9ydGVuZXIudjEuR2V0UmVxdWVzdBocLnVybHNob3J0ZW5lci52MS5HZXRSZXNwb25zZRJJCgZVcGRhdGUSHi51cmxzaG9ydGVuZXIudjEuVXBkYXRlUmVxdWVzdBofLnVybHNob3J0ZW5lci52MS5VcGRhdGVSZXNwb25zZRJJCgZEZWxldGUSHi51cmxzaG9ydGVuZXIudjEuRGVsZXRlUmVxdWVzdBofLnVybHNob3J0ZW5lci52MS5EZWxldGVSZXNwb25zZRJMCgdSZXN0b3JlEh8udXJsc2hvcnRlbmVyLnYxLlJlc3RvcmVSZXF1ZXN0GiAudXJsc2hvcnRlbmVyLnYxLlJlc3RvcmVSZXNwb25zZRJMCgdSZXNvbHZlEh8udXJsc2hvcnRlbmVyLnYxLlJlc29sdmVSZXF1ZXN0GiAudXJsc2hvcnRlbmVyLnYxLlJlc29sdmVSZXNwb25zZRJYCgtSZWNvcmRDbGljaxIjLnVybHNob3J0ZW5lci52MS5SZWNvcmRDbGlja1JlcXVlc3QaJC51cmxzaG9ydGVuZXIudjEuUmVjb3JkQ2xpY2tSZXNwb25zZUJeWlxnaXRodWIuY29tL3RydXZpdHkvcG9saWN5L2V4YW1wbGVzL3VybC1zaG9ydGVuZXIvaW50ZXJuYWwvZ2VuL3VybHNob3J0ZW5lci92MTt1cmxzaG9ydGVuZXJ2MWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Chp1cmxzaG9ydGVuZXIvdjEvdXJscy5wcm90bxIPdXJsc2hvcnRlbmVyLnYxIvkBCgNVcmwSCwoDa2V5GAEgASgJEhAKCGxvbmdfdXJsGAIgASgJEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmRlbGV0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2NsaWNrX2NvdW50GAcgASgDIl4KDUNyZWF0ZVJlcXVlc3QSCwoDa2V5GAEgASgJEhAKCGxvbmdfdXJsGAIgASgJEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjMKDkNyZWF0ZVJlc3BvbnNlEiEKA3VybBgBIAEoCzIULnVybHNob3J0ZW5lci52MS5VcmwiGQoKR2V0UmVxdWVzdBILCgNrZXkYASABKAkiMAoLR2V0UmVzcG9uc2USIQoDdXJsGAEgASgLMhQudXJsc2hvcnRlbmVyLnYxLlVybCJNCgtMaXN0UmVxdWVzdBIRCglwYWdlX3NpemUYASABKAUSEgoKcGFnZV90b2tlbhgCIAEoCRIXCg9pbmNsdWRlX2RlbGV0ZWQYAyABKAgiSwoMTGlzdFJlc3BvbnNlEiIKBHVybHMYASADKAsyFC51cmxzaG9ydGVuZXIudjEuVXJsEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSKEAQoNVXBkYXRlUmVxdWVzdBILCgNrZXkYASABKAkSFQoIbG9uZ191cmwYAiABKAlIAIgBARIzCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBQgsKCV9sb25nX3VybEINCgtfZXhwaXJlc19hdCIzCg5VcGRhdGVSZXNwb25zZRIhCgN1cmwYASABKAsyFC51cmxzaG9ydGVuZXIudjEuVXJsIhwKDURlbGV0ZVJlcXVlc3QSCwoDa2V5GAEgASgJIhAKDkRlbGV0ZVJlc3BvbnNlIh0KDlJlc3RvcmVSZXF1ZXN0EgsKA2tleRgBIAEoCSI0Cg9SZXN0b3JlUmVzcG9uc2USIQoDdXJsGAEgASgLMhQudXJsc2hvcnRlbmVyLnYxLlVybCIdCg5SZXNvbHZlUmVxdWVzdBILCgNrZXkYASABKAkiIwoPUmVzb2x2ZVJlc3BvbnNlEhAKCGxvbmdfdXJsGAEgASgJIiYKElJlY29yZENsaWNrUmVxdWVzdBIQCghsb25nX3VybBgBIAEoCSIqChNSZWNvcmRDbGlja1Jlc3BvbnNlEhMKC2NsaWNrX2NvdW50GAEgASgDMusECgtVcmxzU2VydmljZRJJCgZDcmVhdGUSHi51cmxzaG9ydGVuZXIudjEuQ3JlYXRlUmVxdWVzdBofLnVybHNob3J0ZW5lci52MS5DcmVhdGVSZXNwb25zZRJACgNHZXQSGy51cmxzaG9ydGVuZXIudjEuR2V0UmVxdWVzdBocLnVybHNob3J0ZW5lci52MS5HZXRSZXNwb25zZRJDCgRMaXN0EhwudXJsc2hvcnRlbmVyLnYxLkxpc3RSZXF1ZXN0Gh0udXJsc2hvcnRlbmVyLnYxLkxpc3RSZXNwb25zZRJJCgZVcGRhdGUSHi51cmxzaG9ydGVuZXIudjEuVXBkYXRlUmVxdWVzdBofLnVybHNob3J0ZW5lci52MS5VcGRhdGVSZXNwb25zZRJJCgZEZWxldGUSHi51cmxzaG9ydGVuZXIudjEuRGVsZXRlUmVxdWVzdBofLnVybHNob3J0ZW5lci52MS5EZWxldGVSZXNwb25zZRJMCgdSZXN0b3JlEh8udXJsc2hvcnRlbmVyLnYxLlJlc3RvcmVSZXF1ZXN0GiAudXJsc2hvcnRlbmVyLnYxLlJlc3RvcmVSZXNwb25zZRJMCgdSZXNvbHZlEh8udXJsc2hvcnRlbmVyLnYxLlJlc29sdmVSZXF1ZXN0GiAudXJsc2hvcnRlbmVyLnYxLlJlc29sdmVSZXNwb25zZRJYCgtSZWNvcmRDbGljaxIjLnVybHNob3J0ZW5lci52MS5SZWNvcmRDbGlja1JlcXVlc3QaJC51cmxzaG9ydGVuZXIudjEuUmVjb3JkQ2xpY2tSZXNwb25zZUJeWlxnaXRodWIuY29tL3RydXZpdHkvcG9saWN5L2V4YW1wbGVzL3VybC1zaG9ydGVuZXIvaW50ZXJuYWwvZ2VuL3VybHNob3J0ZW5lci92MTt1cmxzaG9ydGVuZXJ2MWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * A shortened URL, as this service reports it.
@@ -164,6 +164,74 @@ export const GetResponseSchema: GenMessage<GetResponse> = /*@__PURE__*/
   messageDesc(file_urlshortener_v1_urls, 4);
 
 /**
+ * Listing is PAGED, and the page size has a ceiling the caller cannot
+ * raise. A list that returns everything is a list that works until the
+ * table is large and then takes the service down with a query nobody
+ * changed — and an example that shipped one would be teaching that shape
+ * rather than this one.
+ *
+ * @generated from message urlshortener.v1.ListRequest
+ */
+export type ListRequest = Message<"urlshortener.v1.ListRequest"> & {
+  /**
+   * How many at most. Zero means the default; anything above the
+   * service's ceiling is clamped to it rather than refused, because a
+   * caller asking for more is not an error, it is a caller who does not
+   * know the ceiling.
+   *
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * The `next_page_token` from the previous answer. Empty starts at the
+   * beginning.
+   *
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+
+  /**
+   * Include keys that have been retired. Off by default: a retired key
+   * still exists and still refuses, so listing them is a deliberate ask.
+   *
+   * @generated from field: bool include_deleted = 3;
+   */
+  includeDeleted: boolean;
+};
+
+/**
+ * Describes the message urlshortener.v1.ListRequest.
+ * Use `create(ListRequestSchema)` to create a new message.
+ */
+export const ListRequestSchema: GenMessage<ListRequest> = /*@__PURE__*/
+  messageDesc(file_urlshortener_v1_urls, 5);
+
+/**
+ * @generated from message urlshortener.v1.ListResponse
+ */
+export type ListResponse = Message<"urlshortener.v1.ListResponse"> & {
+  /**
+   * @generated from field: repeated urlshortener.v1.Url urls = 1;
+   */
+  urls: Url[];
+
+  /**
+   * Empty when there is no further page.
+   *
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message urlshortener.v1.ListResponse.
+ * Use `create(ListResponseSchema)` to create a new message.
+ */
+export const ListResponseSchema: GenMessage<ListResponse> = /*@__PURE__*/
+  messageDesc(file_urlshortener_v1_urls, 6);
+
+/**
  * @generated from message urlshortener.v1.UpdateRequest
  */
 export type UpdateRequest = Message<"urlshortener.v1.UpdateRequest"> & {
@@ -192,7 +260,7 @@ export type UpdateRequest = Message<"urlshortener.v1.UpdateRequest"> & {
  * Use `create(UpdateRequestSchema)` to create a new message.
  */
 export const UpdateRequestSchema: GenMessage<UpdateRequest> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 5);
+  messageDesc(file_urlshortener_v1_urls, 7);
 
 /**
  * @generated from message urlshortener.v1.UpdateResponse
@@ -209,7 +277,7 @@ export type UpdateResponse = Message<"urlshortener.v1.UpdateResponse"> & {
  * Use `create(UpdateResponseSchema)` to create a new message.
  */
 export const UpdateResponseSchema: GenMessage<UpdateResponse> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 6);
+  messageDesc(file_urlshortener_v1_urls, 8);
 
 /**
  * @generated from message urlshortener.v1.DeleteRequest
@@ -226,7 +294,7 @@ export type DeleteRequest = Message<"urlshortener.v1.DeleteRequest"> & {
  * Use `create(DeleteRequestSchema)` to create a new message.
  */
 export const DeleteRequestSchema: GenMessage<DeleteRequest> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 7);
+  messageDesc(file_urlshortener_v1_urls, 9);
 
 /**
  * @generated from message urlshortener.v1.DeleteResponse
@@ -239,7 +307,7 @@ export type DeleteResponse = Message<"urlshortener.v1.DeleteResponse"> & {
  * Use `create(DeleteResponseSchema)` to create a new message.
  */
 export const DeleteResponseSchema: GenMessage<DeleteResponse> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 8);
+  messageDesc(file_urlshortener_v1_urls, 10);
 
 /**
  * @generated from message urlshortener.v1.RestoreRequest
@@ -256,7 +324,7 @@ export type RestoreRequest = Message<"urlshortener.v1.RestoreRequest"> & {
  * Use `create(RestoreRequestSchema)` to create a new message.
  */
 export const RestoreRequestSchema: GenMessage<RestoreRequest> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 9);
+  messageDesc(file_urlshortener_v1_urls, 11);
 
 /**
  * @generated from message urlshortener.v1.RestoreResponse
@@ -273,7 +341,7 @@ export type RestoreResponse = Message<"urlshortener.v1.RestoreResponse"> & {
  * Use `create(RestoreResponseSchema)` to create a new message.
  */
 export const RestoreResponseSchema: GenMessage<RestoreResponse> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 10);
+  messageDesc(file_urlshortener_v1_urls, 12);
 
 /**
  * @generated from message urlshortener.v1.ResolveRequest
@@ -290,7 +358,7 @@ export type ResolveRequest = Message<"urlshortener.v1.ResolveRequest"> & {
  * Use `create(ResolveRequestSchema)` to create a new message.
  */
 export const ResolveRequestSchema: GenMessage<ResolveRequest> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 11);
+  messageDesc(file_urlshortener_v1_urls, 13);
 
 /**
  * @generated from message urlshortener.v1.ResolveResponse
@@ -307,7 +375,7 @@ export type ResolveResponse = Message<"urlshortener.v1.ResolveResponse"> & {
  * Use `create(ResolveResponseSchema)` to create a new message.
  */
 export const ResolveResponseSchema: GenMessage<ResolveResponse> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 12);
+  messageDesc(file_urlshortener_v1_urls, 14);
 
 /**
  * @generated from message urlshortener.v1.RecordClickRequest
@@ -328,7 +396,7 @@ export type RecordClickRequest = Message<"urlshortener.v1.RecordClickRequest"> &
  * Use `create(RecordClickRequestSchema)` to create a new message.
  */
 export const RecordClickRequestSchema: GenMessage<RecordClickRequest> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 13);
+  messageDesc(file_urlshortener_v1_urls, 15);
 
 /**
  * @generated from message urlshortener.v1.RecordClickResponse
@@ -345,7 +413,7 @@ export type RecordClickResponse = Message<"urlshortener.v1.RecordClickResponse">
  * Use `create(RecordClickResponseSchema)` to create a new message.
  */
 export const RecordClickResponseSchema: GenMessage<RecordClickResponse> = /*@__PURE__*/
-  messageDesc(file_urlshortener_v1_urls, 14);
+  messageDesc(file_urlshortener_v1_urls, 16);
 
 /**
  * UrlsService owns the URL tables. Nothing else writes them.
@@ -368,6 +436,14 @@ export const UrlsService: GenService<{
     methodKind: "unary";
     input: typeof GetRequestSchema;
     output: typeof GetResponseSchema;
+  },
+  /**
+   * @generated from rpc urlshortener.v1.UrlsService.List
+   */
+  list: {
+    methodKind: "unary";
+    input: typeof ListRequestSchema;
+    output: typeof ListResponseSchema;
   },
   /**
    * @generated from rpc urlshortener.v1.UrlsService.Update

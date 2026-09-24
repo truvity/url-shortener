@@ -48,6 +48,8 @@ const (
 	UrlsServiceCreateProcedure = "/urlshortener.v1.UrlsService/Create"
 	// UrlsServiceGetProcedure is the fully-qualified name of the UrlsService's Get RPC.
 	UrlsServiceGetProcedure = "/urlshortener.v1.UrlsService/Get"
+	// UrlsServiceListProcedure is the fully-qualified name of the UrlsService's List RPC.
+	UrlsServiceListProcedure = "/urlshortener.v1.UrlsService/List"
 	// UrlsServiceUpdateProcedure is the fully-qualified name of the UrlsService's Update RPC.
 	UrlsServiceUpdateProcedure = "/urlshortener.v1.UrlsService/Update"
 	// UrlsServiceDeleteProcedure is the fully-qualified name of the UrlsService's Delete RPC.
@@ -64,6 +66,7 @@ const (
 type UrlsServiceClient interface {
 	Create(context.Context, *connect.Request[v1.CreateRequest]) (*connect.Response[v1.CreateResponse], error)
 	Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.GetResponse], error)
+	List(context.Context, *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error)
 	Update(context.Context, *connect.Request[v1.UpdateRequest]) (*connect.Response[v1.UpdateResponse], error)
 	Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error)
 	Restore(context.Context, *connect.Request[v1.RestoreRequest]) (*connect.Response[v1.RestoreResponse], error)
@@ -100,6 +103,12 @@ func NewUrlsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+UrlsServiceGetProcedure,
 			connect.WithSchema(urlsServiceMethods.ByName("Get")),
+			connect.WithClientOptions(opts...),
+		),
+		list: connect.NewClient[v1.ListRequest, v1.ListResponse](
+			httpClient,
+			baseURL+UrlsServiceListProcedure,
+			connect.WithSchema(urlsServiceMethods.ByName("List")),
 			connect.WithClientOptions(opts...),
 		),
 		update: connect.NewClient[v1.UpdateRequest, v1.UpdateResponse](
@@ -139,6 +148,7 @@ func NewUrlsServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type urlsServiceClient struct {
 	create      *connect.Client[v1.CreateRequest, v1.CreateResponse]
 	get         *connect.Client[v1.GetRequest, v1.GetResponse]
+	list        *connect.Client[v1.ListRequest, v1.ListResponse]
 	update      *connect.Client[v1.UpdateRequest, v1.UpdateResponse]
 	delete      *connect.Client[v1.DeleteRequest, v1.DeleteResponse]
 	restore     *connect.Client[v1.RestoreRequest, v1.RestoreResponse]
@@ -154,6 +164,11 @@ func (c *urlsServiceClient) Create(ctx context.Context, req *connect.Request[v1.
 // Get calls urlshortener.v1.UrlsService.Get.
 func (c *urlsServiceClient) Get(ctx context.Context, req *connect.Request[v1.GetRequest]) (*connect.Response[v1.GetResponse], error) {
 	return c.get.CallUnary(ctx, req)
+}
+
+// List calls urlshortener.v1.UrlsService.List.
+func (c *urlsServiceClient) List(ctx context.Context, req *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error) {
+	return c.list.CallUnary(ctx, req)
 }
 
 // Update calls urlshortener.v1.UrlsService.Update.
@@ -185,6 +200,7 @@ func (c *urlsServiceClient) RecordClick(ctx context.Context, req *connect.Reques
 type UrlsServiceHandler interface {
 	Create(context.Context, *connect.Request[v1.CreateRequest]) (*connect.Response[v1.CreateResponse], error)
 	Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.GetResponse], error)
+	List(context.Context, *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error)
 	Update(context.Context, *connect.Request[v1.UpdateRequest]) (*connect.Response[v1.UpdateResponse], error)
 	Delete(context.Context, *connect.Request[v1.DeleteRequest]) (*connect.Response[v1.DeleteResponse], error)
 	Restore(context.Context, *connect.Request[v1.RestoreRequest]) (*connect.Response[v1.RestoreResponse], error)
@@ -217,6 +233,12 @@ func NewUrlsServiceHandler(svc UrlsServiceHandler, opts ...connect.HandlerOption
 		UrlsServiceGetProcedure,
 		svc.Get,
 		connect.WithSchema(urlsServiceMethods.ByName("Get")),
+		connect.WithHandlerOptions(opts...),
+	)
+	urlsServiceListHandler := connect.NewUnaryHandler(
+		UrlsServiceListProcedure,
+		svc.List,
+		connect.WithSchema(urlsServiceMethods.ByName("List")),
 		connect.WithHandlerOptions(opts...),
 	)
 	urlsServiceUpdateHandler := connect.NewUnaryHandler(
@@ -255,6 +277,8 @@ func NewUrlsServiceHandler(svc UrlsServiceHandler, opts ...connect.HandlerOption
 			urlsServiceCreateHandler.ServeHTTP(w, r)
 		case UrlsServiceGetProcedure:
 			urlsServiceGetHandler.ServeHTTP(w, r)
+		case UrlsServiceListProcedure:
+			urlsServiceListHandler.ServeHTTP(w, r)
 		case UrlsServiceUpdateProcedure:
 			urlsServiceUpdateHandler.ServeHTTP(w, r)
 		case UrlsServiceDeleteProcedure:
@@ -280,6 +304,10 @@ func (UnimplementedUrlsServiceHandler) Create(context.Context, *connect.Request[
 
 func (UnimplementedUrlsServiceHandler) Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.GetResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("urlshortener.v1.UrlsService.Get is not implemented"))
+}
+
+func (UnimplementedUrlsServiceHandler) List(context.Context, *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("urlshortener.v1.UrlsService.List is not implemented"))
 }
 
 func (UnimplementedUrlsServiceHandler) Update(context.Context, *connect.Request[v1.UpdateRequest]) (*connect.Response[v1.UpdateResponse], error) {

@@ -90,6 +90,53 @@ func (h *Handler) Get(
 	return connect.NewResponse(&v1.GetResponse{Url: url}), nil
 }
 
+// List returns a page of URLs and the token to resume from.
+//
+// The page size has a CEILING the caller cannot raise. A caller asking for
+// more than the service will give is not an error -- it is a caller who
+// does not know the ceiling -- so the request is clamped rather than
+// refused. Refusing would make every client carry a number that belongs to
+// the service.
+func (h *Handler) List(
+	ctx context.Context,
+	req *connect.Request[v1.ListRequest],
+) (*connect.Response[v1.ListResponse], error) {
+	size := pageSize(int(req.Msg.GetPageSize()))
+
+	// One more than asked for, to learn whether another page exists
+	// without counting the table. A COUNT(*) for that answer reads every
+	// row to report a number the caller only needs as a yes or no.
+	infos, err := h.store.ListURLs(ctx, size+1, req.Msg.GetPageToken(), req.Msg.GetIncludeDeleted())
+	if err != nil {
+		return nil, storeError("list", err)
+	}
+
+	next := ""
+	if len(infos) > size {
+		infos = infos[:size]
+		next = infos[len(infos)-1].URLKey
+	}
+
+	urls := make([]*v1.Url, 0, len(infos))
+	for _, info := range infos {
+		count, err := h.store.GetClickCount(ctx, info.URLKey)
+		if err != nil {
+			return nil, storeError("read the count", err)
+		}
+		urls = append(urls, &v1.Url{
+			Key:        info.URLKey,
+			LongUrl:    info.LongURL,
+			CreatedAt:  timestamppb.New(info.CreatedAt),
+			UpdatedAt:  optionalStamp(info.UpdatedAt),
+			DeletedAt:  optionalStamp(info.DeletedAt),
+			ExpiresAt:  optionalStamp(info.ExpiresAt),
+			ClickCount: count,
+		})
+	}
+
+	return connect.NewResponse(&v1.ListResponse{Urls: urls, NextPageToken: next}), nil
+}
+
 // Update changes what a key points at, or when it expires.
 func (h *Handler) Update(
 	ctx context.Context,
@@ -223,6 +270,30 @@ func (h *Handler) url(ctx context.Context, key string) (*v1.Url, error) {
 //
 // Here rather than at the database, because a constraint violation reaches a
 // caller as "internal" and tells them nothing they can act on.
+// pageSize applies the service's ceiling to what a caller asked for.
+//
+// Separate from the handler so the rule can be read, and tested, without a
+// database behind it.
+func pageSize(asked int) int {
+	if asked <= 0 {
+		return DefaultPageSize
+	}
+	if asked > MaxPageSize {
+		return MaxPageSize
+	}
+
+	return asked
+}
+
+// DefaultPageSize and MaxPageSize bound a listing.
+//
+// The ceiling is the service's, not the caller's: it is what keeps one
+// request from reading a table that grew after this was written.
+const (
+	DefaultPageSize = 50
+	MaxPageSize     = 200
+)
+
 func validKey(key string) error {
 	if len(key) != KeyLength {
 		return connect.NewError(connect.CodeInvalidArgument,

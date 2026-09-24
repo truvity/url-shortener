@@ -49,6 +49,30 @@ message GetResponse {
   Url url = 1;
 }
 
+// Listing is PAGED, and the page size has a ceiling the caller cannot
+// raise. A list that returns everything is a list that works until the
+// table is large and then takes the service down with a query nobody
+// changed — and an example that shipped one would be teaching that shape
+// rather than this one.
+message ListRequest {
+  // How many at most. Zero means the default; anything above the
+  // service's ceiling is clamped to it rather than refused, because a
+  // caller asking for more is not an error, it is a caller who does not
+  // know the ceiling.
+  int32 page_size = 1;
+  // The `next_page_token` from the previous answer. Empty starts at the
+  // beginning.
+  string page_token = 2;
+  // Include keys that have been retired. Off by default: a retired key
+  // still exists and still refuses, so listing them is a deliberate ask.
+  bool include_deleted = 3;
+}
+message ListResponse {
+  repeated Url urls = 1;
+  // Empty when there is no further page.
+  string next_page_token = 2;
+}
+
 message UpdateRequest {
   string key = 1;
   // Unset leaves the current value. Proto3 optional is what makes "leave it
@@ -94,6 +118,7 @@ message RecordClickResponse {
 service UrlsService {
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Get(GetRequest) returns (GetResponse);
+  rpc List(ListRequest) returns (ListResponse);
   rpc Update(UpdateRequest) returns (UpdateResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc Restore(RestoreRequest) returns (RestoreResponse);
