@@ -15,12 +15,13 @@ import (
 	"github.com/truvity/policy/examples/url-shortener/internal/config"
 )
 
-// chartDir is the embedded chart, written out so `helm` can read it.
+// chartDir writes the embedded charts out so `helm` can read them, and
+// returns the path to the one named.
 //
 // The embed is what makes this test honest: Go's cache keys on the files the
 // TEST package reads, not on what helm reads, so a template edit would
 // otherwise leave a cached PASS behind and the contract would go unchecked.
-func chartDir(t *testing.T) string {
+func chartDir(t *testing.T, chart string) string {
 	t.Helper()
 	root := t.TempDir()
 	entries, err := charts.Files.ReadDir(".")
@@ -60,7 +61,7 @@ func chartDir(t *testing.T) string {
 			write(e.Name())
 		}
 	}
-	return filepath.Join(root, "url-shortener")
+	return filepath.Join(root, chart)
 }
 
 // defaults supplies the addresses every render needs. They are REQUIRED —
@@ -78,7 +79,7 @@ func defaults(extra ...string) []string {
 
 func render(t *testing.T, args ...string) (string, error) {
 	t.Helper()
-	cmd := exec.Command("helm", append([]string{"template", "example", chartDir(t)}, args...)...)
+	cmd := exec.Command("helm", append([]string{"template", "example", chartDir(t, "url-shortener")}, args...)...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

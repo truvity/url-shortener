@@ -1,0 +1,43 @@
+---
+# Source: url-shortener-infra/templates/infra.yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: example-pg
+  labels:
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/name: url-shortener-infra
+spec:
+  instances: 1
+  storage:
+    size: 1Gi
+  bootstrap:
+    initdb:
+      database: url_shortener
+      owner: url_shortener_owner
+  managed:
+    roles:
+      - name: url_shortener_app
+        ensure: present
+        login: true
+        passwordSecret:
+          name: example-pg-runtime
+
+---
+# Source: url-shortener-infra/templates/infra.yaml
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: example-events
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  name: URL_SHORTENER
+  subjects:
+    - url-shortener.redirect
+    - url-shortener.log
+  storage: memory
+  replicas: 1
+  servers:
+    - nats://nats.nats.svc:4222

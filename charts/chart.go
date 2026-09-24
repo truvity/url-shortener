@@ -10,7 +10,11 @@ package charts
 
 import "embed"
 
-// Files is the chart, exactly as it is published.
+// Files is BOTH charts, exactly as they are published.
 //
-//go:embed all:url-shortener
+// Both, because the split between them is itself part of the contract — the
+// application chart must not create what its migration migrates — and a
+// test that only ever rendered one half could not see that hold.
+//
+//go:embed all:url-shortener all:url-shortener-infra
 var Files embed.FS

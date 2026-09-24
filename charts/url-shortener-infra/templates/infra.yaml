@@ -12,8 +12,21 @@ kind: Cluster
 metadata:
   name: {{ .Release.Name }}-pg
   labels:
-    app.kubernetes.io/name: url-shortener-infra
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- /*
+    MERGED, with the chart's winning — not written one after the other. A
+    platform that could overwrite `app.kubernetes.io/instance` would be
+    renaming the thing this chart's own selectors look for, and the release
+    would come apart one resource at a time.
+
+    Merged rather than appended because two lines with the same key are not
+    an error anywhere in this path: helm renders them, the API server keeps
+    the last, and which one that is depends on the order a template happens
+    to write them in. The only place it shows up is a diff nobody reads.
+    */}}
+    {{- toYaml (merge (dict
+        "app.kubernetes.io/name" "url-shortener-infra"
+        "app.kubernetes.io/instance" .Release.Name)
+        (.Values.postgres.labels | default dict)) | nindent 4 }}
 spec:
   instances: {{ .Values.postgres.instances }}
   storage:
@@ -22,9 +35,55 @@ spec:
     initdb:
       database: {{ .Values.postgres.database }}
       owner: {{ .Values.postgres.ownerRole }}
+  {{- $sched := .Values.postgres.scheduling | default dict }}
+  {{- if or $sched.nodeSelector $sched.tolerations }}
+  affinity:
+    {{- with $sched.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $sched.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- $tls := .Values.postgres.serverTLS | default dict }}
+  {{- if or $tls.secretName $tls.caSecretName }}
+  {{- /*
+  Server TLS only. The client authority, the replication certificate and
+  the roles' own credentials stay the operator's — this says what the
+  server PRESENTS, not who it admits, and the two are different decisions
+  with different blast radii.
+  */}}
+  certificates:
+    {{- with $tls.secretName }}
+    serverTLSSecret: {{ . | quote }}
+    {{- end }}
+    {{- with $tls.caSecretName }}
+    serverCASecret: {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  {{- $backup := .Values.postgres.backup | default dict }}
+  {{- if $backup.objectStoreName }}
+  {{- if not $backup.serverName }}
+  {{- fail "postgres.backup.objectStoreName needs postgres.backup.serverName, and it must change when this database is rebuilt from nothing — a second timeline under one name is only visible at restore" }}
+  {{- end }}
+  {{- /*
+  The archive is named, not described. What compresses, what encrypts, how
+  long it is kept and who it authenticates as all belong to the resource the
+  platform made; this says which one and who this database is inside it.
+  */}}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      enabled: true
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ $backup.objectStoreName | quote }}
+        serverName: {{ $backup.serverName | quote }}
+  {{- end }}
   managed:
     roles:
-      {{/*
+      {{- /*
       The role the SERVICES connect as. The operator reconciles it, so it
       exists before anything tries to log in with it, and a change here is
       applied to the running database rather than to a migration nobody
@@ -60,5 +119,18 @@ spec:
   name: {{ .Values.events.stream }}
   subjects: {{- toYaml .Values.events.subjects | nindent 4 }}
   storage: {{ .Values.events.storage }}
+  replicas: {{ .Values.events.replicas | default 1 }}
+  {{- with .Values.events.maxAge }}
+  maxAge: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.events.account }}
+  {{- /*
+  An account, and therefore NO server list. The account carries where the
+  broker is and who this is; a `servers` line beside it is the chart
+  arguing with the broker about an answer the broker already has.
+  */}}
+  account: {{ .Values.events.account | quote }}
+  {{- else }}
   servers:
     - {{ .Values.events.url }}
+  {{- end }}

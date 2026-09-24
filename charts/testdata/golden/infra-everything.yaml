@@ -1,0 +1,63 @@
+---
+# Source: url-shortener-infra/templates/infra.yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: example-pg
+  labels:
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/name: url-shortener-infra
+    example.io/project: url-shortener
+    example.io/tier: primary
+spec:
+  instances: 3
+  storage:
+    size: 20Gi
+  bootstrap:
+    initdb:
+      database: shortener
+      owner: shortener_owner
+  affinity:
+    nodeSelector:
+      example.io/nodepool: durable
+    tolerations:
+      - effect: NoSchedule
+        key: durable
+        operator: Equal
+        value: "true"
+  certificates:
+    serverTLSSecret: "url-shortener-pg-server"
+    serverCASecret: "example-trust-bundle"
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      enabled: true
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: "example-archive"
+        serverName: "url-shortener-pg-g2"
+  managed:
+    roles:
+      - name: shortener_app
+        ensure: present
+        login: true
+        passwordSecret:
+          name: example-pg-runtime
+
+---
+# Source: url-shortener-infra/templates/infra.yaml
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: example-events
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  name: SHORTENER
+  subjects:
+    - shortener.redirect
+    - shortener.log
+  storage: file
+  replicas: 3
+  maxAge: "24h"
+  account: "url-shortener"

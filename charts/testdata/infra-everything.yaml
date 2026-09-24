@@ -1,0 +1,41 @@
+# Every value set to something other than its default, so a template that
+# stopped reading one shows up as a diff.
+#
+# Most of what follows exists for a PLATFORM to set and for nobody else, so
+# it is unset in every render an example ever does. This fixture is the only
+# thing standing between "the platform passes it" and "the platform passes
+# it and it goes nowhere".
+postgres:
+  instances: 3
+  storage: 20Gi
+  database: shortener
+  ownerRole: shortener_owner
+  runtimeRole: shortener_app
+  runtimePasswordSecret: example-pg-runtime
+  labels:
+    example.io/project: url-shortener
+    example.io/tier: primary
+  scheduling:
+    nodeSelector:
+      example.io/nodepool: durable
+    tolerations:
+      - key: durable
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+  backup:
+    objectStoreName: example-archive
+    serverName: url-shortener-pg-g2
+  serverTLS:
+    secretName: url-shortener-pg-server
+    caSecretName: example-trust-bundle
+events:
+  stream: SHORTENER
+  storage: file
+  subjects:
+    - shortener.redirect
+    - shortener.log
+  url: nats://broker.example.internal:4222
+  account: url-shortener
+  replicas: 3
+  maxAge: 24h

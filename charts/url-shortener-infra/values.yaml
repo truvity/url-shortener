@@ -26,6 +26,68 @@ postgres:
   runtimeRole: url_shortener_app
   runtimePasswordSecret: ""
 
+  # ---- Below here is the PLATFORM's half, and every key is one of the
+  # decisions docs/contracts/platform.md §9 already calls the platform's
+  # rather than the project's. Each defaults to nothing, so a stranger
+  # installing this on an empty cluster gets what is described above and
+  # none of what follows.
+  #
+  # They are named for the DECISION, not for the operator's field. A
+  # platform running a different database operator can still say "these
+  # instances belong on that pool" and "archive to that store". It could
+  # not say `profile: prod`, which is one estate's vocabulary wearing a
+  # chart's clothes.
+
+  # Stamped on the database resource, for whatever reads labels here — cost
+  # attribution, a policy, a dashboard's grouping. The chart's own labels
+  # are added beside these and win, so a platform cannot rename the thing
+  # its own selectors look for.
+  labels: {}
+
+  # Where the instances are allowed to run.
+  #
+  # Not a preference. A database sharing a pool with everything else is one
+  # eviction away from a failover nobody asked for, and the pool that
+  # prevents that is named differently on every cluster — so the platform
+  # names it and the chart passes it through.
+  scheduling:
+    nodeSelector: {}
+    tolerations: []
+
+  # Continuous archiving.
+  #
+  # A NAME, and nothing else. Not a bucket, not an endpoint, not
+  # credentials — the archive is a thing the platform made, and this chart
+  # is told what it is called (§1, §6).
+  #
+  # That is not a simplification, it is the only version that works. The
+  # database operator here takes its archive as a resource of its own, with
+  # its own compression, retention and credential model; a chart that
+  # described one would be describing the wrong one on every platform but
+  # the one it was written against, and the difference is invisible until
+  # somebody tries a restore.
+  #
+  # Empty means no archiving, which is the right default for an install
+  # nobody has given an archive.
+  backup:
+    # The archive resource, by name.
+    objectStoreName: ""
+    # This database's own name inside that archive. It MUST change when the
+    # database is rebuilt from nothing: a new cluster writing under the old
+    # name interleaves two timelines in one archive, and the damage is only
+    # visible at restore.
+    serverName: ""
+
+  # The certificate the database SERVER presents, as secret NAMES (§1, §3).
+  #
+  # Empty means the operator's own per-cluster authority, which is what an
+  # install with no platform identity should get. Setting these is how a
+  # platform whose workloads verify servers against a shared root makes the
+  # database one of them.
+  serverTLS:
+    secretName: ""
+    caSecretName: ""
+
 events:
   stream: URL_SHORTENER
   # Memory keeps the example's events for as long as the example runs.
@@ -36,3 +98,22 @@ events:
     - url-shortener.log
   # The NATS server the stream is created on.
   url: nats://nats.nats.svc:4222
+
+  # ---- The platform's half, on the same terms as postgres above.
+
+  # The account this stream is created under.
+  #
+  # A broker that authenticates its clients gives each tenant an account,
+  # and a stream is created INSIDE one. Empty means the operator's own
+  # connection — the single-tenant broker an example runs against — and
+  # then `url` above is what it dials. Set, the account decides both, and
+  # a server list beside it would be the chart arguing with the broker
+  # about who this is.
+  account: ""
+
+  # How many copies of the stream the broker keeps, and how long it keeps a
+  # message. One copy and no age limit is an example's answer; a deployment
+  # says three and a duration. Both are the platform's, because they are a
+  # durability decision rather than a feature.
+  replicas: 1
+  maxAge: ""

@@ -43,6 +43,54 @@
         "runtimePasswordSecret": {
           "type": "string",
           "minLength": 1
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "scheduling": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "objectStoreName": {
+              "type": "string"
+            },
+            "serverName": {
+              "type": "string"
+            }
+          }
+        },
+        "serverTLS": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretName": {
+              "type": "string"
+            },
+            "caSecretName": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -77,6 +125,16 @@
         "url": {
           "type": "string",
           "minLength": 1
+        },
+        "account": {
+          "type": "string"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxAge": {
+          "type": "string"
         }
       }
     }

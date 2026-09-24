@@ -1,0 +1,4 @@
+# What the defaults render to, plus the one value the chart refuses to
+# invent. A changed default shows up here and nowhere else.
+postgres:
+  runtimePasswordSecret: example-pg-runtime
