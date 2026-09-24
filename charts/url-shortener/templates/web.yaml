@@ -40,6 +40,8 @@ spec:
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "web") }}
           imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/web.yaml"]
+          env:
+            {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "web") | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080

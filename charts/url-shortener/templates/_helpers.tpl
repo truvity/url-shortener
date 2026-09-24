@@ -174,3 +174,77 @@ securityContext:
   runAsGroup: {{ .Values.podSecurity.runAsGroup }}
   fsGroup: {{ .Values.podSecurity.fsGroup }}
 {{- end -}}
+
+{{/*
+Telemetry, as OpenTelemetry's OWN environment variables.
+
+Decision 0006: no service reads telemetry from its configuration file.
+The specification defines these variables, every language's SDK reads
+them without being asked, and every document about OpenTelemetry is
+written in terms of them. A schema naming three of them would be a
+ceiling, a second vocabulary, and a precedence question at three in the
+morning.
+
+They still belong beside the rest of the service's configuration in this
+chart's values, which is what the decision asks of a chart that sets
+them — they simply leave as variables rather than as file keys.
+
+NO ENDPOINT MEANS DO NOT EXPORT, and that is done here rather than in six
+programs: with no endpoint the exporters are set to `none`, so an SDK
+that would otherwise default to localhost and retry forever does nothing
+at all. That is the default a laptop needs, and it is why no service
+carries an enable flag or an environment-name switch — the failure
+decision 0006 records is a service that exported to a console in
+production because nothing set the variable the code was testing.
+
+Takes the root context and the component name; `service.name` is the
+release and the component, which is stable for the life of the pod and
+carries no request, tenant or version in it.
+*/}}
+{{- define "url-shortener.telemetryEnv" -}}
+{{- $otel := .root.Values.otel | default dict -}}
+- name: OTEL_SERVICE_NAME
+  value: {{ printf "%s-%s" .root.Release.Name .component | quote }}
+{{- if $otel.endpoint }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ $otel.endpoint | quote }}
+- name: OTEL_EXPORTER_OTLP_PROTOCOL
+  value: {{ $otel.protocol | default "http/protobuf" | quote }}
+- name: OTEL_TRACES_EXPORTER
+  value: "otlp"
+- name: OTEL_METRICS_EXPORTER
+  value: "otlp"
+{{- /*
+Logs stay on stdout. A node agent already collects every container's
+stdout into the same store under the same namespace, so an OTLP log
+exporter buys a second copy of what is already there — and a service
+whose logs exist ONLY over OTLP loses them exactly when the exporter is
+the thing that broke.
+*/}}
+- name: OTEL_LOGS_EXPORTER
+  value: "none"
+- name: OTEL_TRACES_SAMPLER
+  value: {{ $otel.tracesSampler | default "parentbased_traceidratio" | quote }}
+- name: OTEL_TRACES_SAMPLER_ARG
+  value: {{ $otel.sampleRatio | default "0.1" | quote }}
+{{- with $otel.resourceAttributes }}
+{{- /*
+Extra resource attributes ride along as pod-level fields. Three of them
+become metric labels and no more — the rest land on `target_info` and
+nowhere else — so anything to be filtered on must be a METRIC attribute
+rather than a resource one.
+*/}}
+{{- $attrs := . }}
+- name: OTEL_RESOURCE_ATTRIBUTES
+  value: {{ range $i, $k := (keys $attrs | sortAlpha) }}{{ if $i }},{{ end }}{{ $k }}={{ get $attrs $k }}{{ end }}
+{{- end }}
+{{- else }}
+{{- /* No endpoint: export nothing, rather than to localhost. */}}
+- name: OTEL_TRACES_EXPORTER
+  value: "none"
+- name: OTEL_METRICS_EXPORTER
+  value: "none"
+- name: OTEL_LOGS_EXPORTER
+  value: "none"
+{{- end }}
+{{- end -}}

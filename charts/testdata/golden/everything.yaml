@@ -346,6 +346,14 @@ spec:
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/log.yaml"]
           env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-log"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
             # The NAMES are in the configuration file; the values are here,
             # from a Secret, and appear in nothing that is rendered, printed
             # or committed.
@@ -454,6 +462,14 @@ spec:
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-redirect"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -558,6 +574,14 @@ spec:
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/stat.yaml"]
           env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-stat"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -653,6 +677,14 @@ spec:
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-urls"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -750,6 +782,15 @@ spec:
           image: example.io/shortener/web@sha256:6666666666666666666666666666666666666666666666666666666666666666
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/web.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-web"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
           ports:
             - name: http
               containerPort: 8080
@@ -891,6 +932,14 @@ spec:
           imagePullPolicy: Always
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-migrate"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:

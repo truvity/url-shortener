@@ -47,6 +47,7 @@ spec:
           imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
+            {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "urls") | nindent 12 }}
             {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}
           ports:
             - name: http

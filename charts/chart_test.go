@@ -294,6 +294,110 @@ func TestTheRouteAttachesToTheParentItWasGiven(t *testing.T) {
 	}
 }
 
+// No endpoint means EXPORT NOTHING, in every component.
+//
+// Not "export to localhost and retry forever", which is what an SDK left
+// to its own defaults does. That matters most where nobody is watching:
+// a laptop, a test, a cluster with no collector. Decision 0006 records
+// the failure this replaces -- a service that exported to a console in
+// production because nothing set the environment name its code tested.
+//
+// Done in the chart rather than in six programs, so no component carries
+// an enable flag and none of them can disagree.
+func TestWithNoEndpointNothingIsExported(t *testing.T) {
+	out, err := render(t, defaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	for _, doc := range documents(t, out) {
+		kind, _ := doc["kind"].(string)
+		if kind != "Deployment" && kind != "Job" {
+			continue
+		}
+		for name, value := range telemetryEnvOf(t, doc) {
+			switch name {
+			case "OTEL_TRACES_EXPORTER", "OTEL_METRICS_EXPORTER", "OTEL_LOGS_EXPORTER":
+				if value != "none" {
+					t.Errorf("%s = %q with no endpoint configured, want none", name, value)
+				}
+			case "OTEL_EXPORTER_OTLP_ENDPOINT":
+				t.Errorf("an endpoint was rendered where none was configured: %q", value)
+			}
+		}
+	}
+}
+
+// Every component says who it is, and logs stay on stdout.
+//
+// `service.name` is a log STREAM field, so it must be stable for the life
+// of the pod and carry no request, tenant or version. And OTLP logs are
+// off deliberately: a node agent already collects stdout into the same
+// store under the same namespace, so an exporter buys a second copy of
+// what is there — and logs that exist only over OTLP vanish exactly when
+// the exporter is what broke.
+func TestEveryComponentNamesItselfAndLeavesLogsOnStdout(t *testing.T) {
+	out, err := render(t, defaults("--set", "otel.endpoint=http://gateway:4318")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	seen := map[string]bool{}
+	for _, doc := range documents(t, out) {
+		kind, _ := doc["kind"].(string)
+		if kind != "Deployment" && kind != "Job" {
+			continue
+		}
+		env := telemetryEnvOf(t, doc)
+
+		name := env["OTEL_SERVICE_NAME"]
+		if name == "" {
+			t.Errorf("a %s exports with no service name", kind)
+		}
+		if seen[name] {
+			t.Errorf("two components share the service name %q; it is a log stream field", name)
+		}
+		seen[name] = true
+
+		if env["OTEL_LOGS_EXPORTER"] != "none" {
+			t.Errorf("%s exports OTLP logs (%q); stdout is already collected", name, env["OTEL_LOGS_EXPORTER"])
+		}
+		if env["OTEL_TRACES_EXPORTER"] != "otlp" || env["OTEL_METRICS_EXPORTER"] != "otlp" {
+			t.Errorf("%s does not export traces and metrics with an endpoint set", name)
+		}
+	}
+
+	if len(seen) != 6 {
+		t.Errorf("expected all six components to carry telemetry, found %d: %v", len(seen), seen)
+	}
+}
+
+// telemetryEnvOf reads the first container's environment as a map.
+func telemetryEnvOf(t *testing.T, doc map[string]any) map[string]string {
+	t.Helper()
+
+	spec, _ := doc["spec"].(map[string]any)
+	template, _ := spec["template"].(map[string]any)
+	podSpec, _ := template["spec"].(map[string]any)
+	containers, _ := podSpec["containers"].([]any)
+	if len(containers) == 0 {
+		return nil
+	}
+
+	container, _ := containers[0].(map[string]any)
+	env, _ := container["env"].([]any)
+
+	out := map[string]string{}
+	for _, entry := range env {
+		item, _ := entry.(map[string]any)
+		name, _ := item["name"].(string)
+		value, _ := item["value"].(string)
+		out[name] = value
+	}
+
+	return out
+}
+
 // Six components are six DIFFERENT images.
 //
 // The chart used to take one `image.digest` and apply it to all of them,

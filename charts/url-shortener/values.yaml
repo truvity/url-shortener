@@ -108,6 +108,34 @@ images:
 
 pullPolicy: IfNotPresent
 
+# Telemetry, as OpenTelemetry's own environment variables (decision 0006).
+#
+# These leave this chart as VARIABLES rather than as configuration file
+# keys, because the specification defines them and every language's SDK
+# reads them without being asked. They live here anyway, beside the rest
+# of the service's configuration, so that a reviewer reads them in one
+# place.
+otel:
+  # NO ENDPOINT MEANS DO NOT EXPORT -- not "export to localhost and retry
+  # forever", which is what an SDK does when left to its default. That is
+  # what a laptop needs, and it is why no service here carries an enable
+  # flag: a flag is a thing nothing sets in the deployment that needed it.
+  endpoint: ""
+  protocol: http/protobuf
+
+  # Sampling is a deployment's decision and turning it down must not need
+  # a release. Parent-based, so a sampled trace stays whole across
+  # services instead of losing every second hop.
+  tracesSampler: parentbased_traceidratio
+  sampleRatio: "0.1"
+
+  # Extra resource attributes, as a map. They ride along as pod-level
+  # fields -- only three resource attributes become metric LABELS
+  # (cluster, namespace, environment) and the rest land on `target_info`
+  # and nowhere else, so anything to be filtered on must be a metric
+  # attribute rather than one of these.
+  resourceAttributes: {}
+
 log:
   level: info
 

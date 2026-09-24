@@ -31,6 +31,7 @@ spec:
           imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
+            {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "migrate") | nindent 12 }}
             {{- include "url-shortener.passwordEnv" .Values.database.owner | nindent 12 }}
           volumeMounts:
             - name: config

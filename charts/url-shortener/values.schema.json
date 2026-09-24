@@ -632,6 +632,35 @@
         "IfNotPresent",
         "Never"
       ]
+    },
+    "otel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "http/protobuf",
+            "grpc"
+          ]
+        },
+        "tracesSampler": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampleRatio": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceAttributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

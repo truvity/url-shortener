@@ -43,8 +43,9 @@ spec:
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "log") }}
           imagePullPolicy: {{ .Values.pullPolicy }}
           args: ["-config", "/etc/url-shortener/log.yaml"]
-          {{- with .Values.archive.bucket.credentialsSecret }}
           env:
+            {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "log") | nindent 12 }}
+            {{- with .Values.archive.bucket.credentialsSecret }}
             {{- $bucket := $.Values.archive.bucket }}
             # The NAMES are in the configuration file; the values are here,
             # from a Secret, and appear in nothing that is rendered, printed
