@@ -835,11 +835,11 @@ spec:
             readOnly: true
 
 ---
-# Source: url-shortener/templates/redirect.yaml
+# Source: url-shortener/templates/route.yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: example-redirect
+  name: example
   labels:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
@@ -852,7 +852,7 @@ spec:
   hostnames: ["shortener.example.invalid"]
   rules:
     
-    - name: example-rule
+    - name: redirect
       matches:
         - path:
             type: PathPrefix
@@ -861,6 +861,17 @@ spec:
         - group: ""
           kind: Service
           name: example-redirect
+          port: 8080
+          weight: 1
+    - name: example-rule
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: example-web
           port: 8080
           weight: 1
 ---

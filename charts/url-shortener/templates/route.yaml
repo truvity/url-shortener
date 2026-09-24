@@ -1,0 +1,106 @@
+{{- if .Values.route.enabled }}
+{{/*
+The route. One route, two rules, and both facts matter.
+
+It is named for the RELEASE rather than for a component, because it is no
+longer one component's: the front end answers the site and the resolver
+answers the short links. A policy targets a route by name, so the name is
+part of the interface a platform is written against, not an internal
+detail this chart may rename.
+
+A route with no parent attaches to whatever the cluster's default happens
+to be, which is nothing in most clusters and the wrong gateway in the
+rest. It renders as healthy with zero attached routes, and the only
+symptom is a 404 nobody can explain.
+*/}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "url-shortener.name" . }}
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ required "route.parentRef.name is required when route.enabled is true: a route that names no parent attaches nowhere" .Values.route.parentRef.name }}
+      {{- /*
+      The parent's KIND, because a Gateway is not the only thing a route
+      can attach to and the default is silently wrong where it is not.
+      A route naming a kind nothing serves is ACCEPTED -- the status says
+      so, and keeps saying so -- and answers 404. The only other signal is
+      the listener reporting zero attached routes, which nobody watches.
+      */}}
+      {{- with .Values.route.parentRef.group }}
+      group: {{ . }}
+      {{- end }}
+      {{- with .Values.route.parentRef.kind }}
+      kind: {{ . }}
+      {{- end }}
+      {{- with .Values.route.parentRef.namespace }}
+      namespace: {{ . }}
+      {{- end }}
+      {{- with .Values.route.parentRef.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+  {{- with .Values.route.hostname }}
+  hostnames: [{{ . | quote }}]
+  {{- end }}
+  {{- /*
+  Rule order does not decide which one answers: the API matches the most
+  specific path, so `/r/` wins over `/` wherever both could apply. They
+  are written longest-first anyway, because a reader should not have to
+  know that to predict what happens.
+  */}}
+  rules:
+    {{/*
+    The resolver, and it is PUBLIC.
+
+    A short link that demands a sign-in before it resolves is not a short
+    link. This rule is deliberately not the one named below, and that
+    separation is the whole reason there are two: a sign-in policy
+    attached to the wrong one of them locks the public path and leaves
+    the site open, which is the same mistake in both directions at once.
+    */}}
+    - name: {{ .Values.route.redirectRuleName }}
+      matches:
+        - path:
+            type: PathPrefix
+            value: /r/
+      backendRefs:
+        {{- /*
+        group, kind and weight are DECLARED, not left to default.
+
+        The API server fills them in, so a chart that omits them renders
+        a route that never matches what is stored: a continuous
+        difference in every renderer that compares the two, for a route
+        nobody changed. The alternative -- telling the comparer to ignore
+        those fields -- silences the real changes underneath them too.
+
+        Declaring a default is not duplication. It is saying which value
+        this chart wants, in a place a reader can see it.
+        */}}
+        - group: ""
+          kind: Service
+          name: {{ include "url-shortener.name" . }}-redirect
+          port: 8080
+          weight: 1
+    {{- /*
+    The site, and it is the rule a policy attaches to.
+
+    Named, because a policy -- for sign-in, for CSRF, for rate limiting --
+    targets a rule BY NAME, and one whose target names no rule that exists
+    is not refused. It reports itself accepted and protects nothing, while
+    the route goes on serving. An unauthenticated front end that looks
+    correct in every rendering is the failure this name exists to prevent,
+    and it is not hypothetical: it is how this rule came to be written.
+    */}}
+    - name: {{ .Values.route.ruleName }}
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ include "url-shortener.name" . }}-web
+          port: 8080
+          weight: 1
+{{- end }}

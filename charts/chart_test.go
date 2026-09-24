@@ -13,6 +13,8 @@ import (
 
 	"github.com/truvity/policy/examples/url-shortener/charts"
 	"github.com/truvity/policy/examples/url-shortener/internal/config"
+
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // chartDir writes the embedded charts out so `helm` can read them, and
@@ -966,5 +968,87 @@ func TestPermissiveServesBothPorts(t *testing.T) {
 		if !strings.Contains(service, port) {
 			t.Errorf("the Service does not carry %q, so one side of the migration is unreachable", port)
 		}
+	}
+}
+
+// The site and the resolver are DIFFERENT rules, and the named one is the
+// site.
+//
+// A policy — for sign-in, for CSRF, for rate limiting — targets a rule by
+// name. Attach it to the resolver and every short link demands a sign-in
+// before it resolves, which is not a short link; leave the site unnamed and
+// the policy protects nothing while reporting itself accepted. Both
+// failures are silent and they are the same mistake pointing opposite ways.
+//
+// Found on a cluster: a policy whose target named a route this chart does
+// not render, sitting "Accepted" beside a front end that answered 404
+// because nothing routed to it at all.
+func TestTheSiteAndTheResolverAreSeparateRules(t *testing.T) {
+	out, err := render(t, defaults(
+		"--set", "route.enabled=true",
+		"--set", "route.hostname=example.test",
+		"--set", "route.parentRef.name=business",
+	)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	var route map[string]any
+	for _, doc := range strings.Split(out, "\n---") {
+		var m map[string]any
+		if err := yaml.Unmarshal([]byte(doc), &m); err != nil || m == nil {
+			continue
+		}
+		if m["kind"] == "HTTPRoute" {
+			route = m
+			break
+		}
+	}
+	if route == nil {
+		t.Fatal("no HTTPRoute in the render")
+	}
+
+	// The route is named for the release. A policy targets a route by
+	// name, so this is interface, not an internal detail.
+	meta, _ := route["metadata"].(map[string]any)
+	if got := meta["name"]; got != "example" {
+		t.Errorf("the route is named %q; a platform's policy targets this name", got)
+	}
+
+	rules, _ := route["spec"].(map[string]any)["rules"].([]any)
+	if len(rules) != 2 {
+		t.Fatalf("expected two rules — the site and the resolver — got %d", len(rules))
+	}
+
+	backendOf := map[string]string{}
+	pathOf := map[string]string{}
+	for _, r := range rules {
+		rule, _ := r.(map[string]any)
+		name, _ := rule["name"].(string)
+		refs, _ := rule["backendRefs"].([]any)
+		first, _ := refs[0].(map[string]any)
+		backendOf[name], _ = first["name"].(string)
+		matches, _ := rule["matches"].([]any)
+		m0, _ := matches[0].(map[string]any)
+		path, _ := m0["path"].(map[string]any)
+		pathOf[name], _ = path["value"].(string)
+	}
+
+	// `app` is the DEFAULT of route.ruleName, and it must be the site:
+	// that is the rule a sign-in policy is pointed at.
+	if backendOf["app"] != "example-web" {
+		t.Errorf("the rule a policy attaches to serves %q, not the site", backendOf["app"])
+	}
+	if pathOf["app"] != "/" {
+		t.Errorf("the site rule matches %q, not the site root", pathOf["app"])
+	}
+
+	// The resolver is a separate rule, so protecting the site does not
+	// lock it.
+	if backendOf["redirect"] != "example-redirect" {
+		t.Errorf("the resolver rule serves %q", backendOf["redirect"])
+	}
+	if pathOf["redirect"] != "/r/" {
+		t.Errorf("the resolver rule matches %q", pathOf["redirect"])
 	}
 }

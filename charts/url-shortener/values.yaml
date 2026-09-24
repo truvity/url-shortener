@@ -307,6 +307,11 @@ route:
   # route keeps serving without it. An unauthenticated route that looks
   # correct in every rendering is the failure this name exists to prevent.
   ruleName: app
+  # The rule that resolves short links, which is a DIFFERENT rule and must
+  # stay one. It is public: a short link that demands a sign-in before it
+  # resolves is not a short link. Naming it separately is what lets a
+  # policy protect the site without locking the resolver.
+  redirectRuleName: redirect
   parentRef:
     name: ""
     # The parent's kind and group. Empty means the API's own defaults --

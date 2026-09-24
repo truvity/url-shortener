@@ -304,6 +304,11 @@
         "ruleName": {
           "type": "string",
           "minLength": 1
+        },
+        "redirectRuleName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver."
         }
       }
     },
