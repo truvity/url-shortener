@@ -29,8 +29,20 @@ fun connect(nats: Nats_): Connection {
             .connectionName("url-shortener-stat")
             .apply {
                 // The token is a FILE the platform mounts, never a value in
-                // the configuration.
-                nats.tokenFile?.let { token(Files.readString(Path.of(it)).trim().toCharArray()) }
+                // the configuration — and it is read on every CONNECT
+                // rather than once here.
+                //
+                // That distinction is the whole option. The token is
+                // short-lived and the runtime replaces the file in place,
+                // so a client that reads it once authenticates fine until
+                // its first reconnect and then fails with an authorisation
+                // error naming nothing that changed. Measured: the broker
+                // closed the connection sixty minutes in, the reconnect
+                // presented the same expired token, and the consumer was
+                // gone until somebody restarted the pod.
+                nats.tokenFile?.let { file ->
+                    tokenSupplier { Files.readString(Path.of(file)).trim().toCharArray() }
+                }
             }
             .build()
     return Nats.connect(options)

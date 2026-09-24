@@ -106,10 +106,28 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
     )
 
     # The broker. The token is a FILE the platform mounts, never a value in
-    # the configuration.
+    # the configuration — and it is read on every CONNECT rather than once
+    # here.
+    #
+    # That is the whole reason this is a callable. The token is short-lived
+    # and the runtime replaces the file in place, so a client that reads it
+    # once authenticates fine until its first reconnect and then fails with
+    # an authorisation error naming nothing that changed. Measured on a
+    # sibling service: the broker closed the connection sixty minutes in,
+    # the reconnect presented the same expired token, and the consumer was
+    # gone until somebody restarted the pod.
     token = None
     if token_file := events["nats"].get("tokenFile"):
-        token = (await asyncio.to_thread(Path(token_file).read_text, encoding="utf-8")).strip()
+        token_path = Path(token_file)
+
+        def read_token() -> str:
+            return token_path.read_text(encoding="utf-8").strip()
+
+        # Read it once HERE so an unreadable file fails at start-up, with
+        # the path, rather than at the first connect as an error about
+        # authorisation.
+        await asyncio.to_thread(read_token)
+        token = read_token
     connection = await nats.connect(
         servers=[events["nats"]["url"]],
         name=f"url-shortener-{COMPONENT}",

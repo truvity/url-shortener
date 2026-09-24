@@ -80,7 +80,17 @@ class Consuming(
         // stream it reads, because two components disagreeing about a
         // stream's retention is a data-loss argument nobody wins at run
         // time.
-        val subscription: JetStreamSubscription =
+        // Subscribing is a FUNCTION, not a one-off, because a
+        // subscription does not survive its connection.
+        //
+        // A reconnect leaves the old one inactive, and every fetch against
+        // it throws rather than returning nothing — so a loop that
+        // subscribed once above and fetched forever below dies on the
+        // first blip and stays dead. Nothing restarts it: the process is
+        // healthy, the connection is healthy, and the stream quietly stops
+        // being read. Measured, after a token expiry took the connection
+        // down at the hour mark.
+        fun subscribe(): JetStreamSubscription =
             stream.subscribe(
                 config.events.consumer.subject,
                 PullSubscribeOptions.builder()
@@ -89,10 +99,23 @@ class Consuming(
                     .build(),
             )
 
+        var subscription: JetStreamSubscription = subscribe()
+
         worker =
             Thread {
                 while (running) {
-                    val messages = subscription.fetch(BATCH, Duration.ofSeconds(1))
+                    val messages =
+                        try {
+                            subscription.fetch(BATCH, Duration.ofSeconds(1))
+                        } catch (e: IllegalStateException) {
+                            // The subscription went with its connection.
+                            // Take a new one and carry on; the durable
+                            // consumer is server-side, so nothing that was
+                            // already delivered is lost by doing this.
+                            log.warn("subscription ended, resubscribing: {}", e.message)
+                            subscription = subscribe()
+                            continue
+                        }
                     for (message in messages) {
                         val detailType = message.headers?.getFirst("X-Detail-Type")
                         val redirect = decode(detailType, String(message.data), mapper)
