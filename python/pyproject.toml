@@ -1,6 +1,9 @@
 [project]
 name = "truvity-policy"
-version = "0.1.0"
+# A placeholder that never moves. The git TAG is the sole version authority
+# and the release stamps it here — a version committed to a manifest is a
+# second place to forget.
+version = "0.0.0"
 description = "Load a service's configuration: one file, one schema, secrets by name."
 readme = "README.md"
 requires-python = ">=3.14"

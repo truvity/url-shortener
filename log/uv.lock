@@ -565,7 +565,7 @@ wheels = [
 
 [[package]]
 name = "truvity-policy"
-version = "0.1.0"
+version = "0.0.0"
 source = { directory = "../../../python" }
 dependencies = [
     { name = "jsonschema" },
