@@ -22,6 +22,10 @@
  * parses an endpoint or a protocol.
  */
 
+// Type-only, so it is erased before this ever runs: the package is an
+// OPTIONAL peer, and a build that exports nothing must not need it.
+import type { Resource } from "@opentelemetry/resources";
+
 /** Flush what is buffered and release the exporters. */
 export type Shutdown = () => Promise<void>;
 
@@ -31,6 +35,26 @@ export type Shutdown = () => Promise<void>;
  */
 function disabled(variable: string): boolean {
   return (process.env[variable] ?? "").trim().toLowerCase() === "none";
+}
+
+/**
+ * The resource this process reports itself as, from OpenTelemetry's own
+ * environment: OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES.
+ *
+ * A provider built with no resource does NOT read them. The Node SDK's
+ * default names the service `unknown_service:node`, and the variable a
+ * platform sets to say who this is is ignored without a word -- the spans
+ * arrive, the store accepts them, every dashboard reports the pipeline
+ * healthy, and the service is filed under a name nobody set and nobody
+ * searches for. Found exactly that way: a service missing from the store's
+ * list of services, and a stranger in it.
+ *
+ * Exported so the behaviour can be asserted without standing up an
+ * exporter.
+ */
+export async function resourceFromEnvironment(): Promise<Resource> {
+  const { detectResources, envDetector } = await import("@opentelemetry/resources");
+  return detectResources({ detectors: [envDetector] });
 }
 
 /**
@@ -52,6 +76,7 @@ export async function start(): Promise<Shutdown> {
     const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");
 
     const provider = new NodeTracerProvider({
+      resource: await resourceFromEnvironment(),
       spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter())],
     });
     provider.register();
@@ -64,6 +89,7 @@ export async function start(): Promise<Shutdown> {
     const { metrics } = await import("@opentelemetry/api");
 
     const provider = new MeterProvider({
+      resource: await resourceFromEnvironment(),
       readers: [new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter() })],
     });
     metrics.setGlobalMeterProvider(provider);
