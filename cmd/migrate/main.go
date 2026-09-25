@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
@@ -94,11 +96,41 @@ func run() error {
 	}
 	defer func() { _ = sqlDB.Close() }()
 
-	if err := migration.Run(ctx, log, db, cfg.OwnerRole, cfg.AppRole); err != nil {
+	if err := withSpan(ctx, "migrate.run", func(ctx context.Context) error {
+		return migration.Run(ctx, log, db, cfg.OwnerRole, cfg.AppRole)
+	}); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
 
 	log.InfoContext(ctx, "migrated")
+	return nil
+}
+
+// withSpan runs a step inside a span, and marks the span an error when the
+// step fails.
+//
+// This Job started telemetry, connected to the gateway, flushed on the way
+// out -- and created no span, so it exported nothing and looked exactly like
+// a Job that ran and was never observed. A provider is where spans GO; it is
+// not what makes them. The same was found in three other services, each
+// found the same way: absent from the trace store's list of services while
+// every dashboard said the pipeline was healthy.
+//
+// One span for the run, because that is the unit somebody asks about: did
+// the migration happen, how long did it take, and did it fail. The failure
+// is recorded on the span itself, or a trace of a Job that failed reads as
+// one that succeeded.
+func withSpan(ctx context.Context, name string, step func(context.Context) error) error {
+	ctx, span := otel.Tracer("github.com/truvity/policy/examples/url-shortener").Start(ctx, name)
+	defer span.End()
+
+	if err := step(ctx); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+
+		return err
+	}
+
 	return nil
 }
 
