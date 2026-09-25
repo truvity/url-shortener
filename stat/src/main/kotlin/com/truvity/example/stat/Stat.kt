@@ -1,6 +1,8 @@
 package com.truvity.example.stat
 
 import com.connectrpc.ProtocolClientConfig
+import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.instrumentation.okhttp.v3_0.OkHttpTelemetry
 import com.connectrpc.extensions.GoogleJavaProtobufStrategy
 import com.connectrpc.impl.ProtocolClient
 import com.connectrpc.okhttp.ConnectOkHttpClient
@@ -59,8 +61,29 @@ typealias Nats_ = com.truvity.example.stat.Nats
  * URL, and the failure arrives as a protocol error on the first call rather
  * than as anything about configuration.
  */
-fun urlsClient(address: String, tls: Tls?): UrlsServiceClient {
-    val builder = OkHttpClient.Builder().callTimeout(Duration.ofSeconds(10))
+// The builder, separated from urlsClient below so a test can build a
+// client and look at what is actually on it -- UrlsServiceClient wraps
+// connect-kotlin's own client and exposes no way to ask it.
+//
+// CLIENT spans for the one outbound call this service makes.
+// This client is built outside Spring's bean graph -- the identity
+// handshake below has to configure it directly -- so the starter's own
+// instrumentation never sees it: that instruments what Spring manages,
+// and manages nothing here (server.port is -1; application.yaml explains
+// why). GlobalOpenTelemetry is what the starter DOES publish for code
+// outside that graph, turned on in the same file.
+//
+// `newInterceptor()` is the deprecated half of this library's API, and it
+// is still the one this needs: the replacement, `newCallFactory`, wraps a
+// finished OkHttpClient as a bare Call.Factory, which is not the type
+// ConnectOkHttpClient's constructor takes. The interceptor is the only
+// shape that fits into a Builder that is still being configured below.
+@Suppress("DEPRECATION")
+internal fun urlsHttpClientBuilder(tls: Tls?): OkHttpClient.Builder {
+    val builder =
+        OkHttpClient.Builder()
+            .callTimeout(Duration.ofSeconds(10))
+            .addInterceptor(OkHttpTelemetry.create(GlobalOpenTelemetry.get()).newInterceptor())
     val identity = Identity.load(tls)
     if (identity == null) {
         builder.protocols(listOf(Protocol.H2_PRIOR_KNOWLEDGE))
@@ -77,14 +100,17 @@ fun urlsClient(address: String, tls: Tls?): UrlsServiceClient {
         builder.addInterceptor(identity.peerCheck())
         builder.protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
     }
+    return builder
+}
 
+fun urlsClient(address: String, tls: Tls?): UrlsServiceClient {
     val config =
         ProtocolClientConfig(
             host = address,
             serializationStrategy = GoogleJavaProtobufStrategy(),
             networkProtocol = NetworkProtocol.GRPC,
         )
-    return UrlsServiceClient(ProtocolClient(ConnectOkHttpClient(builder.build()), config))
+    return UrlsServiceClient(ProtocolClient(ConnectOkHttpClient(urlsHttpClientBuilder(tls).build()), config))
 }
 
 /**

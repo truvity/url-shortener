@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 private val mapper = ObjectMapper()
 
@@ -47,5 +48,23 @@ class IdentityTest {
         // A chart's default is off, and it must produce a service that runs.
         assertNull(Identity.load(null))
         assertNull(Identity.load(Tls(mode = "off", null, null, null, null)))
+    }
+}
+
+class UrlsClientTest {
+    @Test
+    fun `the outbound client carries a span for every call`() {
+        // Built outside Spring's bean graph, so the starter's own
+        // instrumentation never sees this client (it instruments what
+        // Spring manages, and manages nothing here — server.port is -1).
+        // Without its own interceptor this is a consumer with an outbound
+        // call and no span anywhere describing it, which is exactly the
+        // gap found: a tracer provider connected and exporting nothing,
+        // because nothing created a span.
+        val client = urlsHttpClientBuilder(null).build()
+        assertTrue(
+            client.interceptors.any { it.javaClass.name.startsWith("io.opentelemetry.") },
+            "no OpenTelemetry interceptor on the client that makes the one outbound call this service makes",
+        )
     }
 }

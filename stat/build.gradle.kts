@@ -43,6 +43,15 @@ dependencies {
     // instrumentation for the web layer comes with it.
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.11.0")
 
+    // The OUTBOUND call to urls, and the reason for a library rather than
+    // asking the starter above for it: that starter instruments what
+    // Spring manages, and this client builds its own OkHttpClient outside
+    // Spring's lifecycle entirely (the identity handshake above needs to
+    // configure it directly). Without this, spans exist for nothing this
+    // process ever does -- it is a consumer with one outbound call, and
+    // neither end is something the starter sees.
+    implementation("io.opentelemetry.instrumentation:opentelemetry-okhttp-3.0:2.11.0-alpha")
+
     // The broker's own client.
     implementation("io.nats:jnats:2.23.0")
 
