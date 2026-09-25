@@ -1,7 +1,19 @@
 package com.truvity.example.stat
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.sun.net.httpserver.HttpServer
+import io.nats.client.impl.Headers
 import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.SpanKind
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
+import io.opentelemetry.context.propagation.ContextPropagators
+import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.trace.ReadableSpan
+import io.opentelemetry.sdk.trace.SdkTracerProvider
+import java.net.InetSocketAddress
+import okhttp3.Protocol
+import okhttp3.Request
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -105,5 +117,94 @@ class GlobalOpenTelemetryTest {
         enableGlobalOpenTelemetry()
 
         assertEquals("false", System.getProperty("otel.java.global-autoconfigure.enabled"))
+    }
+}
+
+class TraceContinuityTest {
+    @AfterTest
+    fun reset() {
+        GlobalOpenTelemetry.resetForTest()
+    }
+
+    private fun sdk(): OpenTelemetrySdk {
+        GlobalOpenTelemetry.resetForTest()
+        val sdk =
+            OpenTelemetrySdk.builder()
+                .setTracerProvider(SdkTracerProvider.builder().build())
+                .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+                .build()
+        GlobalOpenTelemetry.set(sdk)
+        return sdk
+    }
+
+    @Test
+    fun `a consumed message continues the publishers trace`() {
+        val sdk = sdk()
+        val publisher = sdk.getTracer("test").spanBuilder("redirect").startSpan()
+        val headers = Headers()
+        headers.add("traceparent", "00-${publisher.spanContext.traceId}-${publisher.spanContext.spanId}-01")
+
+        var inside: Span? = null
+        consumed("events.redirect", headers) { inside = Span.current() }
+
+        val span = inside as ReadableSpan
+        assertEquals(publisher.spanContext.traceId, span.spanContext.traceId, "the consumer started a trace of its own")
+        assertEquals(publisher.spanContext.spanId, span.parentSpanContext.spanId, "the consumer is not the publisher's child")
+        assertEquals(SpanKind.CONSUMER, span.kind)
+    }
+
+    @Test
+    fun `a message with no context still gets a span`() {
+        sdk()
+        var inside: Span? = null
+        consumed("events.redirect", null) { inside = Span.current() }
+        assertTrue(inside!!.spanContext.isValid)
+    }
+
+    @Test
+    fun `the call made while consuming carries the consumers trace to the callee`() {
+        val sdk = sdk()
+        val seen = java.util.concurrent.atomic.AtomicReference<String?>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            seen.set(exchange.requestHeaders.getFirst("traceparent"))
+            exchange.sendResponseHeaders(200, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val publisher = sdk.getTracer("test").spanBuilder("redirect").startSpan()
+            val headers = Headers()
+            headers.add("traceparent", "00-${publisher.spanContext.traceId}-${publisher.spanContext.spanId}-01")
+            val client = urlsHttpClientBuilder(null).protocols(listOf(Protocol.HTTP_1_1)).build()
+
+            // ENQUEUED, as the Connect client does: the call runs on a
+            // dispatcher thread, and only the wrapped executor lets it see
+            // the span that is current here.
+            consumed("events.redirect", headers) {
+                val latch = java.util.concurrent.CountDownLatch(1)
+                client.newCall(Request.Builder().url("http://127.0.0.1:${server.address.port}/").build())
+                    .enqueue(
+                        object : okhttp3.Callback {
+                            override fun onFailure(call: okhttp3.Call, e: java.io.IOException) = latch.countDown()
+
+                            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                                response.close()
+                                latch.countDown()
+                            }
+                        },
+                    )
+                latch.await()
+            }
+
+            val header = seen.get()
+            assertTrue(header != null, "no trace context reached the callee")
+            assertTrue(
+                header!!.startsWith("00-${publisher.spanContext.traceId}-"),
+                "the callee joined a different trace: $header",
+            )
+        } finally {
+            server.stop(0)
+        }
     }
 }

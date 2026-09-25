@@ -117,29 +117,38 @@ class Consuming(
                             continue
                         }
                     for (message in messages) {
-                        val detailType = message.headers?.getFirst("X-Detail-Type")
-                        val redirect = decode(detailType, String(message.data), mapper)
-                        if (redirect == null) {
-                            // Nothing this component reads. Acknowledged, so
-                            // it is not redelivered forever.
-                            message.ack()
-                            continue
-                        }
-                        try {
-                            runBlocking { recordClick(counter, redirect.longUrl) }
-                            message.ack()
-                            log.info("counted a redirect for {}", redirect.urlKey)
-                        } catch (e: Exception) {
-                            // No ack: let it be redelivered. A click counted
-                            // zero times is worse than one counted twice,
-                            // and the increment is by URL.
-                            log.error("not counted, will be redelivered: {}", e.message)
+                        consumed(message.subject, message.headers) {
+                            handle(message)
                         }
                     }
                 }
             }
         worker?.start()
         log.info("consuming {} as {}", config.events.consumer.subject, config.events.consumer.durable)
+    }
+
+    private fun handle(message: io.nats.client.Message) {
+        val detailType = message.headers?.getFirst("X-Detail-Type")
+        val redirect = decode(detailType, String(message.data), mapper)
+        if (redirect == null) {
+            // Nothing this component reads. Acknowledged, so it is not
+            // redelivered forever.
+            message.ack()
+            return
+        }
+        try {
+            runBlocking { recordClick(counter, redirect.longUrl) }
+            message.ack()
+            log.info("counted a redirect for {}", redirect.urlKey)
+        } catch (e: Exception) {
+            // No ack: let it be redelivered. A click counted zero times is
+            // worse than one counted twice, and the increment is by URL.
+            // Recorded on the span as well, so the failed attempt is the
+            // one a trace search finds.
+            log.error("not counted, will be redelivered: {}", e.message)
+            io.opentelemetry.api.trace.Span.current().recordException(e)
+            io.opentelemetry.api.trace.Span.current().setStatus(io.opentelemetry.api.trace.StatusCode.ERROR)
+        }
     }
 
     /**

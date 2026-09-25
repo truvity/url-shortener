@@ -198,6 +198,15 @@ func connectOptions(log *slog.Logger) []connect.HandlerOption {
 	// Spans for every procedure, and the incoming trace context continued
 	// rather than restarted.
 	//
+	// TRUSTED, because the caller is another service of this platform, and
+	// the alternative is the default: an untrusted server span starts a
+	// trace of its own and only LINKS to the caller's. That is the right
+	// default for a service facing the internet, where any client could
+	// otherwise choose the trace this service joins and whether it is
+	// sampled. Here it is what left every request as two unconnected traces.
+	// Every caller reaches this service through the platform's transport
+	// rules, so a hostile caller is not what this trusts.
+	//
 	// Installing exporters is not instrumentation: a service with a tracer
 	// provider and nothing creating spans exports nothing, and the only
 	// symptom is a service missing from the trace store while every
@@ -206,7 +215,7 @@ func connectOptions(log *slog.Logger) []connect.HandlerOption {
 	// A failure here is not fatal. Telemetry that can refuse to start is
 	// telemetry that can take the service with it, and a service that will
 	// not serve because it cannot be observed has the priority backwards.
-	if otelInterceptor, err := otelconnect.NewInterceptor(); err != nil {
+	if otelInterceptor, err := otelconnect.NewInterceptor(otelconnect.WithTrustRemote()); err != nil {
 		// Background, because this is start-up: there is no request whose
 		// context this belongs to.
 		log.WarnContext(context.Background(), "serving without spans", slog.String("error", err.Error()))
@@ -277,6 +286,9 @@ func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("connect to the database: %w", err)
+	}
+	if err := runtime.TraceDatabase(db); err != nil {
+		return nil, nil, err
 	}
 	sqlDB, err := db.DB()
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 // The headers a published event carries beside its body.
@@ -80,6 +82,21 @@ func (p *JetStream) PublishEvents(ctx context.Context, events []Event) error {
 		}
 		if e.Source != "" {
 			msg.Header.Set(HeaderSource, e.Source)
+		}
+
+		// The trace context rides in the message, so a consumer's span
+		// can name the request that caused it. Broker hops do not carry it
+		// by themselves: without this the store shows a request that ends
+		// at the publish and a consumer that began from nothing.
+		//
+		// Lower-case names, set on the map directly. NATS header names are
+		// case-sensitive, and an HTTP-style carrier would canonicalise
+		// `traceparent` to `Traceparent`, which a Kotlin or Python consumer
+		// looking for the name the W3C specification gives would not find.
+		carrier := propagation.MapCarrier{}
+		otel.GetTextMapPropagator().Inject(ctx, carrier)
+		for name, value := range carrier {
+			msg.Header[name] = []string{value}
 		}
 
 		opts := []jetstream.PublishOpt{}

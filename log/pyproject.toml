@@ -7,6 +7,7 @@ license = "MIT"
 dependencies = [
     "boto3>=1.35",
     "nats-py>=2.9",
+    "opentelemetry-instrumentation-botocore>=0.50b0",
     "structlog>=24.4",
     # The loader, and the telemetry extra beside it. Telemetry is
     # configured by OpenTelemetry's own environment (decision 0006); with

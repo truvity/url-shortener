@@ -90,6 +90,9 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("connect to the database: %w", err)
 	}
+	if err := runtime.TraceDatabase(db); err != nil {
+		return err
+	}
 	sqlDB, err := db.DB()
 	if err != nil {
 		return fmt.Errorf("reach the connection pool: %w", err)

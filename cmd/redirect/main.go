@@ -237,6 +237,9 @@ func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error
 	if err != nil {
 		return nil, nil, fmt.Errorf("connect to the database: %w", err)
 	}
+	if err := runtime.TraceDatabase(db); err != nil {
+		return nil, nil, err
+	}
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, nil, fmt.Errorf("reach the connection pool: %w", err)

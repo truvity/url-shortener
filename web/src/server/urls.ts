@@ -6,7 +6,8 @@
  * point of a schema living in the repository with a build configuration
  * beside it.
  */
-import { createClient, type Client } from "@connectrpc/connect";
+import { createClient, type Client, type Interceptor } from "@connectrpc/connect";
+import { context, propagation, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { createGrpcTransport } from "@connectrpc/connect-node";
 
 import { UrlsService } from "../gen/urlshortener/v1/urls_pb.ts";
@@ -21,5 +22,44 @@ import { UrlsService } from "../gen/urlshortener/v1/urls_pb.ts";
  * The address carries that decision because the chart renders the address.
  */
 export function urlsClient(address: string): Client<typeof UrlsService> {
-  return createClient(UrlsService, createGrpcTransport({ baseUrl: address }));
+  return createClient(
+    UrlsService,
+    createGrpcTransport({ baseUrl: address, interceptors: [tracing] }),
+  );
 }
+
+/**
+ * One CLIENT span per call, and the trace context on the wire.
+ *
+ * Without the header the callee starts a trace of its own: the store fills
+ * with two half-traces per request, each looking complete, and nothing shows
+ * that one caused the other. The span is named for the procedure, never the
+ * arguments, because a span name is a dimension.
+ */
+export const tracing: Interceptor = (next) => async (req) => {
+  const tracer = trace.getTracer("url-shortener-web");
+  const span = tracer.startSpan(
+    `${req.service.typeName}/${req.method.name}`,
+    {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        "rpc.system": "grpc",
+        "rpc.service": req.service.typeName,
+        "rpc.method": req.method.name,
+      },
+    },
+    context.active(),
+  );
+  propagation.inject(trace.setSpan(context.active(), span), req.header, {
+    set: (carrier, key, value) => carrier.set(key, value),
+  });
+  try {
+    return await context.with(trace.setSpan(context.active(), span), () => next(req));
+  } catch (error) {
+    span.recordException(error as Error);
+    span.setStatus({ code: SpanStatusCode.ERROR });
+    throw error;
+  } finally {
+    span.end();
+  }
+};

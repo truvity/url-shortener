@@ -1,7 +1,12 @@
 package com.truvity.example.stat
 
 import com.connectrpc.ProtocolClientConfig
+import io.nats.client.impl.Headers
 import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.trace.SpanKind
+import io.opentelemetry.api.trace.StatusCode
+import io.opentelemetry.context.Context
+import io.opentelemetry.context.propagation.TextMapGetter
 import io.opentelemetry.instrumentation.okhttp.v3_0.OkHttpTelemetry
 import com.connectrpc.extensions.GoogleJavaProtobufStrategy
 import com.connectrpc.impl.ProtocolClient
@@ -15,6 +20,8 @@ import io.nats.client.api.ConsumerConfiguration
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import java.util.concurrent.Executors
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import org.slf4j.LoggerFactory
@@ -85,6 +92,20 @@ internal fun urlsHttpClientBuilder(tls: Tls?): OkHttpClient.Builder {
     val builder =
         OkHttpClient.Builder()
             .callTimeout(Duration.ofSeconds(10))
+            // The call is made on ANOTHER thread, and the current span
+            // lives in a thread-local: without this the client span is
+            // created with no parent and every click starts a trace of its
+            // own. Wrapping captures the context where the call is
+            // ENQUEUED, which is the thread that holds the span.
+            .dispatcher(
+                Dispatcher(
+                    Context.taskWrapping(
+                        Executors.newCachedThreadPool { task ->
+                            Thread(task, "urls-dispatcher").apply { isDaemon = true }
+                        },
+                    ),
+                ),
+            )
             .addInterceptor(OkHttpTelemetry.create(GlobalOpenTelemetry.get()).newInterceptor())
     val identity = Identity.load(tls)
     if (identity == null) {
@@ -164,4 +185,47 @@ fun decode(detailType: String?, body: String, mapper: com.fasterxml.jackson.data
         return null
     }
     return Redirect(node.at("/url_key").asText(""), longUrl)
+}
+
+/** Reads a trace context out of a message's headers. */
+internal object NatsHeaders : TextMapGetter<Headers> {
+    override fun keys(carrier: Headers): Iterable<String> = carrier.keySet()
+
+    override fun get(carrier: Headers?, key: String): String? = carrier?.getFirst(key)
+}
+
+/**
+ * Runs [block] as a span that CONTINUES the publisher's trace.
+ *
+ * The broker keeps the trace context the publisher put in the message, and
+ * nothing else does anything with it: this is the only place it is read.
+ * Without it the redirect that caused a click and the click's counting are
+ * two traces, and nothing in the store says one caused the other.
+ *
+ * A child of the publisher, not a link, because there is one publisher and
+ * one message: the span describes the same piece of work, later. The span
+ * is made CURRENT for the block, which is what lets the outbound call made
+ * inside it become its child in turn.
+ */
+internal fun <T> consumed(subject: String, headers: Headers?, block: () -> T): T {
+    val otel = GlobalOpenTelemetry.get()
+    val parent = otel.propagators.textMapPropagator.extract(Context.root(), headers ?: Headers(), NatsHeaders)
+    val span =
+        otel.getTracer("url-shortener-stat")
+            .spanBuilder("$subject process")
+            .setParent(parent)
+            .setSpanKind(SpanKind.CONSUMER)
+            .setAttribute("messaging.system", "nats")
+            .setAttribute("messaging.destination.name", subject)
+            .setAttribute("messaging.operation.type", "process")
+            .startSpan()
+    try {
+        span.makeCurrent().use { return block() }
+    } catch (e: Throwable) {
+        span.recordException(e)
+        span.setStatus(StatusCode.ERROR)
+        throw e
+    } finally {
+        span.end()
+    }
 }

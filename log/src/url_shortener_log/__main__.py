@@ -21,10 +21,11 @@ import nats
 from nats.errors import TimeoutError as NATSTimeoutError
 from nats.js.api import AckPolicy, ConsumerConfig
 from opentelemetry import trace
-from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
+from opentelemetry.trace import Span, SpanKind, StatusCode
 from truvity_policy import ConfigError, telemetry
 
-from . import archive, config, runtime
+from . import archive, config, runtime, tracing
 
 if TYPE_CHECKING:
     from nats.aio.msg import Msg
@@ -74,6 +75,10 @@ def main() -> int:
     # and this installs nothing, so a laptop and a cluster run the same
     # code down the same path.
     shutdown_telemetry = telemetry.start()
+    # Every S3 call becomes a span under whatever is current -- here the
+    # flush. Before any client is built, so none is missed.
+    # The instrumentor package ships no type information.
+    BotocoreInstrumentor().instrument()  # type: ignore[no-untyped-call]
     try:
         return asyncio.run(run(cfg))
     finally:
@@ -169,6 +174,7 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
         loop.add_signal_handler(received, stopping.set)
 
     held: list[Msg] = []
+    waiting: list[Span] = []
 
     tracer = trace.get_tracer("url-shortener-log")
 
@@ -176,25 +182,42 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
         """Write what is held, then acknowledge it. In that order, always."""
         if not held:
             return
-        # One span per FLUSH, not per message. A span per message would be
-        # one per event on a stream this process reads continuously, which
-        # is the cardinality problem batching exists to avoid in the first
-        # place -- the unit of work here is the write, not the record.
+        # One span per FLUSH for the write, and a short span per message
+        # (tracing.py) that the flush LINKS to. The write is the unit of
+        # work, so it cannot be the child of any one record; the per-message
+        # spans are what put the archive inside the trace of the request
+        # that caused it. They are sampled with their publisher, so they
+        # cost what the sampled traffic costs and no more.
         with tracer.start_as_current_span(
-            "archive.flush", kind=SpanKind.PRODUCER, attributes={"archive.records": len(held)}
+            "archive.flush",
+            kind=SpanKind.PRODUCER,
+            attributes={"archive.records": len(held)},
+            links=tracing.links(waiting),
         ) as span:
             try:
                 key = await asyncio.to_thread(writer.flush)
             except Exception as error:
                 span.set_status(StatusCode.ERROR, str(error))
                 span.record_exception(error)
+                for each in waiting:
+                    each.set_status(StatusCode.ERROR, str(error))
+                    each.end()
+                waiting.clear()
                 raise
             if key is not None:
                 span.set_attribute("archive.key", key)
             for message in held:
                 await message.ack()
+            # Ended NOW, not when the message arrived: each span covers the
+            # time the record spent waiting for its batch, which is the
+            # part of the archive's latency a trace should show.
+            for each in waiting:
+                if key is not None:
+                    each.set_attribute("archive.key", key)
+                each.end()
             log.info("archived", key=key, records=len(held))
             held.clear()
+            waiting.clear()
 
     try:
         while not stopping.is_set():
@@ -217,6 +240,7 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
                     ),
                 )
                 held.append(message)
+                waiting.append(tracing.receive(tracer, message.subject, message.headers))
 
             if writer.due(archive.now()):
                 await write()
