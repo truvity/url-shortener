@@ -9,6 +9,7 @@ package urls
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -59,20 +60,92 @@ func (h *Handler) Create(
 	ctx context.Context,
 	req *connect.Request[v1.CreateRequest],
 ) (*connect.Response[v1.CreateResponse], error) {
-	if err := validKey(req.Msg.GetKey()); err != nil {
-		return nil, err
-	}
 	if req.Msg.GetLongUrl() == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("long_url is required"))
 	}
 
+	key := req.Msg.GetKey()
+	if key == "" {
+		// Optional means the CALLER may omit it, not that the column
+		// accepts nothing -- something still has to choose one. A
+		// missing key was never wired to anything here, which the
+		// front end's own request just proved: it sends the empty
+		// string the proto's zero value already is, and validKey
+		// refused it as a key of length zero.
+		generated, err := h.generateKey(ctx)
+		if err != nil {
+			return nil, err
+		}
+		key = generated
+	} else if err := validKey(key); err != nil {
+		return nil, err
+	}
+
 	expires := optionalTime(req.Msg.GetExpiresAt())
-	if err := h.store.PutURL(ctx, req.Msg.GetKey(), req.Msg.GetLongUrl(), expires); err != nil {
+	if err := h.store.PutURL(ctx, key, req.Msg.GetLongUrl(), expires); err != nil {
 		return nil, storeError("create", err)
 	}
-	return h.getResponse(ctx, req.Msg.GetKey(), func(url *v1.Url) *connect.Response[v1.CreateResponse] {
+	return h.getResponse(ctx, key, func(url *v1.Url) *connect.Response[v1.CreateResponse] {
 		return connect.NewResponse(&v1.CreateResponse{Url: url})
 	})
+}
+
+// generateKeyAttempts bounds the collision retry. Unbounded would turn one
+// unlucky draw into a request that hangs; this many draws from a 62-symbol,
+// 8-character alphabet is a probability nobody needs to plan around, and a
+// caller who does see the refusal has a real signal that the keyspace is
+// filling up rather than a request that silently never returns.
+const generateKeyAttempts = 5
+
+// generateKey draws a random KeyLength code and checks it is not already
+// taken.
+//
+// Checked rather than proven: this asks the store, decides, and only then
+// writes, so a key handed to another request in that gap would collide.
+// For a code drawn from 62^8 possibilities that gap is not worth the
+// machinery an atomic reservation would cost, and PutURL's own unique
+// constraint is still the backstop if it ever happens -- the retry above
+// is the handler being polite about it, not the guarantee.
+func (h *Handler) generateKey(ctx context.Context) (string, error) {
+	for range generateKeyAttempts {
+		key, err := randomKey()
+		if err != nil {
+			return "", connect.NewError(connect.CodeInternal, fmt.Errorf("draw a key: %w", err))
+		}
+		existing, err := h.store.GetURL(ctx, key)
+		if err != nil {
+			return "", storeError("check a generated key", err)
+		}
+		if existing == nil {
+			return key, nil
+		}
+	}
+	return "", connect.NewError(connect.CodeResourceExhausted,
+		fmt.Errorf("could not find an unused key in %d attempts", generateKeyAttempts))
+}
+
+// keyAlphabet matches what a caller is told a key looks like -- the front
+// end's own validation and the RETURNED key must agree, or a generated key
+// would fail the same check a typed one is held to.
+const keyAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+// randomKey draws KeyLength symbols from crypto/rand, not math/rand.
+//
+// A short link is reachable by anyone who has it, so a PREDICTABLE one is
+// a way to find somebody else's: a generator seeded or advanced
+// predictably turns "here is your link" into "here is everyone's link, in
+// order." That is a wrong answer for an example to teach as much as for a
+// deployment to ship.
+func randomKey() (string, error) {
+	raw := make([]byte, KeyLength)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	out := make([]byte, KeyLength)
+	for i, b := range raw {
+		out[i] = keyAlphabet[int(b)%len(keyAlphabet)]
+	}
+	return string(out), nil
 }
 
 // Get reports one URL.

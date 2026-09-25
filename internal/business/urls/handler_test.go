@@ -1,6 +1,9 @@
 package urls
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // A caller cannot raise the page ceiling, and asking to is not an error.
 //
@@ -29,5 +32,34 @@ func TestThePageSizeCeilingIsTheService(t *testing.T) {
 				t.Errorf("pageSize(%d) = %d, want %d", c.ask, got, c.want)
 			}
 		})
+	}
+}
+
+// A generated key is the shape validKey demands, drawn from the alphabet
+// the front end tells a caller a key looks like -- a generated key that
+// failed its OWN service's validation would be a bug no caller could work
+// around.
+func TestARandomKeyIsTheShapeTheServiceAccepts(t *testing.T) {
+	seen := map[string]bool{}
+	for range 100 {
+		key, err := randomKey()
+		if err != nil {
+			t.Fatalf("randomKey: %v", err)
+		}
+		if err := validKey(key); err != nil {
+			t.Fatalf("a generated key failed the service's own check: %v (key %q)", err, key)
+		}
+		for _, r := range key {
+			if !strings.ContainsRune(keyAlphabet, r) {
+				t.Fatalf("key %q contains %q, outside the declared alphabet", key, r)
+			}
+		}
+		seen[key] = true
+	}
+	// Not a statistical proof of randomness -- a sanity check that this
+	// draws from crypto/rand at all rather than, say, returning a
+	// constant that happens to be valid.
+	if len(seen) < 95 {
+		t.Errorf("100 draws produced only %d distinct keys", len(seen))
 	}
 }
