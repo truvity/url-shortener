@@ -348,12 +348,22 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "example-log"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_METRICS_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
             # The NAMES are in the configuration file; the values are here,
             # from a Secret, and appear in nothing that is rendered, printed
             # or committed.
@@ -466,12 +476,22 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "example-redirect"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_METRICS_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -580,12 +600,22 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "example-stat"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_METRICS_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -685,12 +715,22 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "example-urls"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_METRICS_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -791,12 +831,22 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "example-web"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_METRICS_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
           ports:
             - name: http
               containerPort: 8080
@@ -954,12 +1004,22 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: "example-migrate"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
             - name: OTEL_TRACES_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_METRICS_EXPORTER
-              value: "none"
+              value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:

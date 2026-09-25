@@ -8,18 +8,6 @@ spring:
   main:
     banner-mode: off
 
-otel:
-  java:
-    global-autoconfigure:
-      # The starter wires spans and metrics for what Spring manages, and
-      # registers nothing GLOBAL by default -- dependency injection is the
-      # framework's own preference, and correctly so for anything that is a
-      # bean. The outbound client below is not one: it builds its own
-      # OkHttpClient outside Spring's lifecycle (the identity handshake
-      # needs to configure it directly), so it can only reach the SDK
-      # through GlobalOpenTelemetry, which this line is what turns on.
-      enabled: true
-
 management:
   server:
     # Probes on their OWN listener. The port that serves traffic is the port

@@ -1,6 +1,8 @@
 package com.truvity.example.stat
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.opentelemetry.api.GlobalOpenTelemetry
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -66,5 +68,42 @@ class UrlsClientTest {
             client.interceptors.any { it.javaClass.name.startsWith("io.opentelemetry.") },
             "no OpenTelemetry interceptor on the client that makes the one outbound call this service makes",
         )
+    }
+}
+
+class GlobalOpenTelemetryTest {
+    @AfterTest
+    fun reset() {
+        System.clearProperty("otel.java.global-autoconfigure.enabled")
+        GlobalOpenTelemetry.resetForTest()
+    }
+
+    @Test
+    fun `once enabled the global SDK produces real spans, not no-op ones`() {
+        // The claim is about what the outbound client will actually get,
+        // so this asks for exactly that: a span from GlobalOpenTelemetry
+        // and whether it is real. A no-op span has an invalid context, and
+        // that is what the process had for the entire time it exported
+        // nothing -- no error, no log, an interceptor tracing into a void.
+        System.clearProperty("otel.java.global-autoconfigure.enabled")
+        GlobalOpenTelemetry.resetForTest()
+
+        enableGlobalOpenTelemetry()
+
+        val span = GlobalOpenTelemetry.get().getTracer("test").spanBuilder("probe").startSpan()
+        try {
+            assertTrue(span.spanContext.isValid, "the global SDK is a no-op: nothing this service traces is recorded")
+        } finally {
+            span.end()
+        }
+    }
+
+    @Test
+    fun `an operator's explicit setting wins over the default`() {
+        System.setProperty("otel.java.global-autoconfigure.enabled", "false")
+
+        enableGlobalOpenTelemetry()
+
+        assertEquals("false", System.getProperty("otel.java.global-autoconfigure.enabled"))
     }
 }

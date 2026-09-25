@@ -167,7 +167,40 @@ fun configPath(args: Array<String> = emptyArray()): String {
         ?: error("no configuration file: pass -config or set CONFIG_FILE")
 }
 
+/**
+ * Publish the OpenTelemetry SDK to code that Spring does not manage.
+ *
+ * This is a JVM quirk, and it lives HERE rather than in the chart on
+ * purpose. The chart's telemetry settings are the specification's own
+ * variables, identical for every service in every language; a variable
+ * only the JVM reads does not belong in that list, where it would sit
+ * inert in a Go, a Python and a TypeScript pod and say something false
+ * about what they need.
+ *
+ * The SDK registers itself into GlobalOpenTelemetry only when told to,
+ * and it decides in its static bootstrap -- before any bean exists, so a
+ * Spring configuration key of the same name is read by nobody (tried
+ * first; the SDK's own log line said so, in a pod's stdout, which is the
+ * only place anyone would have seen it). The outbound client is built
+ * outside Spring's lifecycle, so GlobalOpenTelemetry is the only way it
+ * reaches the SDK the starter already configured.
+ *
+ * An operator's explicit setting wins, either as the property or as the
+ * environment variable the SDK derives from it -- this supplies a default,
+ * it does not take a decision away.
+ */
+internal fun enableGlobalOpenTelemetry() {
+    val property = "otel.java.global-autoconfigure.enabled"
+    if (System.getProperty(property) == null && System.getenv("OTEL_JAVA_GLOBAL_AUTOCONFIGURE_ENABLED") == null) {
+        System.setProperty(property, "true")
+    }
+}
+
 fun main(args: Array<String>) {
+    // Before ANYTHING that could touch GlobalOpenTelemetry: the SDK reads
+    // this once, at class initialisation, and never again.
+    enableGlobalOpenTelemetry()
+
     // Read and validated BEFORE the framework starts, for two reasons. The
     // framework reads its own logging settings before any bean exists, so
     // the level has to be in place by then. And a configuration this

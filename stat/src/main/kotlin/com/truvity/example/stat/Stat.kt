@@ -70,8 +70,10 @@ typealias Nats_ = com.truvity.example.stat.Nats
 // handshake below has to configure it directly -- so the starter's own
 // instrumentation never sees it: that instruments what Spring manages,
 // and manages nothing here (server.port is -1; application.yaml explains
-// why). GlobalOpenTelemetry is what the starter DOES publish for code
-// outside that graph, turned on in the same file.
+// why). GlobalOpenTelemetry is what the starter can publish for code
+// outside that graph -- but only when told to, and only before anything
+// has touched it. enableGlobalOpenTelemetry() in Application.kt does that
+// as the first thing main() runs, and says why it is not in the chart.
 //
 // `newInterceptor()` is the deprecated half of this library's API, and it
 // is still the one this needs: the replacement, `newCallFactory`, wraps a

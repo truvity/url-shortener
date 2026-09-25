@@ -121,3 +121,11 @@ route:
     namespace: gateways
     sectionName: https
   hostname: shortener.example.invalid
+
+otel:
+  endpoint: http://collector.example.invalid:4318
+  protocol: http/protobuf
+  tracesSampler: parentbased_traceidratio
+  sampleRatio: "0.25"
+  resourceAttributes:
+    deployment.example.tier: primary
