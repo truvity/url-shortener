@@ -17,6 +17,7 @@ from importlib.metadata import version as package_version
 from typing import TYPE_CHECKING, cast
 
 import structlog
+from truvity_policy.telemetry import trace_context
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -50,6 +51,10 @@ def logger(level: str) -> structlog.stdlib.BoundLogger:
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
+            # trace_id/span_id for the span current when the event was
+            # logged -- absent, not empty, when none is. Before the
+            # renderer, like every processor that adds a field.
+            trace_context,
             structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(parsed),

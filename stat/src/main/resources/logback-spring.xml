@@ -18,7 +18,20 @@
         </encoder>
     </appender>
 
-    <root level="${LOG_LEVEL:-info}">
+    <!--
+      Wraps STDERR, not a config for it: before an event reaches the
+      encoder above, this injects trace_id/span_id/trace_flags -- the
+      current span's, in the W3C lower-case hex form -- into the MDC, and
+      leaves them out entirely when no span is current. The ECS encoder
+      already folds every MDC entry into the JSON object as a top-level
+      field, so nothing here maps a field name: that would be a second
+      place for the two encoders to agree.
+    -->
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.mdc.v1_0.OpenTelemetryAppender">
         <appender-ref ref="STDERR"/>
+    </appender>
+
+    <root level="${LOG_LEVEL:-info}">
+        <appender-ref ref="OTEL"/>
     </root>
 </configuration>

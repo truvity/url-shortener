@@ -16,6 +16,7 @@ import { context, propagation, SpanKind, SpanStatusCode, trace } from "@opentele
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { read } from "./config.ts";
 import { urlsClient } from "./urls.ts";
@@ -31,12 +32,32 @@ const TYPES: Record<string, string> = {
   ".json": "application/json",
 };
 
+// spanCorrelation reads the span active when a log line is written and
+// returns trace_id/span_id for it -- the names the OpenTelemetry
+// specification recommends for trace context in a log format that is not
+// OTLP, lower-case hex, the W3C forms. An empty object when no span is
+// current, so the fields are ABSENT from the line rather than empty
+// strings.
+export function spanCorrelation(): Record<string, string> {
+  const spanContext = trace.getSpan(context.active())?.spanContext();
+  if (!spanContext || !trace.isSpanContextValid(spanContext)) {
+    return {};
+  }
+  return { trace_id: spanContext.traceId, span_id: spanContext.spanId };
+}
+
 function logLine(level: string, message: string, rest: Record<string, unknown> = {}): void {
   // JSON, to stderr, at one level. stdout is the program's product and
   // stderr is its commentary; this program's product is a web page, so it
   // writes nothing to stdout at all.
   process.stderr.write(
-    `${JSON.stringify({ time: new Date().toISOString(), level, msg: message, ...rest })}\n`,
+    `${JSON.stringify({
+      time: new Date().toISOString(),
+      level,
+      msg: message,
+      ...spanCorrelation(),
+      ...rest,
+    })}\n`,
   );
 }
 
@@ -309,6 +330,12 @@ async function serve(
   res.writeHead(404, { "content-type": "text/plain" }).end("not found");
 }
 
-// The entry is async because telemetry starts before anything serves: a
-// span lost during start-up is one describing the start-up.
-void main();
+// Guarded so importing this module (a test, importing spanCorrelation) does
+// not also run it: only run when this file is the one `node` was started
+// on, the same file esbuild bundles to `dist/server/main.js` and the image
+// runs.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  // The entry is async because telemetry starts before anything serves: a
+  // span lost during start-up is one describing the start-up.
+  void main();
+}

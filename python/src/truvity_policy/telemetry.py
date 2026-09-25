@@ -19,7 +19,22 @@ parses an endpoint or a protocol.
 from __future__ import annotations
 
 import os
-from typing import Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping
+
+    # A processor's third argument, spelled out rather than imported from
+    # structlog: that package is the ARCHIVER's dependency, not this
+    # module's, and importing its types here would make a consumer who
+    # never took structlog carry it just to type-check.
+    EventDict = MutableMapping[str, Any]
+
+# The names the OpenTelemetry specification recommends for trace context in
+# a log format that is not OTLP: lower-case hex, the W3C forms. Every
+# language in this repository uses exactly these two names.
+_FIELD_TRACE_ID = "trace_id"
+_FIELD_SPAN_ID = "span_id"
 
 
 class Shutdown(Protocol):
@@ -89,3 +104,29 @@ def start() -> Shutdown:
             each()
 
     return shutdown
+
+
+def trace_context(_logger: object, _method_name: str, event_dict: EventDict) -> EventDict:
+    """Add trace_id and span_id for the current span, as a structlog processor.
+
+    Imported here, not at module load, for the same reason `start` delays
+    its own import: telemetry is an optional extra, and a consumer that
+    took only the loader must still be able to wire this processor into a
+    logger without carrying the SDK — it degrades to a no-op rather than
+    an import error, whether or not `start` was ever called.
+
+    Absent, not empty: when no span is current, or the SDK was never
+    installed, neither key is added at all.
+    """
+    try:
+        from opentelemetry import trace  # noqa: PLC0415
+    except ImportError:
+        return event_dict
+
+    span_context = trace.get_current_span().get_span_context()
+    if not span_context.is_valid:
+        return event_dict
+
+    event_dict[_FIELD_TRACE_ID] = format(span_context.trace_id, "032x")
+    event_dict[_FIELD_SPAN_ID] = format(span_context.span_id, "016x")
+    return event_dict

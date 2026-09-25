@@ -52,6 +52,17 @@ dependencies {
     // neither end is something the starter sees.
     implementation("io.opentelemetry.instrumentation:opentelemetry-okhttp-3.0:2.11.0-alpha")
 
+    // Log <-> trace correlation. The starter above does NOT bring this: it
+    // wires the SDK and the web/client instrumentation, but injecting
+    // trace_id/span_id into Logback's MDC is a separate module, referenced
+    // by class name from logback-spring.xml rather than from Kotlin code --
+    // runtimeOnly is what that shape asks for in the service itself.
+    runtimeOnly("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.11.0-alpha")
+    // The test DOES reference the class directly, to drive the same
+    // appender against a ListAppender instead of the console -- so the
+    // test source set needs it at compile time too.
+    testImplementation("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.11.0-alpha")
+
     // The broker's own client.
     implementation("io.nats:jnats:2.23.0")
 

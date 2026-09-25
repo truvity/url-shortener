@@ -8,6 +8,7 @@
 package runtime
 
 import (
+	"github.com/truvity/policy/telemetry"
 	"github.com/truvity/policy/transport"
 
 	"github.com/gofiber/fiber/v3"
@@ -26,12 +27,18 @@ import (
 // level. Per-package levels are not a thing here — they sound useful twice a
 // year and cost a configuration surface every service, chart and operator has
 // to know about.
+//
+// Wrapped with telemetry.NewLogHandler, so a record written with
+// log.InfoContext(ctx, ...) while ctx carries a current span gets that
+// span's trace_id and span_id — a plain log.Info call, or a call while no
+// span is current, gets neither field.
 func Logger(level string) *slog.Logger {
 	var l slog.Level
 	if err := l.UnmarshalText([]byte(level)); err != nil {
 		l = slog.LevelInfo
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))
+	handler := telemetry.NewLogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))
+	return slog.New(handler)
 }
 
 // Version reads what this binary was built from. Nothing passes it in: a
