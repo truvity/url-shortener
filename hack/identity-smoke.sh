@@ -25,6 +25,12 @@ helm() { command helm --kube-context "$KCTX" "$@"; }
 NS=${NS:-shortener}
 APP=${APP:-example}
 TRUST_DOMAIN=${TRUST_DOMAIN:-policy.local}
+
+# The subject the counter's consumer is bound to is computed from the
+# namespace and the pair's installName (hack/install.sh and
+# charts/url-shortener/templates/_helpers.tpl), not a fixed string. This
+# matches install.sh's own default.
+INSTALL_NAME=${INSTALL_NAME:-$APP}
 CHARTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../charts" && pwd)"
 
 # `permissive`, not `strict`: the cleartext port is what the rest of the
@@ -179,7 +185,7 @@ kubectl -n "$NS" exec "${INFRA:-infra}-pg-1" -c postgres -- \
 # nothing outside the mesh of identities can call it — which is the rule
 # working, and also why this step cannot use curl.
 kubectl -n nats exec deploy/nats-box -- nats --server nats://nats:4222 \
-    pub url-shortener.redirect \
+    pub "$NS-$INSTALL_NAME.redirect" \
     "{\"url_key\":\"$KEY\",\"long_url\":\"$LONG\",\"timestamp\":\"2026-01-01T00:00:00Z\"}" \
     -H X-Detail-Type:URLRedirect >/dev/null
 
