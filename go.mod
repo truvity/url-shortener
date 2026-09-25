@@ -10,6 +10,7 @@ replace github.com/truvity/policy => ../..
 
 require (
 	connectrpc.com/connect v1.21.0
+	connectrpc.com/otelconnect v0.10.0
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/nats-io/nats.go v1.54.0

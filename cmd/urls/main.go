@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -188,9 +189,30 @@ func run() error {
 // the point of naming them once: a service whose two handlers disagree about
 // interceptors has one of them unprotected, and nothing says which.
 func connectOptions(log *slog.Logger) []connect.HandlerOption {
-	return []connect.HandlerOption{
+	options := []connect.HandlerOption{
 		connect.WithInterceptors(procedureLogger(log)),
 	}
+
+	// Spans for every procedure, and the incoming trace context continued
+	// rather than restarted.
+	//
+	// Installing exporters is not instrumentation: a service with a tracer
+	// provider and nothing creating spans exports nothing, and the only
+	// symptom is a service missing from the trace store while every
+	// dashboard reports the pipeline healthy. Found exactly that way.
+	//
+	// A failure here is not fatal. Telemetry that can refuse to start is
+	// telemetry that can take the service with it, and a service that will
+	// not serve because it cannot be observed has the priority backwards.
+	if otelInterceptor, err := otelconnect.NewInterceptor(); err != nil {
+		// Background, because this is start-up: there is no request whose
+		// context this belongs to.
+		log.WarnContext(context.Background(), "serving without spans", slog.String("error", err.Error()))
+	} else {
+		options = append(options, connect.WithInterceptors(otelInterceptor))
+	}
+
+	return options
 }
 
 // procedureLogger puts the procedure name on every log line a call produces.

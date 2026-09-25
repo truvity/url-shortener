@@ -11,6 +11,7 @@
  * consuming side.
  */
 import { start as startTelemetry } from "@truvity/policy/telemetry";
+import { context, propagation, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
@@ -66,7 +67,10 @@ async function main(): Promise<void> {
   const urls = urlsClient(cfg.urls.address);
 
   const app = createServer((req, res) => {
-    void serve(req, res, cfg.assets.directory, urls);
+    // The probe listener below is deliberately NOT traced: a readiness
+    // check every few seconds is not a request anybody is debugging, and
+    // it would be most of what the store holds.
+    void traced(req, res, () => serve(req, res, cfg.assets.directory, urls));
   });
 
   // Probes on their OWN listener. The port that serves the page is the port
@@ -164,6 +168,58 @@ async function readBody(req: IncomingMessage): Promise<string> {
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+// traced wraps a request in a SERVER span.
+//
+// Installing exporters is not instrumentation. A provider with nothing
+// creating spans exports nothing, and the only symptom is a service that
+// is missing from the trace store while every dashboard says the pipeline
+// is healthy — which is exactly how this was found, after forty requests
+// produced no trace at all.
+//
+// The incoming context is extracted BEFORE the span starts, so a request
+// that arrives with a traceparent continues that trace instead of
+// beginning an orphan one.
+async function traced(
+  req: IncomingMessage,
+  res: ServerResponse,
+  run: () => Promise<void>,
+): Promise<void> {
+  const tracer = trace.getTracer("url-shortener-web");
+  const incoming = propagation.extract(context.active(), req.headers);
+  // Named for the ROUTE, never the path: `/api/urls/abc12345` as a span
+  // name makes one span per key, and a trace store groups by name.
+  const route = routeOf(req);
+
+  await context.with(incoming, async () => {
+    const span = tracer.startSpan(`${req.method ?? "GET"} ${route}`, {
+      kind: SpanKind.SERVER,
+      attributes: { "http.request.method": req.method ?? "GET", "http.route": route },
+    });
+    try {
+      await context.with(trace.setSpan(context.active(), span), run);
+      span.setAttribute("http.response.status_code", res.statusCode);
+      // Only 5xx is this service's failure. A 404 is an answer.
+      if (res.statusCode >= 500) {
+        span.setStatus({ code: SpanStatusCode.ERROR });
+      }
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+      span.recordException(error as Error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+/** The low-cardinality name for a path. */
+function routeOf(req: IncomingMessage): string {
+  const path = new URL(req.url ?? "/", "http://localhost").pathname;
+  if (path.startsWith("/api/urls/")) return "/api/urls/:key";
+  if (path === "/api/urls" || path === "/api/url") return path;
+  return path === "/" ? "/" : "/*";
 }
 
 async function serve(
