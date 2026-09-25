@@ -65,20 +65,50 @@ func (h *Handler) Create(
 	}
 
 	key := req.Msg.GetKey()
+	if key != "" {
+		if err := validKey(key); err != nil {
+			return nil, err
+		}
+	}
+
+	// Ask what already exists BEFORE choosing or writing anything.
+	//
+	// A long URL has exactly one row -- its identity is the hash of it --
+	// and PutURL treats a URL that is already there as a success and stores
+	// NOTHING. So a caller that picks a key, calls PutURL and reads that key
+	// back is reading a key that was never written whenever the URL was
+	// shortened before. That is what this used to do: it dereferenced the
+	// empty result and panicked, and the caller saw a transport-level
+	// "stream closed" for a request whose row was already in the table.
+	byURL, err := h.store.GetURLByLongURL(ctx, req.Msg.GetLongUrl())
+	if err != nil {
+		return nil, storeError("look up the URL", err)
+	}
+	var owner *store.URLInfo
+	if key != "" && byURL == nil {
+		owner, err = h.store.GetURL(ctx, key)
+		if err != nil {
+			return nil, storeError("look up the key", err)
+		}
+	}
+	reuse, err := decideCreate(key, byURL, owner)
+	if err != nil {
+		return nil, err
+	}
+	if reuse != nil {
+		return h.getResponse(ctx, reuse.URLKey, func(url *v1.Url) *connect.Response[v1.CreateResponse] {
+			return connect.NewResponse(&v1.CreateResponse{Url: url})
+		})
+	}
+
 	if key == "" {
 		// Optional means the CALLER may omit it, not that the column
-		// accepts nothing -- something still has to choose one. A
-		// missing key was never wired to anything here, which the
-		// front end's own request just proved: it sends the empty
-		// string the proto's zero value already is, and validKey
-		// refused it as a key of length zero.
+		// accepts nothing -- something still has to choose one.
 		generated, err := h.generateKey(ctx)
 		if err != nil {
 			return nil, err
 		}
 		key = generated
-	} else if err := validKey(key); err != nil {
-		return nil, err
 	}
 
 	expires := optionalTime(req.Msg.GetExpiresAt())
@@ -88,6 +118,39 @@ func (h *Handler) Create(
 	return h.getResponse(ctx, key, func(url *v1.Url) *connect.Response[v1.CreateResponse] {
 		return connect.NewResponse(&v1.CreateResponse{Url: url})
 	})
+}
+
+// decideCreate applies the rules for a Create request to what already exists.
+//
+// It returns the entry to answer with when nothing should be written, or
+// nil to say "go ahead and insert". Pure, on purpose: every branch is a
+// question about what a caller is told, and they can be read and tested
+// without a database behind them.
+//
+//   - the URL already has an entry: shortening it again is not an error, it
+//     is the same link -- unless the caller asked for a DIFFERENT key, which
+//     is a conflict worth naming, or the entry is retired, which needs
+//     Restore rather than a second, silent, success.
+//   - the URL is new but the requested key belongs to something else: a
+//     conflict, said as one. Left to the database it arrives as "internal"
+//     with a constraint name in it, which tells nobody what to change.
+func decideCreate(requestedKey string, byURL, keyOwner *store.URLInfo) (*store.URLInfo, error) {
+	if byURL != nil {
+		if byURL.DeletedAt != nil {
+			return nil, connect.NewError(connect.CodeFailedPrecondition,
+				fmt.Errorf("this URL was shortened as %s and that key was retired; restore it rather than shortening again", byURL.URLKey))
+		}
+		if requestedKey != "" && requestedKey != byURL.URLKey {
+			return nil, connect.NewError(connect.CodeAlreadyExists,
+				fmt.Errorf("this URL is already shortened as %s", byURL.URLKey))
+		}
+		return byURL, nil
+	}
+	if requestedKey != "" && keyOwner != nil {
+		return nil, connect.NewError(connect.CodeAlreadyExists,
+			fmt.Errorf("the key %q is already taken", requestedKey))
+	}
+	return nil, nil
 }
 
 // generateKeyAttempts bounds the collision retry. Unbounded would turn one
@@ -323,6 +386,14 @@ func (h *Handler) url(ctx context.Context, key string) (*v1.Url, error) {
 	info, err := h.store.GetURL(ctx, key)
 	if err != nil {
 		return nil, storeError("read", err)
+	}
+	// GetURL answers a missing row with (nil, nil), so storeError's own
+	// not-found mapping is never reached from here. Without this, every
+	// caller -- Get, Update and Create's read-back -- dereferenced nothing
+	// and took the connection down with it, and a caller saw a stream reset
+	// instead of the "no such key" it was owed.
+	if info == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such key"))
 	}
 	count, err := h.store.GetClickCount(ctx, key)
 	if err != nil {

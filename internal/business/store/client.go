@@ -165,6 +165,38 @@ func (c *Client) ListURLs(ctx context.Context, limit int, after string, includeD
 	return infos, nil
 }
 
+// GetURLByLongURL retrieves the entry for a long URL, or nil if there is none.
+//
+// The row's identity IS the hash of its long URL, so this is a primary-key
+// lookup, not a scan -- and it is the question Create has to ask before it
+// decides anything, because PutURL treats a URL that already exists as a
+// success and stores nothing. A caller that skips this and reads back the
+// key it just generated is reading a key that was never written.
+//
+// A retired entry is returned like any other: it still occupies the row, so
+// the URL cannot be shortened again, and the caller has to be told that
+// rather than shown a success.
+func (c *Client) GetURLByLongURL(ctx context.Context, longURL string) (*URLInfo, error) {
+	var url models.URL
+	err := c.db.WithContext(ctx).Where("id = ?", hashLongURL(longURL)).First(&url).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get URL by long URL: %w", err)
+	}
+
+	return &URLInfo{
+		Code:      url.URLKey,
+		URLKey:    url.URLKey,
+		LongURL:   url.LongURL,
+		CreatedAt: url.CreatedAt,
+		UpdatedAt: url.UpdatedAt,
+		DeletedAt: url.DeletedAt,
+		ExpiresAt: url.ExpiresAt,
+	}, nil
+}
+
 // GetURLString retrieves long URL string by url_key (for redirect)
 func (c *Client) GetURLString(ctx context.Context, urlKey string) (string, error) {
 	info, err := c.GetURL(ctx, urlKey)

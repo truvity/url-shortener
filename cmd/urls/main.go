@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -191,6 +192,7 @@ func run() error {
 func connectOptions(log *slog.Logger) []connect.HandlerOption {
 	options := []connect.HandlerOption{
 		connect.WithInterceptors(procedureLogger(log)),
+		connect.WithRecover(recoverToError(log)),
 	}
 
 	// Spans for every procedure, and the incoming trace context continued
@@ -213,6 +215,32 @@ func connectOptions(log *slog.Logger) []connect.HandlerOption {
 	}
 
 	return options
+}
+
+// recoverToError turns a panic in a handler into an ordinary error.
+//
+// Without it a panic is not an error at all to the caller: net/http resets
+// the HTTP/2 stream, and what arrives is `Stream closed with error code
+// NGHTTP2_INTERNAL_ERROR` -- a transport failure, naming nothing, for a
+// request that may already have written its row. That is exactly what a
+// user saw, and it says the opposite of what happened.
+//
+// This is the net, not the fix: the bug behind that panic was fixed where it
+// was. The net exists because the next one will not have been anticipated.
+// It logs the stack at error level with the procedure named, so it is loud
+// where it is useful, and it tells the CALLER only that something went
+// wrong -- a panic value is an implementation detail and a stack trace is
+// not an answer.
+func recoverToError(log *slog.Logger) func(context.Context, connect.Spec, http.Header, any) error {
+	return func(ctx context.Context, spec connect.Spec, _ http.Header, recovered any) error {
+		log.ErrorContext(ctx, "handler panicked",
+			slog.String("procedure", spec.Procedure),
+			slog.Any("panic", recovered),
+			slog.String("stack", string(debug.Stack())),
+		)
+
+		return connect.NewError(connect.CodeInternal, errors.New("internal error"))
+	}
 }
 
 // procedureLogger puts the procedure name on every log line a call produces.
