@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #
-# Install the example into the local cluster, the way a deployment installs
-# it: two releases, in order.
+# Install the example's APPLICATION chart into the local cluster.
 #
-# The order is not a convenience. The application's migration is a
-# pre-install hook, and Helm runs every hook before it applies anything else
-# in the same release — so the database cannot belong to the release that
-# migrates it. The first release creates the database and the stream, and
-# the second one waits for them to become real before it installs anything.
+# It installs ONLY this chart. On a public repository's kind box there is no
+# infra release: the database, the two roles, the stream and the bucket
+# every value below points at are provided by
+# examples/url-shortener/e2e/fixture/apply.sh, which must have already run
+# — `just example-fixture`, before `just example-install`; `just cluster-all`
+# runs them in that order. See docs/decisions/0005-kind-is-the-gate.md for
+# why kind installs no infra chart at all.
 set -euo pipefail
 
 # The cluster this example is installed into, BY NAME.
@@ -23,8 +24,8 @@ kubectl() { command kubectl --context "$KCTX" "$@"; }
 helm() { command helm --kube-context "$KCTX" "$@"; }
 
 NS=${NS:-shortener}
-INFRA=${INFRA:-infra}
 APP=${APP:-example}
+BUCKET=${BUCKET:-url-shortener-archive}
 
 # Where the images come from, and how they are named.
 #
@@ -58,22 +59,35 @@ EXTRA=${EXTRA:-}
 
 CHARTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../charts" && pwd)"
 
-# The secret holding the runtime role's password. Neither chart generates it:
-# a chart that invented a password would store it in the release's own
-# manifest, where anyone who can read a release can read the password.
-RUNTIME_SECRET="${INFRA}-pg-runtime"
+# The names the fixture provisioned under, read the SAME way the fixture
+# itself read them — from the charts, not repeated here. `apply.sh` and
+# this script must agree on every one of them, and a shared resolver is
+# what makes agreeing not something either has to remember.
+#
+# Notably absent below: the stream, its subjects and the two durable
+# consumer names. This chart computes all of them from its OWN release
+# name by default, and so does the fixture's template of the infra chart
+# (fixture/names.go renders it under this SAME release name, on purpose) —
+# so as long as both sides agree on APP, neither has to tell the other
+# what it decided. Forcing them with `--set` here would only be another
+# place for the two to drift.
+eval "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && go run ./e2e/fixture/cmd/resolve \
+  -namespace "$NS" -app-release "$APP" -bucket "$BUCKET")"
 
-# The archive's bucket and the credential to reach it. Both belong to the
-# PLATFORM, not to either chart: a service does not create its own store, for
-# the same reason it does not create its own database — a component that can
-# create a bucket can create it in the wrong account, with the wrong
-# retention, and nothing notices until somebody looks.
-BUCKET="${BUCKET:-url-shortener-archive}"
-BUCKET_SECRET="${INFRA}-archive"
+kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
 
-# Where the local store is, when there is one. On a real cluster the bucket
-# is reached by the SDK's own resolution and the workload's own identity, so
-# none of this is set — which is the bucket fragment's documented default.
+# Static credentials for the LOCAL store only. A real cluster gives its
+# workloads an identity instead, and the configuration's `credentialsEnv`
+# stays unset — which is the better answer and the one the bucket fragment
+# documents, because an ambient credential leaves nothing to leak.
+BUCKET_SECRET="${APP}-archive"
+if kubectl get namespace object-store >/dev/null 2>&1 &&
+    ! kubectl -n "$NS" get secret "$BUCKET_SECRET" >/dev/null 2>&1; then
+    kubectl -n "$NS" create secret generic "$BUCKET_SECRET" \
+        --from-literal=accessKeyID=test \
+        --from-literal=secretAccessKey=test
+fi
+
 LOCAL_STORE_ARGS=""
 if kubectl get namespace object-store >/dev/null 2>&1; then
     LOCAL_STORE_ARGS="--set archive.bucket.endpoint=http://s3.object-store.svc:4566"
@@ -82,59 +96,17 @@ if kubectl get namespace object-store >/dev/null 2>&1; then
     LOCAL_STORE_ARGS="$LOCAL_STORE_ARGS --set archive.bucket.credentialsSecret=$BUCKET_SECRET"
 fi
 
-kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
-
-# The local box runs its own object store and this creates the bucket in it.
-# A real cluster's bucket was provisioned by whoever owns the account, which
-# is the store rule the platform contract states: a service does not create
-# its own store, and neither does its installer.
-if kubectl get namespace object-store >/dev/null 2>&1; then
-    echo "==> the archive's bucket, in the local store"
-    kubectl -n object-store exec deploy/s3 -- awslocal s3 mb "s3://$BUCKET" >/dev/null 2>&1 || true
-else
-    echo "==> no local object store: expecting $BUCKET to exist already"
-fi
-
-# Static credentials for the LOCAL store only. A real cluster gives its
-# workloads an identity instead, and the configuration's `credentialsEnv`
-# stays unset — which is the better answer and the one the bucket fragment
-# documents, because an ambient credential leaves nothing to leak.
-if kubectl get namespace object-store >/dev/null 2>&1 &&
-    ! kubectl -n "$NS" get secret "$BUCKET_SECRET" >/dev/null 2>&1; then
-    kubectl -n "$NS" create secret generic "$BUCKET_SECRET" \
-        --from-literal=accessKeyID=test \
-        --from-literal=secretAccessKey=test
-fi
-
-if ! kubectl -n "$NS" get secret "$RUNTIME_SECRET" >/dev/null 2>&1; then
-    echo "==> the runtime role's credential"
-    kubectl -n "$NS" create secret generic "$RUNTIME_SECRET" \
-        --type=kubernetes.io/basic-auth \
-        --from-literal=username=url_shortener_app \
-        --from-literal=password="$(head -c 24 /dev/urandom | base64 | tr -d '/+=')"
-fi
-
-echo "==> the database and the stream"
-helm upgrade --install "$INFRA" "$CHARTS/url-shortener-infra" -n "$NS" \
-    --set "postgres.runtimePasswordSecret=$RUNTIME_SECRET" \
-    --wait --timeout 5m
-
-# Installed is not the same as real: a custom resource nothing reconciles is
-# accepted and stored and never becomes anything.
-echo "==> waiting for the operators to act"
-kubectl -n "$NS" wait "cluster/${INFRA}-pg" --for=condition=Ready --timeout=6m
-kubectl -n "$NS" wait "stream/${INFRA}-events" --for=condition=Ready --timeout=3m
-
 echo "==> the application"
-# shellcheck disable=SC2086 # EXTRA is deliberately word-split: it is a list
-# of helm arguments, and quoting it would pass them as one.
+# shellcheck disable=SC2086 # EXTRA and the two value strings above are
+# deliberately word-split: each is a list of helm arguments, and quoting it
+# would pass the whole list as one.
 helm upgrade --install "$APP" "$CHARTS/url-shortener" -n "$NS" \
     "${IMAGE_ARGS[@]}" \
     --set pullPolicy="$IMAGE_PULL_POLICY" \
     $LOCAL_STORE_ARGS $EXTRA \
-    --set "database.host=${INFRA}-pg-rw" \
-    --set "database.owner.passwordSecret=${INFRA}-pg-app" \
-    --set "database.app.passwordSecret=$RUNTIME_SECRET" \
+    --set "database.host=${DATABASE_HOST}" \
+    --set "database.owner.passwordSecret=${OWNER_SECRET}" \
+    --set "database.app.passwordSecret=${APP_SECRET}" \
     --set events.url=nats://nats.nats.svc:4222 \
     --set "archive.bucket.name=$BUCKET" \
     --set archive.batch.maxRecords=5 \

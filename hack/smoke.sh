@@ -24,8 +24,13 @@ kubectl() { command kubectl --context "$KCTX" "$@"; }
 helm() { command helm --kube-context "$KCTX" "$@"; }
 
 NS=${NS:-shortener}
-INFRA=${INFRA:-infra}
 APP=${APP:-example}
+
+# The subject the archiver reads, read the SAME way install.sh and the
+# fixture read it — from the chart, not repeated here as a literal. It is
+# not a fixed string: see examples/url-shortener/e2e/fixture/names.go.
+eval "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && go run ./e2e/fixture/cmd/resolve \
+  -namespace "$NS" -app-release "$APP")"
 
 # EXACTLY eight characters: the column holds eight and the route declares
 # eight, so any other length fails as a truncation or as a 422 rather than
@@ -42,8 +47,8 @@ LONG_URL="https://example.com/smoke/$KEY"
 ID=$(printf '%s' "$LONG_URL" | sha256sum | cut -d' ' -f1)
 
 psql() {
-    kubectl -n "$NS" exec "${INFRA}-pg-1" -c postgres -- \
-        psql -qtAX -d url_shortener -c "$1"
+    kubectl -n postgres exec deploy/postgres -c postgres -- \
+        psql -U postgres -qtAX -d url_shortener -c "$1"
 }
 
 echo "==> a URL to shorten"
@@ -210,7 +215,7 @@ newest=$(printf '%s\n' "$objects" | awk '{print $NF}' | sort | tail -1)
 body=$(kubectl -n object-store exec deploy/s3 -- \
     awslocal s3 cp "s3://$BUCKET/$newest" - 2>/dev/null)
 
-if ! printf '%s' "$body" | grep -q '"subject":"url-shortener.log"'; then
+if ! printf '%s' "$body" | grep -q "\"subject\":\"$REQUEST_SUBJECT\""; then
     echo "SMOKE: $newest does not hold a request record:" >&2
     printf '%s\n' "$body" | head -5 >&2
     exit 1
