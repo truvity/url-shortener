@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import nats
-from nats.errors import TimeoutError as NATSTimeoutError
 from nats.js.api import AckPolicy, ConsumerConfig
 from opentelemetry import trace
 from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
@@ -27,6 +26,7 @@ from opentelemetry.trace import Span, SpanKind, StatusCode
 from truvity_policy import ConfigError, telemetry
 
 from . import archive, config, runtime, tracing
+from .pull import pull
 
 if TYPE_CHECKING:
     from nats.aio.msg import Msg
@@ -236,13 +236,7 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
 
     try:
         while not stopping.is_set():
-            try:
-                messages = await subscription.fetch(
-                    batch=writer.capacity,
-                    timeout=FETCH_SECONDS,
-                )
-            except NATSTimeoutError:
-                messages = []
+            messages = await pull(subscription, batch=writer.capacity, timeout=FETCH_SECONDS)
 
             for message in messages:
                 writer.add(
