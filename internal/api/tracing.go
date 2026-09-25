@@ -37,23 +37,26 @@ func Tracing() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		ctx := propagator.Extract(c.Context(), propagation.HeaderCarrier(headersOf(c)))
 
-		route := c.Route().Path
-		if route == "" {
-			route = "unmatched"
-		}
-
-		ctx, span := tracer.Start(ctx, c.Method()+" "+route,
+		// Started under a placeholder: at this point the only route the
+		// router has matched is THIS middleware's own ("/"), so a span named
+		// from it reads "GET /" for every request. The handler's route is
+		// known only after it has run, and the span is renamed then.
+		ctx, span := tracer.Start(ctx, c.Method()+" unmatched",
 			trace.WithSpanKind(trace.SpanKindServer),
-			trace.WithAttributes(
-				semconv.HTTPRequestMethodKey.String(c.Method()),
-				semconv.HTTPRouteKey.String(route),
-			),
+			trace.WithAttributes(semconv.HTTPRequestMethodKey.String(c.Method())),
 		)
 		defer span.End()
 
 		c.SetContext(ctx)
 
 		err := c.Next()
+
+		route := c.Route().Path
+		if route == "" {
+			route = "unmatched"
+		}
+		span.SetName(c.Method() + " " + route)
+		span.SetAttributes(semconv.HTTPRouteKey.String(route))
 
 		status := c.Response().StatusCode()
 		span.SetAttributes(semconv.HTTPResponseStatusCodeKey.Int(status))
