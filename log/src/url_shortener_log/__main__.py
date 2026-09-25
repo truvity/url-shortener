@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING
 import nats
 from nats.errors import TimeoutError as NATSTimeoutError
 from nats.js.api import AckPolicy, ConsumerConfig
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, StatusCode
 from truvity_policy import ConfigError, telemetry
 
 from . import archive, config, runtime
@@ -168,15 +170,31 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
 
     held: list[Msg] = []
 
+    tracer = trace.get_tracer("url-shortener-log")
+
     async def write() -> None:
         """Write what is held, then acknowledge it. In that order, always."""
         if not held:
             return
-        key = await asyncio.to_thread(writer.flush)
-        for message in held:
-            await message.ack()
-        log.info("archived", key=key, records=len(held))
-        held.clear()
+        # One span per FLUSH, not per message. A span per message would be
+        # one per event on a stream this process reads continuously, which
+        # is the cardinality problem batching exists to avoid in the first
+        # place -- the unit of work here is the write, not the record.
+        with tracer.start_as_current_span(
+            "archive.flush", kind=SpanKind.PRODUCER, attributes={"archive.records": len(held)}
+        ) as span:
+            try:
+                key = await asyncio.to_thread(writer.flush)
+            except Exception as error:
+                span.set_status(StatusCode.ERROR, str(error))
+                span.record_exception(error)
+                raise
+            if key is not None:
+                span.set_attribute("archive.key", key)
+            for message in held:
+                await message.ack()
+            log.info("archived", key=key, records=len(held))
+            held.clear()
 
     try:
         while not stopping.is_set():
