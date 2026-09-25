@@ -2,7 +2,7 @@ import { trace } from "@opentelemetry/api";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { resourceFromEnvironment, start } from "./telemetry.ts";
+import { resourceFromEnvironment, start } from "./telemetry.js";
 
 const KEYS = [
   "OTEL_SERVICE_NAME",
