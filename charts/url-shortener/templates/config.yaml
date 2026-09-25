@@ -62,8 +62,8 @@ data:
         a projected ServiceAccount token this pod cannot forge. */}}
         tokenFile: /var/run/events/token
         {{- end }}
-      redirectSubject: {{ .Values.events.redirectSubject }}
-      requestSubject: {{ .Values.events.requestSubject }}
+      redirectSubject: {{ include "url-shortener.redirectSubject" . }}
+      requestSubject: {{ include "url-shortener.requestSubject" . }}
 
   urls.yaml: |
     listen:
@@ -183,9 +183,9 @@ data:
         tokenFile: /var/run/events/token
         {{- end }}
       consumer:
-        stream: {{ .Values.events.stream }}
-        durable: {{ .Values.events.consumers.stat }}
-        subject: {{ .Values.events.redirectSubject }}
+        stream: {{ include "url-shortener.eventsStream" . }}
+        durable: {{ include "url-shortener.statConsumer" . }}
+        subject: {{ include "url-shortener.redirectSubject" . }}
 
   web.yaml: |
     listen:
@@ -241,9 +241,9 @@ data:
         tokenFile: /var/run/events/token
         {{- end }}
       consumer:
-        stream: {{ .Values.events.stream }}
-        durable: {{ .Values.events.consumers.log }}
-        subject: {{ .Values.events.requestSubject }}
+        stream: {{ include "url-shortener.eventsStream" . }}
+        durable: {{ include "url-shortener.logConsumer" . }}
+        subject: {{ include "url-shortener.requestSubject" . }}
     archive:
       bucket:
         name: {{ required "archive.bucket.name is required: a component that archives to a bucket nobody named has nowhere to write" .Values.archive.bucket.name }}

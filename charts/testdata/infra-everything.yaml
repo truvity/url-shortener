@@ -8,6 +8,7 @@
 # A primary install, because that is the tier where the cloud objects
 # exist at all. A fixture pinned to `test` would render none of them and
 # prove nothing about the values that describe them.
+installName: example-install
 tier: primary
 cloud:
   bucket: example-archive
@@ -43,11 +44,7 @@ postgres:
     secretName: url-shortener-pg-server
     caSecretName: example-trust-bundle
 events:
-  stream: SHORTENER
   storage: file
-  subjects:
-    - shortener.redirect
-    - shortener.log
   url: nats://broker.example.internal:4222
   account: url-shortener
   replicas: 3

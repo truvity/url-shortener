@@ -15,6 +15,10 @@
     "images"
   ],
   "properties": {
+    "installName": {
+      "type": "string",
+      "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."
+    },
     "database": {
       "type": "object",
       "additionalProperties": false,
@@ -83,47 +87,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "url",
-        "redirectSubject",
-        "requestSubject",
-        "stream",
-        "consumers"
+        "url"
       ],
       "properties": {
         "url": {
           "type": "string",
           "minLength": 1
-        },
-        "redirectSubject": {
-          "type": "string",
-          "minLength": 1
-        },
-        "requestSubject": {
-          "type": "string",
-          "minLength": 1
-        },
-        "stream": {
-          "type": "string",
-          "minLength": 1
-        },
-        "consumers": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "One durable name per consuming component, shared by every replica of it.",
-          "required": [
-            "stat",
-            "log"
-          ],
-          "properties": {
-            "stat": {
-              "type": "string",
-              "minLength": 1
-            },
-            "log": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
         },
         "auth": {
           "type": "object",

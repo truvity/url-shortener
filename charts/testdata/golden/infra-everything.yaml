@@ -173,10 +173,10 @@ metadata:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: example
 spec:
-  name: SHORTENER
+  name: default-example-install-events
   subjects:
-    - shortener.redirect
-    - shortener.log
+    - "default-example-install.redirect"
+    - "default-example-install.log"
   storage: file
   replicas: 3
   maxAge: "24h"

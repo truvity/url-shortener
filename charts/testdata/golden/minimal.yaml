@@ -72,8 +72,8 @@ data:
     events:
       nats:
         url: nats://nats:4222
-      redirectSubject: url-shortener.redirect
-      requestSubject: url-shortener.log
+      redirectSubject: default-example.redirect
+      requestSubject: default-example.log
 
   urls.yaml: |
     listen:
@@ -102,9 +102,9 @@ data:
       nats:
         url: nats://nats:4222
       consumer:
-        stream: URL_SHORTENER
-        durable: stat
-        subject: url-shortener.redirect
+        stream: default-example-events
+        durable: default-example-stat
+        subject: default-example.redirect
 
   web.yaml: |
     listen:
@@ -131,9 +131,9 @@ data:
       nats:
         url: nats://nats:4222
       consumer:
-        stream: URL_SHORTENER
-        durable: log
-        subject: url-shortener.log
+        stream: default-example-events
+        durable: default-example-log
+        subject: default-example.log
     archive:
       bucket:
         name: archive
@@ -233,7 +233,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+        checksum/config: 80c51cb2881b7a309b540d2805305ae238f1281513ede6ec66128a5d47bebdde
     spec:
       serviceAccountName: example-app
       securityContext:
@@ -331,7 +331,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+        checksum/config: 80c51cb2881b7a309b540d2805305ae238f1281513ede6ec66128a5d47bebdde
     spec:
       serviceAccountName: example-app
       securityContext:
@@ -435,7 +435,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+        checksum/config: 80c51cb2881b7a309b540d2805305ae238f1281513ede6ec66128a5d47bebdde
     spec:
       serviceAccountName: example-app
       securityContext:
@@ -533,7 +533,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+        checksum/config: 80c51cb2881b7a309b540d2805305ae238f1281513ede6ec66128a5d47bebdde
     spec:
       serviceAccountName: example-app
       securityContext:
@@ -630,7 +630,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: 71aeed485895d43c66d454c02a4f265e0daf8f4220ed5ffb9cbbf3d2a5a553ac
+        checksum/config: 80c51cb2881b7a309b540d2805305ae238f1281513ede6ec66128a5d47bebdde
     spec:
       serviceAccountName: example-app
       securityContext:

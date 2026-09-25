@@ -1,3 +1,15 @@
+# The name THIS install is known by. Empty means this chart's own release
+# name, which is what a standalone install needs and what a platform that
+# installs both charts under one release name never has to set.
+#
+# It is folded into the NATS subject and durable consumer names below, so
+# that two installs sharing a namespace, or sharing a release name in
+# different namespaces, get different names instead of finding each
+# other's — see templates/_helpers.tpl. Set this only when the
+# infrastructure release this install connects to is NOT this release's
+# own name; then it must be that release's own installName, exactly.
+installName: ""
+
 # Where this service's database and stream are.
 #
 # It does not create them: url-shortener-infra does, as a separate release
@@ -31,16 +43,17 @@ database:
 
 events:
   url: ""
-  redirectSubject: url-shortener.redirect
-  requestSubject: url-shortener.log
-  stream: URL_SHORTENER
-  # One durable name per consuming component, shared by every replica of it.
-  # That is what makes the replicas ONE consumer group rather than several
-  # copies of the same work, and what lets a restart resume where it left off
-  # instead of replaying the stream or losing what arrived while it was gone.
-  consumers:
-    stat: stat
-    log: log
+
+  # The stream, its two subjects and the two durable consumer names are
+  # NOT here. All five are cluster-global on the broker, computed from
+  # `installName` above rather than taken as values — see
+  # templates/_helpers.tpl for why a value would be the wrong fix, and
+  # `docs/guides/events.md` for the collision a value used to allow. A
+  # durable name is still one per consuming component, shared by every
+  # replica of it: that is what makes the replicas ONE consumer group
+  # rather than several copies of the same work, and what lets a restart
+  # resume where it left off instead of replaying the stream or losing
+  # what arrived while it was gone.
 
   # The broker authenticates its clients, or it does not.
   #

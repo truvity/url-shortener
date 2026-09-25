@@ -279,3 +279,81 @@ clients. That is what a local one does, and what a laptop needs.
   readOnly: true
 {{- end }}
 {{- end -}}
+
+{{/*
+The name THIS install is known by, across both charts of the pair.
+
+Mirrors url-shortener-infra's "url-shortener-infra.installName" exactly,
+because it exists to answer the same question the other chart answers for
+itself: what is this release called, for the purpose of the stream it
+connects to. Defaulting to this chart's own release name is what makes a
+standalone install work with nothing set; a platform giving the two
+releases different names sets this to the infrastructure release's own
+installName, on both charts, identically.
+
+REFUSED, not sanitised, when it is not a safe shape — see the other
+chart's helper for why: this is a plain string a caller can set to
+anything, unlike `.Release.Namespace` and `.Release.Name`, and it is
+folded into the NATS subject and durable names below.
+*/}}
+{{- define "url-shortener.installName" -}}
+{{- $name := .Values.installName | default .Release.Name -}}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$" $name) -}}
+{{- fail (printf "installName %q must be a lowercase name of letters, digits and hyphens, at most 40 characters: it is folded into a NATS subject and durable consumer name, which is why this refuses it instead of lower-casing or truncating it for you" $name) -}}
+{{- end -}}
+{{- $name -}}
+{{- end -}}
+
+{{/*
+The tenant scope every cluster-global name below derives from.
+
+MUST MATCH url-shortener-infra/templates/_helpers.tpl's
+"url-shortener-infra.eventsScope" — read that comment for why namespace
+and install name together are the smallest pair that separates both
+collision shapes, and why this is computed rather than taken as a value
+(platform.md's naming rule; the name is this project's own convention,
+not a platform's).
+*/}}
+{{- define "url-shortener.eventsScope" -}}
+{{- printf "%s-%s" .Release.Namespace (include "url-shortener.installName" .) -}}
+{{- end -}}
+
+{{/*
+The JetStream stream this chart CONNECTS to (platform.md rule 6, "found,
+not made") and the two subjects it reads and writes on it. Computed by the
+SAME formula as url-shortener-infra's "url-shortener-infra.eventsStream",
+"...redirectSubject" and "...requestSubject" — not passed as a value,
+because agreement by formula is what makes the two charts's names equal
+without either release knowing the other's.
+*/}}
+{{- define "url-shortener.eventsStream" -}}
+{{- printf "%s-events" (include "url-shortener.eventsScope" .) -}}
+{{- end -}}
+
+{{- define "url-shortener.redirectSubject" -}}
+{{- printf "%s.redirect" (include "url-shortener.eventsScope" .) -}}
+{{- end -}}
+
+{{- define "url-shortener.requestSubject" -}}
+{{- printf "%s.log" (include "url-shortener.eventsScope" .) -}}
+{{- end -}}
+
+{{/*
+Durable consumer names, one per consuming component.
+
+NATS only requires a durable name to be unique WITHIN its stream, and
+this install's stream is already scoped to it — a durable name of just
+"stat" would not collide on the broker. It is scoped anyway, because
+every other cluster-global name here comes from one formula, and a
+component suffix is cheap to add beside it: one rule for the whole
+family is one fewer thing a reader has to remember is the exception.
+This pair is internal to this chart alone — the infrastructure chart
+renders no consumer, so there is nothing on its side to match.
+*/}}
+{{- define "url-shortener.statConsumer" -}}
+{{- printf "%s-stat" (include "url-shortener.eventsScope" .) -}}
+{{- end -}}
+
+{{- define "url-shortener.logConsumer" -}}
+{{- printf "%s-log" (include "url-shortener.eventsScope" .) -}}
+{{- end -}}

@@ -9,6 +9,18 @@
 # That was found by building it the other way first. The ring model this
 # mirrors is not ceremony; it is the only ordering that works.
 
+# The name THIS install is known by. Empty means this chart's own release
+# name, which is what a standalone install needs and what a platform that
+# installs both charts under one release name never has to set.
+#
+# It is folded into the JetStream stream and subject names below, so that
+# two installs sharing a namespace, or sharing a release name in different
+# namespaces, get different streams instead of finding each other's — see
+# templates/_helpers.tpl. Set this only when the application release this
+# install belongs to is NOT this release's own name; then it must be that
+# release's name exactly.
+installName: ""
+
 # What KIND of install this is, and it decides what gets provisioned.
 #
 # `test` is the default because it is the one that cannot fail: an
@@ -155,13 +167,15 @@ postgres:
     caSecretName: ""
 
 events:
-  stream: URL_SHORTENER
+  # The stream's name and its two subjects are NOT here. Both are
+  # cluster-global on the broker, computed from this install's namespace
+  # and installName rather than taken as values — see
+  # templates/_helpers.tpl for why a value would be the wrong fix, and
+  # `docs/guides/events.md` for the collision a value used to allow.
+  #
   # Memory keeps the example's events for as long as the example runs.
   # A deployment says `file`.
   storage: memory
-  subjects:
-    - url-shortener.redirect
-    - url-shortener.log
   # The NATS server the stream is created on.
   url: nats://nats.nats.svc:4222
 

@@ -8,6 +8,10 @@
     "events"
   ],
   "properties": {
+    "installName": {
+      "type": "string",
+      "description": "The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."
+    },
     "tier": {
       "type": "string",
       "enum": [
@@ -147,29 +151,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "stream",
         "storage",
-        "subjects",
         "url"
       ],
       "properties": {
-        "stream": {
-          "type": "string",
-          "minLength": 1
-        },
         "storage": {
           "enum": [
             "memory",
             "file"
           ]
-        },
-        "subjects": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
         },
         "url": {
           "type": "string",

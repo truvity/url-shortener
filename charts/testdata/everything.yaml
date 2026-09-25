@@ -6,6 +6,8 @@
 # proves the chart works; this proves the chart is still WIRED — every value
 # below has to appear somewhere in the output, and a template that dropped
 # one would otherwise pass every test in this package.
+installName: example-install
+
 database:
   host: pg.example.svc
   name: shortener
@@ -20,12 +22,6 @@ database:
 
 events:
   url: nats://broker.example.svc:4222
-  redirectSubject: example.redirect
-  requestSubject: example.log
-  stream: EXAMPLE
-  consumers:
-    stat: example-stat
-    log: example-log
 
 archive:
   bucket:

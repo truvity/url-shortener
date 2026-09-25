@@ -132,8 +132,17 @@ metadata:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  name: {{ .Values.events.stream }}
-  subjects: {{- toYaml .Values.events.subjects | nindent 4 }}
+  {{- /*
+  The stream's name and its subjects are CLUSTER-GLOBAL on the broker, so
+  they are computed from this install's tenant scope rather than taken as
+  values — see _helpers.tpl. Two installs that only differed by namespace
+  or only by release name used to find each other's stream here; now
+  neither alone repeats the other's name.
+  */}}
+  name: {{ include "url-shortener-infra.eventsStream" . }}
+  subjects:
+    - {{ include "url-shortener-infra.redirectSubject" . | quote }}
+    - {{ include "url-shortener-infra.requestSubject" . | quote }}
   storage: {{ .Values.events.storage }}
   replicas: {{ .Values.events.replicas | default 1 }}
   {{- with .Values.events.maxAge }}

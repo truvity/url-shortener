@@ -35,10 +35,10 @@ metadata:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: example
 spec:
-  name: URL_SHORTENER
+  name: default-example-events
   subjects:
-    - url-shortener.redirect
-    - url-shortener.log
+    - "default-example.redirect"
+    - "default-example.log"
   storage: memory
   replicas: 1
   servers:
