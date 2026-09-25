@@ -14,6 +14,7 @@ import contextlib
 import os
 import signal
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -188,6 +189,7 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
         # spans are what put the archive inside the trace of the request
         # that caused it. They are sampled with their publisher, so they
         # cost what the sampled traffic costs and no more.
+        started = time.time_ns()
         with tracer.start_as_current_span(
             "archive.flush",
             kind=SpanKind.PRODUCER,
@@ -200,18 +202,31 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
                 span.set_status(StatusCode.ERROR, str(error))
                 span.record_exception(error)
                 for each in waiting:
+                    tracing.record_write(
+                        tracer,
+                        each,
+                        span.get_span_context(),
+                        started,
+                        time.time_ns(),
+                        key=None,
+                        error=str(error),
+                    )
                     each.set_status(StatusCode.ERROR, str(error))
                     each.end()
                 waiting.clear()
                 raise
             if key is not None:
                 span.set_attribute("archive.key", key)
+            written = time.time_ns()
             for message in held:
                 await message.ack()
             # Ended NOW, not when the message arrived: each span covers the
             # time the record spent waiting for its batch, which is the
             # part of the archive's latency a trace should show.
             for each in waiting:
+                tracing.record_write(
+                    tracer, each, span.get_span_context(), started, written, key=key
+                )
                 if key is not None:
                     each.set_attribute("archive.key", key)
                 each.end()

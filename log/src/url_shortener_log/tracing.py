@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from opentelemetry import propagate
-from opentelemetry.trace import Link, Span, SpanKind, Tracer
+from opentelemetry import propagate, trace
+from opentelemetry.trace import Link, Span, SpanContext, SpanKind, StatusCode, Tracer
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -51,3 +51,39 @@ def links(spans: Iterable[Span]) -> list[Link]:
     """Link a write to each received message it carries, up to the cap."""
     found = [Link(span.get_span_context()) for span in spans]
     return found[:MAX_LINKS]
+
+
+def record_write(  # noqa: PLR0913 — one call per message, and each argument is a different fact
+    tracer: Tracer,
+    message: Span,
+    flush: SpanContext,
+    start_ns: int,
+    end_ns: int,
+    *,
+    key: str | None,
+    error: str | None = None,
+) -> None:
+    """Show the write inside the trace of a message it carried.
+
+    The write itself — and the object-store call beneath it — is ONE span in
+    ONE trace, because a batch of hundreds cannot be the child of any single
+    request. Left at that, a request's trace ends at "received" and the
+    question "did my event reach the archive, and how long did that take?"
+    has to be answered by finding a different trace.
+
+    So each message also gets a short child, timed to the write and LINKED to
+    the real one: the request's trace shows the write and its duration, and
+    the link is the way into the flush and the store call. It costs a span
+    per sampled message, which is what the per-message span already costs.
+    """
+    child = tracer.start_span(
+        "archive.write",
+        context=trace.set_span_in_context(message),
+        kind=SpanKind.PRODUCER,
+        start_time=start_ns,
+        links=[Link(flush)],
+        attributes={"archive.key": key} if key else None,
+    )
+    if error is not None:
+        child.set_status(StatusCode.ERROR, error)
+    child.end(end_time=end_ns)
