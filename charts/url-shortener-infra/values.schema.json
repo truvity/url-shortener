@@ -77,8 +77,21 @@
           "minLength": 1
         },
         "runtimePasswordSecret": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
+        },
+        "runtimePassword": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Have the chart mint the runtime role's password via the ExternalSecrets Password generator, instead of taking the name of a secret someone else made.",
+          "properties": {
+            "generate": {
+              "type": "boolean"
+            },
+            "length": {
+              "type": "integer",
+              "minimum": 16
+            }
+          }
         },
         "labels": {
           "type": "object",

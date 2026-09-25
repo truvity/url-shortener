@@ -77,7 +77,23 @@ postgres:
   # managed role, and wiring one up needs an issuer signing from the
   # database's own client CA, which is a platform's to provide.
   runtimeRole: url_shortener_app
+  # Empty means the platform makes it: `runtimePassword.generate` below.
+  # Set, this NAMES a basic-auth secret somebody else made, and generate
+  # is ignored -- an install told exactly what to use does not go asking
+  # a generator for a second answer.
   runtimePasswordSecret: ""
+
+  # The other half of taking a name: instead of a platform generating a
+  # password and handing over its name, the chart can be told to mint
+  # one itself, from a provider the platform names.
+  #
+  # Off by default. `generate: true` is a dependency an install may not
+  # have -- it asks for the ExternalSecrets Password generator -- so a
+  # bare install that supplies neither this nor runtimePasswordSecret
+  # fails on the required password name below, which says so.
+  runtimePassword:
+    generate: false
+    length: 32
 
   # ---- Below here is the PLATFORM's half, and every key is one of the
   # decisions docs/contracts/platform.md §9 already calls the platform's

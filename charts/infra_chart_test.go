@@ -350,3 +350,64 @@ func TestAPrimaryInstallMintsWhatItOwns(t *testing.T) {
 		}
 	}
 }
+
+// A missing password names BOTH ways to supply one.
+//
+// Neither runtimePasswordSecret nor runtimePassword.generate is a
+// reasonable default to assume silently — a chart that guessed would be
+// inventing a password, which is the rule this whole area exists to
+// avoid. The refusal has to name both options, because a reader who only
+// hears about one does not know the other exists.
+func TestAMissingPasswordNamesBothWaysToSupplyOne(t *testing.T) {
+	out, err := renderInfra(t)
+	if err == nil {
+		t.Fatal("the chart rendered with no password source at all")
+	}
+	for _, want := range []string{"runtimePasswordSecret", "runtimePassword.generate"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the refusal does not mention %q:\n%s", want, out)
+		}
+	}
+}
+
+// An explicit secret name wins over generate, so an install told exactly
+// what to use never has the chart go asking a generator for a second
+// answer nobody reads.
+func TestAnExplicitSecretWinsOverGenerate(t *testing.T) {
+	out, err := renderInfra(t,
+		"--set", "postgres.runtimePasswordSecret=given-secret",
+		"--set", "postgres.runtimePassword.generate=true",
+	)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "kind: Password") || strings.Contains(out, "kind: ExternalSecret") {
+		t.Error("a generator rendered even though an explicit secret was given")
+	}
+	if !strings.Contains(out, "name: given-secret") {
+		t.Error("the given secret name is not what the managed role points at")
+	}
+}
+
+// Generating mints a Password and an ExternalSecret under the SAME name
+// the managed role is told to read, and the ExternalSecret is never
+// refreshed.
+//
+// A refresh mints a NEW password. The operator updates the role to match
+// it and every pod already holding the old one fails its next connection
+// — an outage with no deploy and no config change behind it. Rotation is
+// a deliberate act with a restart beside it, not a timer.
+func TestGeneratingMintsUnderTheNameTheRoleReads(t *testing.T) {
+	out, err := renderInfra(t, "--set", "postgres.runtimePassword.generate=true")
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	for _, want := range []string{"kind: Password", "kind: ExternalSecret", "name: example-pg-runtime"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("generating did not render %q:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(out, `refreshInterval: "0"`) {
+		t.Error("the ExternalSecret refreshes, which mints a new password behind the role's back")
+	}
+}

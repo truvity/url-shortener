@@ -114,7 +114,7 @@ spec:
         connectionLimit: -1
         inherit: true
         passwordSecret:
-          name: {{ required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent a password" .Values.postgres.runtimePasswordSecret }}
+          name: {{ include "url-shortener-infra.runtimePasswordSecret" . }}
 ---
 {{/*
 One stream, several subjects. The redirect service publishes to two of them
