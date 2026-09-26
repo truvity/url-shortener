@@ -114,6 +114,34 @@ func namespaceFromEnv() (string, bool) {
 	return ns, ns != ""
 }
 
+// verificationHookMode reports whether this run IS the chart's own
+// post-install/post-upgrade verification hook (templates/verification.yaml),
+// running in-cluster rather than from a laptop or CI runner against the kind
+// box or a caller's own kubeconfig context.
+//
+// The hook Job sets envKubecontext to the empty string ON PURPOSE — see
+// kubecontextFromEnv — which is otherwise a shape nothing else produces: a
+// human or a CI runner either leaves it unset (getting this package's kind
+// default) or points it at a real context, never at "set, but empty". That
+// same signal is also this suite's only way to know it must not shell out to
+// `helm`: the hook Job runs the e2e image, which carries no helm binary (see
+// e2e/Dockerfile) and no copy of the charts' embedded source the way this
+// checkout does, so fixture.Resolve — which renders url-shortener-infra to
+// read back a real install's database, role and secret names — cannot run
+// there. Those names are also the PLATFORM's own values in the first place
+// (postgres.database, postgres.ownerRole, postgres.runtimeRole,
+// postgres.runtimePasswordSecret in charts/url-shortener-infra/values.yaml,
+// each a `--set` on the install this Job was never told), so there would be
+// nothing trustworthy to resolve even with helm on PATH.
+//
+// resolveEnv skips fixture.Resolve entirely in this mode; db_test.go and
+// log_test.go's archive check notice the resulting zero-value names and skip
+// cleanly instead of asserting a name nobody gave them.
+func verificationHookMode() bool {
+	v, ok := os.LookupEnv(envKubecontext)
+	return ok && strings.TrimSpace(v) == ""
+}
+
 // resolveEnvWithTimeout is resolveEnv bounded by its own context, kept out
 // of TestMain itself: `defer cancel()` beside an os.Exit on the error path
 // never runs (gocritic's exitAfterDefer), so the context this needs lives
@@ -137,6 +165,17 @@ func resolveEnvWithTimeout(namespace string, timeout time.Duration) (env, error)
 // them ran. db_test.go's appPasswordOrSkip resolves that password lazily,
 // inside the one test that needs it, so a missing permission skips that
 // test alone.
+//
+// In verificationHookMode it skips fixture.Resolve altogether, for the same
+// reason and the same way: that call needs `helm` (absent from the e2e
+// image) and the platform's own install-time values (never handed to this
+// Job) to mean anything, so running it here traded one whole-binary failure
+// (a Secret this account cannot read) for another (a binary this image does
+// not carry) — see verificationHookMode's doc comment. The returned Names
+// carries only what this Job WAS given — its namespace and release, and the
+// archive bucket's default or E2E_BUCKET override, neither of which the
+// infra chart's render decides — leaving every chart-derived field at its
+// zero value for the tests that need one to skip on.
 func resolveEnv(_ context.Context, namespace string) (env, error) {
 	// ctx is unused today: fixture.Resolve takes none, and nothing else
 	// here shells out any more (see the doc comment above). Kept in the
@@ -144,14 +183,28 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 	// guard against a future helm invocation hanging with nothing to
 	// cancel it.
 	d := fixture.DefaultOptions()
+	appRelease := getenv(envAppRelease, d.AppRelease)
+	bucket := getenv(envBucket, d.Bucket)
 
-	names, err := fixture.Resolve(fixture.Options{
-		Namespace:  namespace,
-		AppRelease: getenv(envAppRelease, d.AppRelease),
-		Bucket:     getenv(envBucket, d.Bucket),
-	})
-	if err != nil {
-		return env{}, fmt.Errorf("resolve the fixture's names: %w", err)
+	var names fixture.Names
+	if verificationHookMode() {
+		names = fixture.Names{
+			Options: fixture.Options{
+				Namespace:  namespace,
+				AppRelease: appRelease,
+				Bucket:     bucket,
+			},
+		}
+	} else {
+		var err error
+		names, err = fixture.Resolve(fixture.Options{
+			Namespace:  namespace,
+			AppRelease: appRelease,
+			Bucket:     bucket,
+		})
+		if err != nil {
+			return env{}, fmt.Errorf("resolve the fixture's names: %w", err)
+		}
 	}
 
 	cluster := &harness.Cluster{Kubecontext: kubecontextFromEnv()}

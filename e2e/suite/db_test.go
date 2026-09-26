@@ -68,6 +68,18 @@ const (
 //     right nobody meant to grant, and internal/migration/migrate.go exists
 //     specifically to keep it off that role.
 func TestMigrationRanAndRolesAreSeparate(t *testing.T) {
+	// shared.names.AppSecret is empty exactly when this run resolved no
+	// infra-chart names at all — verificationHookMode, in env_test.go's
+	// resolveEnv. The database name and both role names are the platform's
+	// own values there (postgres.database, postgres.ownerRole,
+	// postgres.runtimeRole — none of them this chart's convention to
+	// assume), so there is nothing here to compare or connect with; skip
+	// cleanly rather than fail on two empty strings comparing equal below.
+	if shared.names.AppSecret == "" {
+		t.Skip("no infra-chart names resolved in this environment (see env_test.go's verificationHookMode) " +
+			"— the database and role names are the platform's own values, which this suite is not told " +
+			"and cannot render without helm; skipping the role-separation check")
+	}
 	if shared.names.OwnerRole == shared.names.AppRole {
 		t.Fatalf("the owner role and the app role resolved to the SAME name (%q) — there is no separation to test",
 			shared.names.OwnerRole)
