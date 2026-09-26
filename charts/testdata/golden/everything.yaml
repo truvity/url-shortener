@@ -244,6 +244,11 @@ spec:
     - name: http
       port: 8080
       targetPort: http
+    # See urls.yaml's identical port: the suite reaches liveness/readiness
+    # through the Service, the same way it reaches everything else.
+    - name: probes
+      port: 7070
+      targetPort: probes
     - name: https
       port: 9443
       targetPort: https
@@ -267,6 +272,12 @@ spec:
     - name: http
       port: 8080
       targetPort: http
+    # Exposed so a test can ask the same question a kubelet already asks the
+    # Pod directly — see examples/url-shortener/e2e/suite, which has no
+    # other way to reach a probe port than through a Service.
+    - name: probes
+      port: 7070
+      targetPort: probes
     - name: https
       port: 9443
       targetPort: https
@@ -290,6 +301,11 @@ spec:
     - name: http
       port: 8080
       targetPort: http
+    # See urls.yaml's identical port: the suite reaches liveness/readiness
+    # through the Service, the same way it reaches everything else.
+    - name: probes
+      port: 7070
+      targetPort: probes
 
 ---
 # Source: url-shortener/templates/log.yaml
