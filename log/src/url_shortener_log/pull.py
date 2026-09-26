@@ -4,8 +4,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
+from nats.errors import ConnectionClosedError
+
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from nats.aio.msg import Msg
+
+    # A fresh dial, called only once the old connection is beyond saving.
+    # Reads whatever credential is current NOW, which is the reason to call
+    # it again rather than retry the same subscription.
+    Reconnect = Callable[[], Awaitable["Subscription"]]
 
 
 class Subscription(Protocol):
@@ -34,3 +43,34 @@ async def pull(subscription: Subscription, batch: int, timeout: float) -> list[M
         return await subscription.fetch(batch=batch, timeout=timeout)
     except TimeoutError:
         return []
+
+
+async def pull_or_reconnect(
+    subscription: Subscription,
+    reconnect: Reconnect,
+    batch: int,
+    timeout: float,  # noqa: ASYNC109 — the client's own signature
+) -> tuple[Subscription, list[Msg]]:
+    """Fetch a batch, dialing once more if the connection is gone for good.
+
+    A short-lived credential expiring mid-connection is an ordinary event —
+    the platform rotates it well before it expires — and every other
+    component treats it as one: it is the ONE server error `nats-py` (unlike
+    the Go and Kotlin clients on the same broker) does not hand to its own
+    reconnect logic. On `-ERR 'Authorization Violation'` it closes the
+    client outright, `max_reconnect_attempts` and `allow_reconnect` are
+    never consulted, and every subsequent `fetch` raises
+    `ConnectionClosedError` forever — nothing brings the connection back on
+    its own.
+
+    So this supplies the missing half: on that one error, and only that
+    one, dial again — which reads the credential file fresh — and retry the
+    fetch once, against the new subscription. A second failure is not
+    retried again here; it surfaces, because two dials in a row failing
+    is no longer "the credential rotated."
+    """
+    try:
+        return subscription, await pull(subscription, batch=batch, timeout=timeout)
+    except ConnectionClosedError:
+        subscription = await reconnect()
+        return subscription, await pull(subscription, batch=batch, timeout=timeout)

@@ -26,10 +26,13 @@ from opentelemetry.trace import Span, SpanKind, StatusCode
 from truvity_policy import ConfigError, telemetry
 
 from . import archive, config, runtime, tracing
-from .pull import pull
+from .pull import pull_or_reconnect
 
 if TYPE_CHECKING:
+    from nats.aio.client import Client as NATSClient
     from nats.aio.msg import Msg
+
+    from .pull import Subscription
 
 COMPONENT = "log"
 
@@ -130,8 +133,9 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
     # sibling service: the broker closed the connection sixty minutes in,
     # the reconnect presented the same expired token, and the consumer was
     # gone until somebody restarted the pod.
+    nats_settings = events["nats"]
     token = None
-    if token_file := events["nats"].get("tokenFile"):
+    if token_file := nats_settings.get("tokenFile"):
         token_path = Path(token_file)
 
         def read_token() -> str:
@@ -142,26 +146,61 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
         # authorisation.
         await asyncio.to_thread(read_token)
         token = read_token
-    connection = await nats.connect(
-        servers=[events["nats"]["url"]],
-        name=f"url-shortener-{COMPONENT}",
-        token=token,
-    )
 
     # The stream exists already — a component does not create the stream it
     # reads, because two components disagreeing about a stream's retention is
     # a data-loss argument nobody wins at run time.
     consumer = events["consumer"]
-    subscription = await connection.jetstream().pull_subscribe(
-        subject=consumer.get("subject", ""),
-        durable=consumer["durable"],
-        stream=consumer["stream"],
-        config=ConsumerConfig(
-            ack_policy=AckPolicy.EXPLICIT,
-            ack_wait=ACK_WAIT_SECONDS,
-            max_deliver=MAX_DELIVER,
-        ),
-    )
+
+    async def dial() -> tuple[NATSClient, Subscription]:
+        """Connect and open the pull subscription. Called again to reconnect.
+
+        `max_reconnect_attempts=-1`: never give up on an ordinary network
+        blip — a broker restart is a routine event, not a reason to exit.
+        It does not cover a rotated credential: `nats-py` closes the client
+        outright on that server error rather than handing it to this
+        machinery at all, so surviving THAT is this function being called
+        again from scratch (see `reconnect` below and `pull.pull_or_reconnect`),
+        not a setting passed into it.
+        """
+        connection = await nats.connect(
+            servers=[nats_settings["url"]],
+            name=f"url-shortener-{COMPONENT}",
+            token=token,
+            max_reconnect_attempts=-1,
+        )
+        subscription = await connection.jetstream().pull_subscribe(
+            subject=consumer.get("subject", ""),
+            durable=consumer["durable"],
+            stream=consumer["stream"],
+            config=ConsumerConfig(
+                ack_policy=AckPolicy.EXPLICIT,
+                ack_wait=ACK_WAIT_SECONDS,
+                max_deliver=MAX_DELIVER,
+            ),
+        )
+        return connection, subscription
+
+    connection, subscription = await dial()
+
+    async def reconnect() -> Subscription:
+        """Dial again, once the old connection is beyond saving.
+
+        Called only from `pull.pull_or_reconnect`, itself called only once
+        `fetch` has raised `ConnectionClosedError` — which `nats-py` raises
+        when the SERVER closed the connection and nothing in the client is
+        going to bring it back on its own (unlike an ordinary disconnect,
+        which its own reconnect logic already retries under
+        `max_reconnect_attempts`). A broker closing a connection over an
+        expired, since-rotated credential is ordinary and expected, not a
+        fault to raise about.
+        """
+        nonlocal connection
+        log.warning("nats connection closed, reconnecting", component=COMPONENT)
+        with contextlib.suppress(Exception):
+            await connection.close()
+        connection, new_subscription = await dial()
+        return new_subscription
 
     stopping = asyncio.Event()
 
@@ -242,7 +281,9 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
 
     try:
         while not stopping.is_set():
-            messages = await pull(subscription, batch=writer.capacity, timeout=FETCH_SECONDS)
+            subscription, messages = await pull_or_reconnect(
+                subscription, reconnect, batch=writer.capacity, timeout=FETCH_SECONDS
+            )
 
             for message in messages:
                 writer.add(
