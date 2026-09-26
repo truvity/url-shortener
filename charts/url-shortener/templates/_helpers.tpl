@@ -79,6 +79,16 @@ The two account names: what was asked for, or the release's own, suffixed.
 {{- end -}}
 
 {{/*
+The verification Job's own account name. Not overridable like the two
+above: this account is scoped to exactly what templates/verification.yaml
+grants it and nothing a platform would bind rights to ahead of time, so
+there is nothing an override would be FOR.
+*/}}
+{{- define "url-shortener.verifyServiceAccountName" -}}
+{{- printf "%s-verify" (include "url-shortener.name" .) -}}
+{{- end -}}
+
+{{/*
 The pod-level settings that make a replacement gapless, shared by every
 workload so that one number governs all of them.
 

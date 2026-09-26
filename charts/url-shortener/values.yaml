@@ -132,6 +132,11 @@ images:
   stat: {registry: ghcr.io, repository: truvity/policy/url-shortener/stat, tag: "", digest: ""}
   log: {registry: ghcr.io, repository: truvity/policy/url-shortener/log, tag: "", digest: ""}
   web: {registry: ghcr.io, repository: truvity/policy/url-shortener/web, tag: "", digest: ""}
+  # The verification suite, released alongside every other component here —
+  # SAME version, so "the suite that runs after this release" and "the suite
+  # this release shipped" are never two different questions. Read only when
+  # verification.enabled is true; see templates/verification.yaml.
+  e2e: {registry: ghcr.io, repository: truvity/policy/url-shortener/e2e, tag: "", digest: ""}
 
 pullPolicy: IfNotPresent
 
@@ -306,6 +311,8 @@ resources:
     requests: { cpu: 50m, memory: 96Mi }
   migrate:
     requests: { cpu: 50m, memory: 64Mi }
+  verify:
+    requests: { cpu: 50m, memory: 64Mi }
 
 # The route this service is reached through. Off by default: a chart that
 # exposes something the moment it is installed is a chart that exposes
@@ -341,3 +348,33 @@ route:
     namespace: ""
     sectionName: ""
   hostname: ""
+
+# Post-promotion verification: this release's OWN e2e suite (images.e2e —
+# same release, same version), run once as a Helm hook after the rest of the
+# release applies successfully.
+#
+# OFF by default, and that default must stay byte-identical to a chart that
+# had never heard of this: turning it on needs a ServiceAccount the platform
+# has not necessarily budgeted for, and a namespace where the suite's own
+# assumptions (a reachable Service per component, a database it may read a
+# Secret for) hold. A platform enables it only where it is prepared to gate
+# a promotion on the result — see docs on how ArgoCD maps a Helm hook to
+# PostSync, and how a Kargo Stage can read the Job's outcome.
+verification:
+  enabled: false
+  # E2E_APP_RELEASE: the release/installName the suite treats as the
+  # deployment under test. Empty means this chart's own release name, which
+  # is what a standalone install needs.
+  appRelease: ""
+  # Extra environment for the suite process, verbatim — e.g.
+  # E2E_TRACES_URL to enable the one trace-shaped test, or
+  # E2E_S3_ENDPOINT / E2E_S3_REGION to run the archive check outside kind.
+  # Never a place for a secret: the one credential the suite reads (the
+  # database's app password) comes from a Secret the suite's own
+  # ServiceAccount is not even granted to read — see
+  # templates/verification.yaml for why that test skips cleanly instead.
+  env: {}
+  # Bounds how long the Job — and therefore the hook, and therefore the
+  # `helm upgrade`/`helm install` or the ArgoCD sync waiting on it — can run
+  # before Kubernetes kills it and the hook is reported failed.
+  activeDeadlineSeconds: 300

@@ -1,0 +1,135 @@
+{{/*
+Post-promotion verification: this release's OWN e2e suite (images.e2e — the
+SAME release, so the same version that just deployed), run once as a Helm
+hook after the rest of the release applies.
+
+`post-install,post-upgrade`, not `pre-`: the suite asserts against what THIS
+release deployed, which does not exist until the install or upgrade has
+already applied it. ArgoCD maps every Helm post-* hook to its own PostSync
+phase — a sync is not reported Healthy/Synced until PostSync hooks finish —
+so a platform gating a promotion on ArgoCD's own sync result already gates
+on this Job without anything further to wire on that side.
+
+`before-hook-creation`, not `hook-succeeded`: a Job that deletes itself on
+success leaves nothing to read when the NEXT run fails, and "what did the
+last verification actually check" is a question people ask once a promotion
+is already suspect.
+
+Three objects, and the account and its RBAC are hooks too, at a lower
+weight than the Job — see templates/serviceaccount.yaml and
+templates/migrate.yaml's own comments for why: Helm applies every hook
+before it applies anything else in the release, so a hook Job naming an
+ordinary ServiceAccount never fails on the Job. It fails on the POD, which
+is never created, with "error looking up service account" in an event
+nobody is watching, while the release sits at "Job in progress" until
+activeDeadlineSeconds runs out.
+
+The Role grants exactly what the suite's own tests need and reads
+env_test.go's kubectl calls and the harness's port-forward/rollout-status
+calls to know it — get/list/watch on Pods, Deployments, Services and
+Endpoints (readiness_test.go's own Deployment check and rollout wait, and
+the harness's Service->Pod port-forward), create on pods/portforward, and
+get/list/watch on Jobs (this Job itself, and any other this release owns).
+Nothing else, and no Secrets: db_test.go's role-credential check and
+log_test.go's archive check both read appPasswordOrSkip's own comment for
+why a Forbidden reading a Secret is a clean skip rather than a failure —
+this account is exactly the caller that test was written for.
+*/}}
+{{- if .Values.verification.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "url-shortener.verifyServiceAccountName" . }}
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "url-shortener.name" . }}-verify
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "url-shortener.name" . }}-verify
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "url-shortener.name" . }}-verify
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "url-shortener.verifyServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "url-shortener.name" . }}-verify
+  labels: {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.verification.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener.labels" . | nindent 8 }}
+        app.kubernetes.io/component: verify
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "url-shortener.verifyServiceAccountName" . }}
+      {{- include "url-shortener.podSecurity" . | nindent 6 }}
+      containers:
+        - name: verify
+          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "e2e") }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          args: ["-test.v"]
+          env:
+            # The one variable that turns the suite on at all — see
+            # e2e/suite/env_test.go's envNamespace doc comment.
+            - name: E2E_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: E2E_APP_RELEASE
+              value: {{ .Values.verification.appRelease | default (include "url-shortener.name" .) | quote }}
+            # Set, and EMPTY: the suite's own kubecontextFromEnv treats a
+            # present-but-empty value as "no --context at all", which is
+            # what an in-cluster Job needs — kubectl and the harness then
+            # fall back to this Pod's own ServiceAccount rather than a
+            # kubeconfig context that does not exist here.
+            - name: E2E_KCTX
+              value: ""
+            {{- range $k, $v := .Values.verification.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          resources: {{- toYaml .Values.resources.verify | nindent 12 }}
+{{- end }}
