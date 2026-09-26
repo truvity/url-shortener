@@ -26,8 +26,22 @@
 // OPTIONAL peer, and a build that exports nothing must not need it.
 import type { Resource } from "@opentelemetry/resources";
 
+import { DEFAULT_ALLOWED_ATTRIBUTES, filteringSpanExporter } from "./attributes.js";
+
 /** Flush what is buffered and release the exporters. */
 export type Shutdown = () => Promise<void>;
+
+/** Options for {@link start}. */
+export interface StartOptions {
+  /**
+   * Span attribute keys to export beyond {@link DEFAULT_ALLOWED_ATTRIBUTES},
+   * for this service's own additions. Additive only: it never removes a
+   * default, and it is the ONLY way to add a key — there is no
+   * configuration key and no environment variable for it (decision 0006 is
+   * about the SDK's own environment, not this list).
+   */
+  readonly extraAttributes?: readonly string[];
+}
 
 /**
  * `none` is the only value that turns a signal off. Absent means the
@@ -68,8 +82,9 @@ export async function resourceFromEnvironment(): Promise<Resource> {
  * does not carry the exporter's cost at start-up — and a bundle that is
  * never going to export does not have to resolve it at all.
  */
-export async function start(): Promise<Shutdown> {
+export async function start(options: StartOptions = {}): Promise<Shutdown> {
   const stops: Shutdown[] = [];
+  const allowed = new Set([...DEFAULT_ALLOWED_ATTRIBUTES, ...(options.extraAttributes ?? [])]);
 
   if (!disabled("OTEL_TRACES_EXPORTER")) {
     const { NodeTracerProvider, BatchSpanProcessor } = await import("@opentelemetry/sdk-trace-node");
@@ -77,7 +92,10 @@ export async function start(): Promise<Shutdown> {
 
     const provider = new NodeTracerProvider({
       resource: await resourceFromEnvironment(),
-      spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter())],
+      // Every exported span passes through the allow-list first: an
+      // attribute nobody thought about is ABSENT, not exported because an
+      // instrumentation library happened to add it.
+      spanProcessors: [new BatchSpanProcessor(filteringSpanExporter(new OTLPTraceExporter(), allowed))],
     });
     provider.register();
     stops.push(() => provider.shutdown());

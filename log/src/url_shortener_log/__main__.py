@@ -75,7 +75,13 @@ def main() -> int:
     # With no endpoint configured the chart sets the exporters to `none`
     # and this installs nothing, so a laptop and a cluster run the same
     # code down the same path.
-    shutdown_telemetry = telemetry.start()
+    #
+    # `archive.records` and `archive.key` are this component's own addition
+    # to the default span-attribute allow-list (see `write` below): neither
+    # carries a request's data, only how many records one flush held and
+    # where it landed, so they are extended here rather than folded into
+    # the package's default list.
+    shutdown_telemetry = telemetry.start(extra_attributes=("archive.records", "archive.key"))
     # Every S3 call becomes a span under whatever is current -- here the
     # flush. Before any client is built, so none is missed.
     # The instrumentor package ships no type information.

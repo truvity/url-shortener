@@ -72,7 +72,12 @@ func run() error {
 	// Telemetry, from OpenTelemetry's own environment (decision 0006).
 	// With no endpoint configured this installs exporters that do nothing,
 	// so a laptop and a cluster run the same code down the same path.
-	shutdownTelemetry, err := policytelemetry.Start(ctx)
+	//
+	// "error" is this service's own addition to the default span-attribute
+	// allow-list: api.Tracing sets it as a boolean on a failed request, and
+	// it carries no request data of its own, so it is extended here rather
+	// than folded into the package's default list.
+	shutdownTelemetry, err := policytelemetry.Start(ctx, policytelemetry.WithAllowedAttributes("error"))
 	if err != nil {
 		return err
 	}

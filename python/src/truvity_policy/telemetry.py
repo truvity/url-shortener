@@ -22,7 +22,9 @@ import os
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Iterable, MutableMapping
+
+    from opentelemetry.sdk.trace.export import SpanExporter
 
     # A processor's third argument, spelled out rather than imported from
     # structlog: that package is the ARCHIVER's dependency, not this
@@ -35,6 +37,92 @@ if TYPE_CHECKING:
 # language in this repository uses exactly these two names.
 _FIELD_TRACE_ID = "trace_id"
 _FIELD_SPAN_ID = "span_id"
+
+# The span attribute keys exported by default: OpenTelemetry semantic-
+# convention keys that describe a call's shape rather than its content. An
+# attribute nobody thought about is ABSENT, not exported because some
+# instrumentation library happened to add it -- so this list is short on
+# purpose and never grows to accommodate one caller. A caller with more of
+# its own passes `extra_attributes` to `start`.
+#
+# Deliberately NOT here: url.path, url.query, url.full (the request line
+# itself -- ids, search terms, tokens), any header, any database or
+# messaging PAYLOAD, and any peer address. Those are exactly the attributes
+# an instrumentation library adds on its own, which is why this is an ALLOW
+# list rather than a set of things to strip.
+DEFAULT_ALLOWED_ATTRIBUTES: frozenset[str] = frozenset(
+    {
+        "http.request.method",
+        "http.route",
+        "http.response.status_code",
+        "rpc.system",
+        "rpc.service",
+        "rpc.method",
+        "rpc.grpc.status_code",
+        "rpc.connect_rpc.error_code",
+        "db.system",
+        "db.system.name",
+        "db.operation",
+        "db.operation.name",
+        "db.query.text",
+        "db.response.returned_rows",
+        "messaging.system",
+        "messaging.destination.name",
+        "messaging.operation",
+        "messaging.operation.type",
+        "server.port",
+        "error.type",
+        "otel.status_code",
+        "otel.status_description",
+    },
+)
+
+
+def _filtering_span_exporter(exporter: SpanExporter, allowed: frozenset[str]) -> SpanExporter:
+    """Wrap a span exporter so no attribute outside ``allowed`` reaches it.
+
+    The SDK hands a processor's ``on_end`` a :class:`ReadableSpan` -- already
+    a read-only snapshot -- so there is no processor hook that lets code
+    remove an attribute after instrumentation added it. This wraps the
+    EXPORTER instead: the last point before spans leave the process where
+    the shape is still ours to change, by building a new ``ReadableSpan``
+    that copies everything but the attributes.
+    """
+    from opentelemetry.sdk.trace import ReadableSpan  # noqa: PLC0415
+    from opentelemetry.sdk.trace.export import SpanExporter as _SpanExporter  # noqa: PLC0415
+
+    class FilteringSpanExporter(_SpanExporter):
+        def export(self, spans: Any) -> Any:  # noqa: ANN401 — matches the SDK's own untyped signature
+            kept = [
+                ReadableSpan(
+                    name=span.name,
+                    context=span.context,
+                    parent=span.parent,
+                    resource=span.resource,
+                    attributes={
+                        key: value
+                        for key, value in (span.attributes or {}).items()
+                        if key in allowed
+                    },
+                    events=span.events,
+                    links=span.links,
+                    kind=span.kind,
+                    status=span.status,
+                    start_time=span.start_time,
+                    end_time=span.end_time,
+                    instrumentation_scope=span.instrumentation_scope,
+                )
+                for span in spans
+            ]
+            return exporter.export(kept)
+
+        def shutdown(self) -> None:
+            exporter.shutdown()
+
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            return exporter.force_flush(timeout_millis)
+
+    return FilteringSpanExporter()
 
 
 class Shutdown(Protocol):
@@ -51,13 +139,22 @@ def _disabled(variable: str) -> bool:
     return os.environ.get(variable, "").strip().lower() == "none"
 
 
-def start() -> Shutdown:
+def start(*, extra_attributes: Iterable[str] = ()) -> Shutdown:
     """Install the global tracer and meter providers.
 
     Returns a callable that flushes them. A caller that skips it loses
     whatever had not been sent, which on a short-lived process is usually
     everything.
+
+    Every exported span passes through an allow-list first: an attribute
+    nobody thought about is ABSENT, not exported because an instrumentation
+    library happened to add it. ``DEFAULT_ALLOWED_ATTRIBUTES`` covers the
+    semantic-convention keys that carry no request data; ``extra_attributes``
+    extends it for keys this service's own code adds. There is no
+    configuration key or environment variable for this -- decision 0006 is
+    about the SDK's own environment, not this list.
     """
+    allowed = DEFAULT_ALLOWED_ATTRIBUTES | frozenset(extra_attributes)
     shutdowns: list[Shutdown] = []
 
     if not _disabled("OTEL_TRACES_EXPORTER"):
@@ -75,7 +172,8 @@ def start() -> Shutdown:
         from opentelemetry.sdk.trace.export import BatchSpanProcessor  # noqa: PLC0415
 
         tracer_provider = TracerProvider()
-        tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        exporter = _filtering_span_exporter(OTLPSpanExporter(), allowed)
+        tracer_provider.add_span_processor(BatchSpanProcessor(exporter))
         trace.set_tracer_provider(tracer_provider)
         shutdowns.append(tracer_provider.shutdown)
 
