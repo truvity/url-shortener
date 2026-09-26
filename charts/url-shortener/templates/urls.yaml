@@ -93,12 +93,6 @@ spec:
     - name: http
       port: 8080
       targetPort: http
-    # Exposed so a test can ask the same question a kubelet already asks the
-    # Pod directly — see examples/url-shortener/e2e/suite, which has no
-    # other way to reach a probe port than through a Service.
-    - name: probes
-      port: 7070
-      targetPort: probes
     {{- if and (include "url-shortener.tlsOn" .) (eq .Values.tls.mode "permissive") }}
     - name: https
       port: {{ .Values.tls.port }}

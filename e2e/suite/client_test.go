@@ -12,19 +12,20 @@ import (
 
 // component names the chart's own, matching the release names
 // examples/url-shortener/e2e/fixture reads off it — never repeated as a
-// literal at more than this one place.
+// literal at more than this one place. stat and log carry no Service (see
+// charts/url-shortener/templates/{stat,log}.yaml) but are still
+// Deployments, which is what readiness_test.go checks for all five.
 const (
 	componentURLs     = "urls"
 	componentRedirect = "redirect"
 	componentWeb      = "web"
+	componentStat     = "stat"
+	componentLog      = "log"
 )
 
-// httpPort and probesPort are the two ports EVERY Service in this chart
-// carries — see charts/url-shortener/templates/{urls,redirect,web}.yaml.
-const (
-	httpPort   = 8080
-	probesPort = 7070
-)
+// httpPort is the one port every RPC-serving Service in this chart carries
+// — see charts/url-shortener/templates/{urls,redirect,web}.yaml.
+const httpPort = 8080
 
 // service renders the Service name for one of this chart's components —
 // {{ include "url-shortener.name" . }}-{{ component }}, which is
@@ -71,33 +72,6 @@ func urlsClient(ctx context.Context, t *testing.T) urlshortenerv1connect.UrlsSer
 
 	baseURL := serviceURL(ctx, t, componentURLs, httpPort)
 	return urlshortenerv1connect.NewUrlsServiceClient(&http.Client{Timeout: 10 * time.Second}, baseURL)
-}
-
-// probeHealth asks a component's probe port the same two questions the
-// kubelet already asks the Pod directly (livenessProbe/readinessProbe in
-// the chart) — but through the Service, which is the one thing a rendered
-// chart cannot prove: that the probe port the chart wires up is actually
-// the one the Service reaches.
-func probeHealth(ctx context.Context, t *testing.T, component string) {
-	t.Helper()
-
-	base := serviceURL(ctx, t, component, probesPort)
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	for _, path := range []string{"/health/live", "/health/ready"} {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, http.NoBody)
-		if err != nil {
-			t.Fatalf("%s %s: build request: %v", component, path, err)
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Fatalf("%s %s: %v", component, path, wrapThroughForward(component, err))
-		}
-		_ = resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("%s %s answered %d, wanted 200", component, path, resp.StatusCode)
-		}
-	}
 }
 
 // errString is a small helper so callers can name a failing RPC without

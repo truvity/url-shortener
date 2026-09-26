@@ -34,18 +34,25 @@ func TestStatMovesTheCounter(t *testing.T) {
 
 	// Two redirects, not one: the assertion below is an exact count, which
 	// is the difference between "the counter counts" and "a row exists".
-	const wantClicks = 2
-	for range wantClicks {
+	const redirects = 2
+	for range redirects {
 		_ = followRedirect(ctx, t, key)
 	}
 
+	// want is read by BOTH the comparison and the failure message below, so
+	// the two cannot drift apart — a literal repeated at each site is a
+	// message that can go on stating the old expectation after the
+	// comparison changes, which is exactly the bug a mutation check here
+	// once caught: "click_count is 2, want exactly 2" for a test that was
+	// failing because 2 was not what it wanted.
+	want := int64(redirects)
 	eventually(t, 60*time.Second, func() error {
 		resp, err := client.Get(ctx, connect.NewRequest(&v1.GetRequest{Key: key}))
 		if err != nil {
 			return errString(componentURLs, "get the click count", err)
 		}
-		if got := resp.Msg.GetUrl().GetClickCount(); got != wantClicks {
-			return fmt.Errorf("click_count is %d, want exactly %d", got, wantClicks)
+		if got := resp.Msg.GetUrl().GetClickCount(); got != want {
+			return fmt.Errorf("click_count is %d, want exactly %d", got, want)
 		}
 		return nil
 	})

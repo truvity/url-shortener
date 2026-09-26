@@ -103,11 +103,6 @@ spec:
     - name: http
       port: 8080
       targetPort: http
-    # See urls.yaml's identical port: the suite reaches liveness/readiness
-    # through the Service, the same way it reaches everything else.
-    - name: probes
-      port: 7070
-      targetPort: probes
     {{- if and (include "url-shortener.tlsOn" .) (eq .Values.tls.mode "permissive") }}
     - name: https
       port: {{ .Values.tls.port }}
