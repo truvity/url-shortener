@@ -3,6 +3,7 @@ package suite
 import (
 	"context"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
@@ -46,6 +48,8 @@ func TestLogArchivesTheRecord(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
+	s3Client := s3ClientOrSkip(ctx, t)
+
 	client := urlsClient(ctx, t)
 	longURL := testLongURL(t)
 	created, err := client.Create(ctx, connect.NewRequest(&v1.CreateRequest{LongUrl: longURL}))
@@ -54,8 +58,6 @@ func TestLogArchivesTheRecord(t *testing.T) {
 	}
 	key := created.Msg.GetUrl().GetKey()
 	_ = followRedirect(ctx, t, key)
-
-	s3Client := newS3Client(ctx, t)
 
 	// The redirect record carries the short key (url_key, and the /r/<key>
 	// path) rather than the long URL it resolved to — see
@@ -67,21 +69,49 @@ func TestLogArchivesTheRecord(t *testing.T) {
 	})
 }
 
-// newS3Client builds an S3 client against the box's LocalStack, through the
-// harness — the same ServiceURL every other Service in this suite goes
-// through. Static test credentials, matching hack/install.sh's own
-// BUCKET_SECRET: the local box has no identity plane to hand the client
-// instead (docs/decisions/0005-kind-is-the-gate.md's amendment).
-func newS3Client(ctx context.Context, t *testing.T) *s3.Client {
+// s3ClientOrSkip builds an S3 client against wherever this environment's
+// archive bucket lives.
+//
+// envS3Endpoint set (a real S3, or S3-compatible, endpoint outside kind)
+// takes it, and credentials then come from this process's own default AWS
+// credential chain — a verification Job's Pod identity, in production —
+// never the kind box's static test credentials, which are meaningless
+// anywhere else.
+//
+// envS3Endpoint unset falls back to the kind box's own S3 stand-in
+// (object-store/s3, reached through the harness the same way every other
+// Service in this suite is), with the same static test credentials
+// hack/install.sh's BUCKET_SECRET carries — the local box has no identity
+// plane to hand the client instead (docs/decisions/0005-kind-is-the-gate.md's
+// amendment). Outside kind, that Service does not exist, so this SKIPS
+// rather than fails: reading a bucket from outside the application's own
+// IAM is a permission a verification Job should not be handed just to run
+// this one check, and the operator can opt in by setting envS3Endpoint
+// (see env_test.go).
+func s3ClientOrSkip(ctx context.Context, t *testing.T) *s3.Client {
 	t.Helper()
+
+	if endpoint := strings.TrimSpace(os.Getenv(envS3Endpoint)); endpoint != "" {
+		region := getenv(envS3Region, defaultS3Region)
+		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+		if err != nil {
+			t.Fatalf("load the default AWS config for %s (%s=%s): %v", region, envS3Endpoint, endpoint, err)
+		}
+		return s3.New(s3.Options{
+			Region:       region,
+			BaseEndpoint: aws.String(endpoint),
+			Credentials:  cfg.Credentials,
+		})
+	}
 
 	endpoint, err := shared.cluster.ServiceURL(ctx, objectStoreNamespace, objectStoreService, objectStorePort)
 	if err != nil {
-		t.Fatalf("resolve the object-store Service: %v", err)
+		t.Skipf("no %s/%s Service and %s is not set — this environment exposes no object store "+
+			"for the archive check: %v", objectStoreNamespace, objectStoreService, envS3Endpoint, err)
 	}
 
 	return s3.New(s3.Options{
-		Region:       "us-east-1",
+		Region:       defaultS3Region,
 		BaseEndpoint: aws.String(endpoint),
 		UsePathStyle: true,
 		Credentials:  credentials.NewStaticCredentialsProvider("test", "test", ""),

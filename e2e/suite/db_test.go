@@ -22,6 +22,33 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 )
 
+// appPasswordOrSkip reads the runtime role's password Secret, the one thing
+// this test needs that no other test in this package touches — see
+// env_test.go's resolveEnv doc comment for why it is resolved HERE and not
+// eagerly in TestMain: a caller with no permission to read Secrets (a
+// verification Job scoped to exactly what the rest of this suite needs, and
+// nothing more privileged) skips only this test, cleanly, rather than
+// failing the whole binary before any test runs.
+//
+// kubectl reports a permission denial as "Forbidden" in its own error text
+// (there is no structured exit code to test instead — see `kubectl get
+// secret --help`'s silence on the subject), which is the one shape of
+// failure this treats as a skip. Anything else — a typo'd secret name, an
+// unreachable API server — still fails the test loudly.
+func appPasswordOrSkip(ctx context.Context, t *testing.T) string {
+	t.Helper()
+
+	password, err := secretPassword(ctx, shared.cluster.Kubecontext, shared.names.Namespace, shared.names.AppSecret)
+	if err != nil {
+		if strings.Contains(err.Error(), "Forbidden") {
+			t.Skipf("no permission to read the app role's password Secret (%s/%s) in this environment — "+
+				"skipping the role-separation check: %v", shared.names.Namespace, shared.names.AppSecret, err)
+		}
+		t.Fatalf("%v", err)
+	}
+	return password
+}
+
 // postgresService and postgresNamespace name the box's one Postgres
 // server's Service, addressed the same cross-namespace way
 // examples/url-shortener/e2e/fixture/apply.sh already reaches it.
@@ -49,7 +76,8 @@ func TestMigrationRanAndRolesAreSeparate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	appDB := openAsRole(ctx, t, shared.names.AppRole, shared.appPassword)
+	appPassword := appPasswordOrSkip(ctx, t)
+	appDB := openAsRole(ctx, t, shared.names.AppRole, appPassword)
 	defer func() { _ = appDB.Close() }()
 
 	// The migration completed: the table the owner's migration created is
