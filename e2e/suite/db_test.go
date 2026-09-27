@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +38,13 @@ import (
 // unreachable API server — still fails the test loudly.
 func appPasswordOrSkip(ctx context.Context, t *testing.T) string {
 	t.Helper()
+
+	// namesFromEnvMode's own Job is handed the password directly, via
+	// `secretKeyRef` rather than a `kubectl get secret` this account is
+	// deliberately not granted to run — see envAppPassword's doc comment.
+	if pw := strings.TrimSpace(os.Getenv(envAppPassword)); pw != "" {
+		return pw
+	}
 
 	password, err := secretPassword(ctx, shared.cluster.Kubecontext, shared.names.Namespace, shared.names.AppSecret)
 	if err != nil {
@@ -146,11 +154,7 @@ func openAsRole(ctx context.Context, t *testing.T, role, password string) *sql.D
 func postgresDSN(ctx context.Context, t *testing.T, role, password string) string {
 	t.Helper()
 
-	raw, err := shared.cluster.ServiceURL(ctx, postgresNamespace, postgresService, postgresPort)
-	if err != nil {
-		t.Fatalf("resolve the postgres Service: %v", err)
-	}
-	hostport := strings.TrimPrefix(raw, "http://")
+	hostport := postgresHostPort(ctx, t)
 
 	u := url.URL{
 		Scheme: "postgres",
@@ -163,6 +167,35 @@ func postgresDSN(ctx context.Context, t *testing.T, role, password string) strin
 	u.RawQuery = q.Encode()
 
 	return u.String()
+}
+
+// postgresHostPort resolves the address to dial the box's Postgres on.
+//
+// namesFromEnvMode's own Job runs IN the cluster its database is in, so
+// shared.names.DatabaseHost — the url-shortener-e2e chart's own
+// database.host value — is dialled directly: there is no reason to
+// believe a Service named postgresService in postgresNamespace exists at
+// all off the kind box (see boxPostgresAddress's own doc comment in
+// fixture/names.go), and this Job's Role grants it no permission to look
+// one up by a name that is not its own release's in any case. Every other
+// mode reaches the kind box's OWN fixed Postgres through the harness,
+// exactly as before.
+func postgresHostPort(ctx context.Context, t *testing.T) string {
+	t.Helper()
+
+	if namesFromEnvMode() {
+		host := strings.TrimSpace(shared.names.DatabaseHost)
+		if host == "" {
+			t.Fatalf("%s is not set — the url-shortener-e2e chart's database.host value is required", envDatabaseHost)
+		}
+		return fmt.Sprintf("%s:%d", host, postgresPort)
+	}
+
+	raw, err := shared.cluster.ServiceURL(ctx, postgresNamespace, postgresService, postgresPort)
+	if err != nil {
+		t.Fatalf("resolve the postgres Service: %v", err)
+	}
+	return strings.TrimPrefix(raw, "http://")
 }
 
 // wrapDBErr enriches a Postgres connection error with the forward it went

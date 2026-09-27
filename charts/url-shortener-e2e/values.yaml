@@ -1,0 +1,145 @@
+# A Job that runs examples/url-shortener/e2e/suite INSIDE the cluster,
+# against an application release already installed in the SAME namespace —
+# see docs/guides/testing.md for how this differs from running the suite
+# directly (`just example-smoke`) and from the application chart's own
+# post-install hook (charts/url-shortener/templates/verification.yaml,
+# which this chart does not replace — see its own doc comment for why that
+# stays a hook while this is a plain Job).
+#
+# Every name below is a value rather than something this chart derives,
+# because it is testing SOMEBODY ELSE's release: url-shortener-infra
+# computes its stream, subjects and consumer names from a formula over its
+# OWN release name, and this chart has no release of that infrastructure
+# to render or to be the same release as. The suite itself never renders a
+# chart to learn them (e2e/suite/fixture.Resolve needs `helm`, which is
+# absent from the e2e image — the same reason
+# charts/url-shortener/templates/verification.yaml's hook Job cannot use
+# it either); it reads them from its own environment, which is exactly
+# what this chart's templates/job.yaml fills in from the values below.
+
+# The release under test, in THIS namespace. Required: there is no sane
+# default for whose release this Job verifies.
+appRelease: ""
+
+# full | tenant.
+#
+#   full    runs every case the suite carries.
+#   tenant  skips TestMigrationRanAndRolesAreSeparate, the one case that
+#           issues DDL straight at the database (CREATE TABLE, then DROP
+#           TABLE, to prove the runtime role cannot) — a probing write
+#           that assumes this install owns its database outright. A
+#           tenant sharing a database under a prefix (url-shortener-infra's
+#           `tier: test`) does not, and should not be handed rights to
+#           make that assumption true.
+#
+# Every other case is an ordinary application-level exercise — an RPC
+# call, a redirect, a counter, the archive — and runs in both modes.
+mode: full
+
+# Where the release under test keeps its database, and under what names —
+# read off url-shortener-infra's own render (or a platform's equivalent),
+# never invented here. Two roles, because the migration and the services
+# are trusted with different things — see charts/url-shortener/values.yaml
+# for why there are two.
+database:
+  host: ""
+  name: ""
+  owner:
+    role: ""
+  app:
+    role: ""
+    # The Secret holding the runtime role's password, and the key inside
+    # it. Read into the suite as an ENVIRONMENT VARIABLE via
+    # `secretKeyRef` (templates/job.yaml) — which needs no RBAC grant at
+    # all, because the value is resolved when this Pod is admitted, never
+    # read back by its own ServiceAccount token. That is also why this
+    # chart's Role names no Secret permission: see templates/rbac.yaml.
+    passwordSecret: ""
+    passwordKey: password
+
+# The stream, its two subjects and the two durable consumer names — all
+# five cluster-global on the broker (see
+# charts/url-shortener/templates/_helpers.tpl's own comment on why they
+# are a formula rather than a value on THAT chart) and read off
+# url-shortener-infra's render here for the same reason database.* is.
+events:
+  stream: ""
+  redirectSubject: ""
+  requestSubject: ""
+  statConsumer: ""
+  logConsumer: ""
+
+# Where the request archive is, on the same terms as
+# charts/url-shortener/values.yaml's own archive.bucket: an endpoint, a
+# region and a bucket name reach a cloud service, a store inside the
+# cluster or a test double, and this chart cannot tell which it got.
+# Empty endpoint means the SDK's own resolution — appropriate wherever the
+# archive is reached under a workload identity; a local store needs it
+# set (see examples/url-shortener/hack/install.sh's LOCAL_STORE_ARGS).
+archive:
+  bucket: ""
+  region: ""
+  endpoint: ""
+  # STATIC credentials for the endpoint above, on exactly the same terms
+  # as charts/url-shortener's own archive.bucket.credentialsSecret: a
+  # Secret NAME, never a value, read into the suite as an environment
+  # variable via `secretKeyRef` — no RBAC on Secrets, for the same reason
+  # database.app.passwordSecret above needs none. Empty means the
+  # suite's own default AWS credential chain, which is right wherever the
+  # endpoint is reached under a workload identity and wrong for a local
+  # store with no identity plane to hand it (e.g. this box's own S3
+  # stand-in, which answers at a real endpoint but authenticates nothing
+  # an ambient credential chain can discover).
+  credentialsSecret: ""
+  accessKeyIDKey: accessKeyID
+  secretAccessKeyKey: secretAccessKey
+
+# A Jaeger-API query endpoint. Optional: unset skips the one trace-shaped
+# case (e2e/suite/trace_test.go) rather than fail it — nothing here can
+# supply a trace store this environment was never given one of.
+traces:
+  url: ""
+
+# The e2e image, on exactly the same terms as
+# charts/url-shortener/values.yaml's images map: ONE entry, stamped with a
+# digest by the same `helmctl package --manifest` a release already runs
+# for the other two charts in this pair — see .goreleaser.yaml's `e2e` kos
+# entry and hack/example-snapshot.sh for the kind-box loop's own copy of
+# that same step. Unstamped, the chart falls back to its own appVersion,
+# same as every other chart here; a published chart always carries a
+# digest.
+images:
+  e2e: {registry: ghcr.io, repository: truvity/policy/url-shortener/e2e, tag: "", digest: ""}
+
+pullPolicy: IfNotPresent
+
+job:
+  # Cleanup, once the Job finishes either way. At least 120s — long enough
+  # for somebody to read `kubectl logs` before the Job disappears — is
+  # required by the schema; 600 is the default.
+  ttlSecondsAfterFinished: 600
+  # Small: a suite that fails is a real failure to look at, not a fluke to
+  # retry into passing.
+  backoffLimit: 0
+  # Bounds how long this Job — and therefore whatever is waiting on it,
+  # `helm upgrade --wait` or a GitOps controller's own health check — can
+  # run before Kubernetes kills it.
+  activeDeadlineSeconds: 300
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+
+# The account this Job runs as. Named, never generated — a platform that
+# needs to grant it something (there is nothing to grant beyond what
+# templates/rbac.yaml already scopes it to) can bind a name it chose.
+serviceAccount:
+  create: true
+  name: ""
+
+# Who the process is, inside the pod — the same defaults every other
+# workload in this pair of charts uses (charts/url-shortener/values.yaml's
+# podSecurity), so a platform that already trusts those trusts this too.
+podSecurity:
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532

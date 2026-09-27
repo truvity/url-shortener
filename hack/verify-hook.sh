@@ -47,7 +47,11 @@ APP=${APP:-example}
 # The packaged chart, on the same terms as hack/install.sh: the newest .tgz
 # under dist/charts, unless the caller names one.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CHART_TGZ=${CHART_TGZ:-$(find "$ROOT/dist/charts" -name 'url-shortener-*.tgz' 2>/dev/null | sort -V | tail -1)}
+# See hack/install.sh's identical exclusion: a bare 'url-shortener-*.tgz'
+# also matches url-shortener-infra-*.tgz and url-shortener-e2e-*.tgz, both
+# now packaged into the same directory.
+CHART_TGZ=${CHART_TGZ:-$(find "$ROOT/dist/charts" -name 'url-shortener-*.tgz' \
+    ! -name 'url-shortener-infra-*.tgz' ! -name 'url-shortener-e2e-*.tgz' 2>/dev/null | sort -V | tail -1)}
 if [ -z "$CHART_TGZ" ]; then
     echo "no packaged chart under dist/charts — run 'just example-snapshot' first" >&2
     exit 1

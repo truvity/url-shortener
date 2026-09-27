@@ -10,11 +10,13 @@ package charts
 
 import "embed"
 
-// Files is BOTH charts, exactly as they are published.
+// Files is all THREE charts, exactly as they are published.
 //
-// Both, because the split between them is itself part of the contract — the
-// application chart must not create what its migration migrates — and a
-// test that only ever rendered one half could not see that hold.
+// All three, because the split between them is itself part of the contract
+// — the application chart must not create what its migration migrates, and
+// the e2e chart must not be able to render without being told what the
+// other two created — and a test that only ever rendered a subset could not
+// see that hold.
 //
-//go:embed all:url-shortener all:url-shortener-infra
+//go:embed all:url-shortener all:url-shortener-infra all:url-shortener-e2e
 var Files embed.FS

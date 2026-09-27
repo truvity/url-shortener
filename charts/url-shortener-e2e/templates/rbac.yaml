@@ -1,0 +1,64 @@
+{{/*
+The account this Job runs as, and exactly what it can read — namespace
+scoped, and nothing on Secrets: the one credential the suite reads (the
+runtime role's password) arrives as an environment variable via
+`secretKeyRef` in templates/job.yaml, which the kubelet resolves without
+this account's token ever being asked — see values.yaml's own comment on
+database.app.passwordSecret.
+
+The verbs and resources mirror what the suite's own calls need — read
+e2e/suite/client_test.go, readiness_test.go and
+github.com/truvity/gemaal/pkg/harness's (*Cluster).ServiceURL,
+ReleaseDeployments and WaitForDeployments to see why each one is here:
+
+  - get/list/watch on Pods, Services, Endpoints, Deployments and Jobs —
+    the harness's own kubectl calls, and readiness_test.go's Deployment
+    check and rollout wait.
+
+NO `pods/portforward`, unlike charts/url-shortener/templates/
+verification.yaml's otherwise-identical Role: that grant exists there for
+a Job that COULD run under any kubecontext tier the harness detects,
+kind's local one included, where ServiceURL opens a port-forward because
+no route to a Service's ClusterIP exists off the box at all. This Job
+carries E2E_KCTX="" unconditionally (see templates/job.yaml) — no kind
+tier detects to, ever — so (*Cluster).ServiceURL always dials the
+ClusterIP directly, and a port-forward is never opened for it to need
+permission for.
+*/}}
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "url-shortener-e2e.serviceAccountName" . }}
+  labels: {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "url-shortener-e2e.name" . }}-e2e
+  labels: {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "url-shortener-e2e.name" . }}-e2e
+  labels: {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "url-shortener-e2e.name" . }}-e2e
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "url-shortener-e2e.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

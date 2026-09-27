@@ -1,0 +1,13 @@
+apiVersion: v2
+name: url-shortener-e2e
+description: >-
+  A Job that runs the example's own e2e suite (examples/url-shortener/e2e/suite)
+  inside the cluster, against an application release already installed in
+  the same namespace — the SAME e2e image the outside-in loop runs
+  directly (docs/guides/testing.md), released and versioned alongside
+  url-shortener and url-shortener-infra rather than as an extra.
+type: application
+# Both are the placeholder a release stamps. A committed version that
+# moves by hand is a version two people can disagree about.
+version: 0.0.0
+appVersion: "0.0.0"

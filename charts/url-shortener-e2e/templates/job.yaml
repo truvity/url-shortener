@@ -1,0 +1,130 @@
+{{/*
+A PLAIN Job — no `helm.sh/hook` annotations anywhere in this chart. It is
+applied the same way `helm upgrade --install` and a GitOps controller's
+`helm template` + apply both already handle any ordinary resource, which
+is the whole point: see templates/_helpers.tpl's "url-shortener-e2e.jobName"
+for why folding this chart's OWN VERSION into the Job's name is what lets
+a plain `apply` work at every version instead of needing hook machinery to
+delete-and-recreate it.
+
+Every name the suite needs arrives as an environment variable — see
+e2e/suite/env_test.go's own doc comments on each E2E_* constant, and
+values.yaml for where each value below comes from. E2E_NAMES_FROM_ENV=1 is
+what tells the suite to build its fixture.Names from THESE variables
+rather than rendering charts/url-shortener-infra with `helm` (absent from
+this image, same reason charts/url-shortener/templates/verification.yaml's
+hook Job cannot do it either) or, worse, silently skipping every test that
+needs one.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "url-shortener-e2e.jobName" . }}
+  labels:
+    {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+    app.kubernetes.io/component: e2e
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener-e2e.labels" . | nindent 8 }}
+        app.kubernetes.io/component: e2e
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "url-shortener-e2e.serviceAccountName" . }}
+      {{- include "url-shortener-e2e.podSecurity" . | nindent 6 }}
+      containers:
+        - name: e2e
+          image: {{ include "url-shortener-e2e.image" . }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          args:
+            - "-test.v"
+            {{- if eq .Values.mode "tenant" }}
+            # See values.yaml's own comment on `mode` for why exactly this
+            # one case is skipped and nothing else is.
+            - "-test.skip=TestMigrationRanAndRolesAreSeparate"
+            {{- end }}
+          env:
+            # The one variable that turns the suite on at all — see
+            # e2e/suite/env_test.go's envNamespace doc comment.
+            - name: E2E_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: E2E_APP_RELEASE
+              value: {{ .Values.appRelease | quote }}
+            # Set, and EMPTY: the suite's own kubecontextFromEnv treats a
+            # present-but-empty value as "no --context at all", which is
+            # what a Job running in the cluster it tests needs — kubectl
+            # and the harness then fall back to this Pod's own
+            # ServiceAccount rather than a kubeconfig context that does
+            # not exist here. It is also what makes (*Cluster).ServiceURL
+            # dial every Service's ClusterIP directly instead of opening a
+            # port-forward — see templates/rbac.yaml's own comment on why
+            # this Role grants no `pods/portforward`.
+            - name: E2E_KCTX
+              value: ""
+            - name: E2E_NAMES_FROM_ENV
+              value: "1"
+            - name: E2E_DATABASE
+              value: {{ .Values.database.name | quote }}
+            - name: E2E_DATABASE_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: E2E_OWNER_ROLE
+              value: {{ .Values.database.owner.role | quote }}
+            - name: E2E_APP_ROLE
+              value: {{ .Values.database.app.role | quote }}
+            - name: E2E_APP_SECRET
+              value: {{ .Values.database.app.passwordSecret | quote }}
+            # The runtime role's password ITSELF — resolved by the kubelet
+            # at admission, never read back by this Pod's own
+            # ServiceAccount token, which is why templates/rbac.yaml grants
+            # this account nothing on Secrets at all.
+            - name: E2E_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.app.passwordSecret }}
+                  key: {{ .Values.database.app.passwordKey | default "password" }}
+            - name: E2E_STREAM
+              value: {{ .Values.events.stream | quote }}
+            - name: E2E_REDIRECT_SUBJECT
+              value: {{ .Values.events.redirectSubject | quote }}
+            - name: E2E_REQUEST_SUBJECT
+              value: {{ .Values.events.requestSubject | quote }}
+            - name: E2E_STAT_CONSUMER
+              value: {{ .Values.events.statConsumer | quote }}
+            - name: E2E_LOG_CONSUMER
+              value: {{ .Values.events.logConsumer | quote }}
+            - name: E2E_BUCKET
+              value: {{ .Values.archive.bucket | quote }}
+            {{- with .Values.archive.region }}
+            - name: E2E_S3_REGION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.archive.endpoint }}
+            - name: E2E_S3_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.archive.credentialsSecret }}
+            # Static credentials for archive.endpoint, on exactly the same
+            # terms as E2E_APP_PASSWORD above — a Secret this account has
+            # no RBAC to read, resolved by the kubelet at admission
+            # instead. See values.yaml's own comment on
+            # archive.credentialsSecret for when this is needed at all.
+            - name: E2E_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.archive.accessKeyIDKey | default "accessKeyID" }}
+            - name: E2E_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.archive.secretAccessKeyKey | default "secretAccessKey" }}
+            {{- end }}
+            {{- with .Values.traces.url }}
+            - name: E2E_TRACES_URL
+              value: {{ . | quote }}
+            {{- end }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}

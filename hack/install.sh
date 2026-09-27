@@ -40,7 +40,13 @@ BUCKET=${BUCKET:-url-shortener-archive}
 # The newest .tgz under dist/charts, unless the caller names one — a real
 # cluster's installer names a version somebody released instead.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CHART_TGZ=${CHART_TGZ:-$(find "$ROOT/dist/charts" -name 'url-shortener-*.tgz' 2>/dev/null | sort -V | tail -1)}
+# NOT a bare 'url-shortener-*.tgz': that glob also matches
+# url-shortener-infra-*.tgz and, now that hack/example-snapshot.sh packages
+# it into the same directory, url-shortener-e2e-*.tgz too — see the harness's
+# own AppChartTgz (github.com/truvity/gemaal/pkg/harness) for the same
+# exclusion, needed for the same reason.
+CHART_TGZ=${CHART_TGZ:-$(find "$ROOT/dist/charts" -name 'url-shortener-*.tgz' \
+    ! -name 'url-shortener-infra-*.tgz' ! -name 'url-shortener-e2e-*.tgz' 2>/dev/null | sort -V | tail -1)}
 if [ -z "$CHART_TGZ" ]; then
     echo "no packaged chart under dist/charts — run 'just example-snapshot' first" >&2
     exit 1

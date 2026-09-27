@@ -93,10 +93,17 @@ func TestLogArchivesTheRecord(t *testing.T) {
 // archive bucket lives.
 //
 // envS3Endpoint set (a real S3, or S3-compatible, endpoint outside kind)
-// takes it, and credentials then come from this process's own default AWS
-// credential chain — a verification Job's Pod identity, in production —
-// never the kind box's static test credentials, which are meaningless
-// anywhere else.
+// takes it. envS3AccessKeyID and envS3SecretAccessKey, set BESIDE it,
+// carry STATIC credentials for that endpoint — the url-shortener-e2e
+// chart's own way of handing this client the same bucket credentials the
+// application itself would read from a Secret (charts/url-shortener's
+// archive.bucket.credentialsSecret), for an environment with no ambient
+// identity to fall back to: the kind box's own S3 stand-in, reached at a
+// real endpoint (http://s3.object-store.svc:4566) but authenticated with
+// nothing an IMDS-shaped credential chain can discover. Unset, credentials
+// come from this process's own default AWS credential chain instead — a
+// verification Job's Pod identity, in production — never the kind box's
+// static test credentials, which are meaningless anywhere else.
 //
 // envS3Endpoint unset falls back to the kind box's own S3 stand-in
 // (object-store/s3, reached through the harness the same way every other
@@ -113,6 +120,18 @@ func s3ClientOrSkip(ctx context.Context, t *testing.T) *s3.Client {
 
 	if endpoint := strings.TrimSpace(os.Getenv(envS3Endpoint)); endpoint != "" {
 		region := getenv(envS3Region, defaultS3Region)
+
+		accessKeyID := strings.TrimSpace(os.Getenv(envS3AccessKeyID))
+		secretAccessKey := strings.TrimSpace(os.Getenv(envS3SecretAccessKey))
+		if accessKeyID != "" && secretAccessKey != "" {
+			return s3.New(s3.Options{
+				Region:       region,
+				BaseEndpoint: aws.String(endpoint),
+				UsePathStyle: true,
+				Credentials:  credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+			})
+		}
+
 		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 		if err != nil {
 			t.Fatalf("load the default AWS config for %s (%s=%s): %v", region, envS3Endpoint, endpoint, err)

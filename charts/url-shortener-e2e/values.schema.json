@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "url-shortener-e2e chart values",
+  "description": "Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appRelease",
+    "mode",
+    "database",
+    "events",
+    "archive",
+    "images",
+    "job",
+    "resources"
+  ],
+  "properties": {
+    "appRelease": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": ["full", "tenant"]
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "name", "owner", "app"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["role"],
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "app": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["role", "passwordSecret"],
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordSecret": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stream", "redirectSubject", "requestSubject", "statConsumer", "logConsumer"],
+      "properties": {
+        "stream": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redirectSubject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestSubject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statConsumer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logConsumer": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket"],
+      "properties": {
+        "bucket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "credentialsSecret": {
+          "type": "string"
+        },
+        "accessKeyIDKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secretAccessKeyKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "traces": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["e2e"],
+      "properties": {
+        "e2e": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["registry", "repository"],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "pullPolicy": {
+      "enum": ["Always", "IfNotPresent", "Never"]
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ttlSecondsAfterFinished", "backoffLimit", "activeDeadlineSeconds"],
+      "properties": {
+        "ttlSecondsAfterFinished": {
+          "type": "integer",
+          "minimum": 120
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "activeDeadlineSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "podSecurity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runAsUser": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fsGroup": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

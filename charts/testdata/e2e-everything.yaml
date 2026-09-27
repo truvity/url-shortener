@@ -1,0 +1,49 @@
+# Every value set to something other than its default, so a template that
+# stopped reading one shows up as a diff in the golden beside this.
+appRelease: example
+mode: tenant
+database:
+  host: pg.custom.svc
+  name: shortener_db
+  owner:
+    role: shortener_owner
+  app:
+    role: shortener_app
+    passwordSecret: shortener-app-secret
+    passwordKey: pw
+events:
+  stream: custom-events
+  redirectSubject: custom.redirect
+  requestSubject: custom.log
+  statConsumer: custom-stat
+  logConsumer: custom-log
+archive:
+  bucket: custom-archive
+  region: eu-west-1
+  endpoint: https://s3.example.test
+  credentialsSecret: custom-archive-creds
+  accessKeyIDKey: ak
+  secretAccessKeyKey: sk
+traces:
+  url: https://jaeger.example.test
+images:
+  e2e:
+    registry: registry.example.test
+    repository: url-shortener/e2e
+    tag: "1.2.3"
+    digest: ""
+pullPolicy: Always
+job:
+  ttlSecondsAfterFinished: 900
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits: { cpu: 200m, memory: 256Mi }
+serviceAccount:
+  create: false
+  name: given-account
+podSecurity:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000

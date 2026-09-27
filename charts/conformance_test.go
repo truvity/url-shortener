@@ -118,10 +118,26 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the infrastructure chart does not render: %v\n%s", err, infra)
 	}
+	e2e, err := renderE2E(t, e2eDefaults()...)
+	if err != nil {
+		t.Fatalf("the e2e chart does not render: %v\n%s", err, e2e)
+	}
+
+	// Each render was installed under its own release name — renderE2E
+	// names a SEPARATE release from render/renderInfra's "example", since
+	// this chart tests somebody else's release rather than sharing its
+	// name — so the label each one's objects must carry differs to match.
+	renders := []struct {
+		out, release string
+	}{
+		{app, "example"},
+		{infra, "example"},
+		{e2e, "example-e2e"},
+	}
 
 	var checked int
-	for _, out := range []string{app, infra} {
-		for _, doc := range documents(t, out) {
+	for _, r := range renders {
+		for _, doc := range documents(t, r.out) {
 			kind, _ := doc["kind"].(string)
 			if !workloadKinds[kind] {
 				continue
@@ -130,11 +146,11 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 
 			meta, _ := doc["metadata"].(map[string]any)
 			labels, _ := meta["labels"].(map[string]any)
-			if got, _ := labels["app.kubernetes.io/instance"].(string); got != "example" {
-				t.Errorf("%s %v carries no app.kubernetes.io/instance label (got %q): "+
+			if got, _ := labels["app.kubernetes.io/instance"].(string); got != r.release {
+				t.Errorf("%s %v carries no app.kubernetes.io/instance label (got %q, want %q): "+
 					"a render-and-apply install identifies this release's objects by that "+
 					"label alone, never by the meta.helm.sh/release-name annotation "+
-					"`helm install` stamps", kind, meta["name"], got)
+					"`helm install` stamps", kind, meta["name"], got, r.release)
 			}
 		}
 	}

@@ -69,6 +69,54 @@ const (
 	envS3Endpoint = "E2E_S3_ENDPOINT"
 	envS3Region   = "E2E_S3_REGION"
 
+	// envS3AccessKeyID and envS3SecretAccessKey carry STATIC credentials
+	// for envS3Endpoint, set beside it — see log_test.go's s3ClientOrSkip
+	// doc comment for why: an endpoint with no ambient identity behind it
+	// (the kind box's own S3 stand-in, reached at a real address but with
+	// nothing an IMDS-shaped credential chain can discover) still needs
+	// something to authenticate with. Both unset (the common case, and
+	// every case before this pair existed) falls back to the default AWS
+	// credential chain, unchanged.
+	envS3AccessKeyID     = "E2E_S3_ACCESS_KEY_ID"
+	envS3SecretAccessKey = "E2E_S3_SECRET_ACCESS_KEY"
+
+	// envNamesFromEnv switches the suite to a THIRD source of names,
+	// beside fixture.Resolve (kind, via helm) and verificationHookMode's
+	// zero-value skip: every name the suite needs, read from its own
+	// E2E_* variable rather than rendered from a chart. This is what the
+	// url-shortener-e2e chart's Job sets — it carries no copy of
+	// charts/url-shortener-infra to render (same reason
+	// verificationHookMode's Job carries none — see that doc comment)
+	// and, unlike the hook, is meant to run EVERY case rather than skip
+	// the ones a missing name would otherwise silence. Any value turns it
+	// on; unlike envKubecontext, an empty one is not itself a distinct
+	// signal — see namesFromEnvMode.
+	envNamesFromEnv = "E2E_NAMES_FROM_ENV"
+
+	// The rest of fixture.Names, one variable per field the
+	// url-shortener-e2e chart's Job can supply — see namesFromEnv and
+	// fixture.Names' own doc comment for what each one is.
+	envDatabase        = "E2E_DATABASE"
+	envDatabaseHost    = "E2E_DATABASE_HOST"
+	envOwnerRole       = "E2E_OWNER_ROLE"
+	envAppRole         = "E2E_APP_ROLE"
+	envAppSecret       = "E2E_APP_SECRET"
+	envStream          = "E2E_STREAM"
+	envRedirectSubject = "E2E_REDIRECT_SUBJECT"
+	envRequestSubject  = "E2E_REQUEST_SUBJECT"
+	envStatConsumer    = "E2E_STAT_CONSUMER"
+	envLogConsumer     = "E2E_LOG_CONSUMER"
+
+	// envAppPassword carries the runtime role's password ITSELF, not the
+	// name of the Secret holding it — see db_test.go's appPasswordOrSkip.
+	// The url-shortener-e2e chart's Job reads it from that Secret via
+	// `secretKeyRef`, which needs no RBAC grant at all (the value is
+	// resolved when the Pod is admitted, never read back by this Pod's
+	// own ServiceAccount token) — unlike `kubectl get secret`, which is
+	// what a caller with no Secret permission (verificationHookMode's own
+	// hook Job) is exactly meant to skip on instead.
+	envAppPassword = "E2E_APP_PASSWORD"
+
 	defaultKubecontext = "kind-policy"
 	defaultS3Region    = "us-east-1"
 )
@@ -142,6 +190,48 @@ func verificationHookMode() bool {
 	return ok && strings.TrimSpace(v) == ""
 }
 
+// namesFromEnvMode reports whether this run should build fixture.Names
+// entirely from environment variables rather than rendering
+// charts/url-shortener-infra with helm (the kind flow) or zeroing every
+// chart-derived name out (verificationHookMode) — see envNamesFromEnv's
+// doc comment.
+func namesFromEnvMode() bool {
+	return strings.TrimSpace(os.Getenv(envNamesFromEnv)) != ""
+}
+
+// namesFromEnv builds fixture.Names entirely from this Job's own
+// environment. Unlike verificationHookMode, which leaves every
+// chart-derived name at its zero value so the tests that need one skip
+// cleanly, this mode exists to run every case — so every name
+// fixture.Resolve would otherwise have rendered from
+// charts/url-shortener-infra arrives here as a value the
+// url-shortener-e2e chart's Job was given instead, one environment
+// variable per field.
+//
+// OwnerSecret is left at its zero value: nothing in this package ever
+// reads it — only examples/url-shortener/e2e/fixture/apply.sh, which this
+// Job never runs, connects as the owner role at all — so there is no
+// variable for it to come from.
+func namesFromEnv(namespace, appRelease, bucket string) fixture.Names {
+	return fixture.Names{
+		Options: fixture.Options{
+			Namespace:  namespace,
+			AppRelease: appRelease,
+			Bucket:     bucket,
+		},
+		Database:        os.Getenv(envDatabase),
+		OwnerRole:       os.Getenv(envOwnerRole),
+		AppRole:         os.Getenv(envAppRole),
+		DatabaseHost:    os.Getenv(envDatabaseHost),
+		AppSecret:       os.Getenv(envAppSecret),
+		Stream:          os.Getenv(envStream),
+		RedirectSubject: os.Getenv(envRedirectSubject),
+		RequestSubject:  os.Getenv(envRequestSubject),
+		StatConsumer:    os.Getenv(envStatConsumer),
+		LogConsumer:     os.Getenv(envLogConsumer),
+	}
+}
+
 // resolveEnvWithTimeout is resolveEnv bounded by its own context, kept out
 // of TestMain itself: `defer cancel()` beside an os.Exit on the error path
 // never runs (gocritic's exitAfterDefer), so the context this needs lives
@@ -187,7 +277,10 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 	bucket := getenv(envBucket, d.Bucket)
 
 	var names fixture.Names
-	if verificationHookMode() {
+	switch {
+	case namesFromEnvMode():
+		names = namesFromEnv(namespace, appRelease, bucket)
+	case verificationHookMode():
 		names = fixture.Names{
 			Options: fixture.Options{
 				Namespace:  namespace,
@@ -195,7 +288,7 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 				Bucket:     bucket,
 			},
 		}
-	} else {
+	default:
 		var err error
 		names, err = fixture.Resolve(fixture.Options{
 			Namespace:  namespace,

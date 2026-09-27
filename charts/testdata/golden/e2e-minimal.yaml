@@ -1,0 +1,142 @@
+---
+# Source: url-shortener-e2e/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-e2e-e2e
+  labels:
+    app.kubernetes.io/name: url-shortener-e2e
+    app.kubernetes.io/instance: example-e2e
+    app.kubernetes.io/managed-by: Helm
+
+---
+# Source: url-shortener-e2e/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: example-e2e-e2e
+  labels:
+    app.kubernetes.io/name: url-shortener-e2e
+    app.kubernetes.io/instance: example-e2e
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Source: url-shortener-e2e/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: example-e2e-e2e
+  labels:
+    app.kubernetes.io/name: url-shortener-e2e
+    app.kubernetes.io/instance: example-e2e
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: example-e2e-e2e
+subjects:
+  - kind: ServiceAccount
+    name: example-e2e-e2e
+    namespace: default
+
+---
+# Source: url-shortener-e2e/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example-e2e-0-0-0
+  labels:
+    app.kubernetes.io/name: url-shortener-e2e
+    app.kubernetes.io/instance: example-e2e
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: e2e
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener-e2e
+        app.kubernetes.io/instance: example-e2e
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: e2e
+    spec:
+      restartPolicy: Never
+      serviceAccountName: example-e2e-e2e
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: e2e
+          image: ghcr.io/truvity/policy/url-shortener/e2e@sha256:1111111111111111111111111111111111111111111111111111111111111111
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-test.v"
+          env:
+            # The one variable that turns the suite on at all — see
+            # e2e/suite/env_test.go's envNamespace doc comment.
+            - name: E2E_NAMESPACE
+              value: "default"
+            - name: E2E_APP_RELEASE
+              value: "example"
+            # Set, and EMPTY: the suite's own kubecontextFromEnv treats a
+            # present-but-empty value as "no --context at all", which is
+            # what a Job running in the cluster it tests needs — kubectl
+            # and the harness then fall back to this Pod's own
+            # ServiceAccount rather than a kubeconfig context that does
+            # not exist here. It is also what makes (*Cluster).ServiceURL
+            # dial every Service's ClusterIP directly instead of opening a
+            # port-forward — see templates/rbac.yaml's own comment on why
+            # this Role grants no `pods/portforward`.
+            - name: E2E_KCTX
+              value: ""
+            - name: E2E_NAMES_FROM_ENV
+              value: "1"
+            - name: E2E_DATABASE
+              value: "url_shortener"
+            - name: E2E_DATABASE_HOST
+              value: "example-pg-rw"
+            - name: E2E_OWNER_ROLE
+              value: "url_shortener_owner"
+            - name: E2E_APP_ROLE
+              value: "url_shortener_app"
+            - name: E2E_APP_SECRET
+              value: "example-pg-runtime"
+            # The runtime role's password ITSELF — resolved by the kubelet
+            # at admission, never read back by this Pod's own
+            # ServiceAccount token, which is why templates/rbac.yaml grants
+            # this account nothing on Secrets at all.
+            - name: E2E_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: example-pg-runtime
+                  key: password
+            - name: E2E_STREAM
+              value: "shortener-example-events"
+            - name: E2E_REDIRECT_SUBJECT
+              value: "shortener-example.redirect"
+            - name: E2E_REQUEST_SUBJECT
+              value: "shortener-example.log"
+            - name: E2E_STAT_CONSUMER
+              value: "shortener-example-stat"
+            - name: E2E_LOG_CONSUMER
+              value: "shortener-example-log"
+            - name: E2E_BUCKET
+              value: "url-shortener-archive"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
