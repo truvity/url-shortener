@@ -32,6 +32,11 @@ images:
     repository: url-shortener/e2e
     tag: "1.2.3"
     digest: ""
+  prober:
+    registry: registry.example.test
+    repository: url-shortener/prober
+    tag: "4.5.6"
+    digest: ""
 pullPolicy: Always
 job:
   ttlSecondsAfterFinished: 900
@@ -47,3 +52,27 @@ podSecurity:
   runAsUser: 1000
   runAsGroup: 1000
   fsGroup: 1000
+prober:
+  enabled: true
+  interval: 5s
+  keyPrefix: "synthetic-"
+  pullPolicy: Always
+  resources:
+    requests: { cpu: 20m, memory: 48Mi }
+    limits: { cpu: 40m, memory: 96Mi }
+  log:
+    level: debug
+  drain:
+    seconds: 3
+  podSecurity:
+    runAsUser: 2000
+    runAsGroup: 2000
+    fsGroup: 2000
+otel:
+  endpoint: https://otel.example.test
+  protocol: grpc
+  tracesSampler: always_on
+  sampleRatio: "1"
+  resourceAttributes:
+    cluster: test-cluster
+    environment: test

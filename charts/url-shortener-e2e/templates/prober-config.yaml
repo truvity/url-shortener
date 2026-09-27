@@ -1,0 +1,39 @@
+{{/*
+The prober's own configuration file, on the same terms as
+charts/url-shortener/templates/config.yaml: exactly the file the binary
+validates against its own schema at start-up
+(examples/url-shortener/schemas/prober.json) — see chart_test.go's
+TestWhatTheE2EChartRendersIsWhatTheProberBinaryAccepts.
+
+A separate template from templates/prober.yaml so that file's own
+`checksum/config` annotation can name THIS one — a template that hashed
+its own rendered output while computing it would recurse forever.
+*/}}
+{{- if .Values.prober.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "url-shortener-e2e.proberName" . }}
+  labels:
+    {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prober
+data:
+  prober.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.prober.log.level | default "info" | quote }}
+    drain:
+      seconds: {{ .Values.prober.drain.seconds | default 5 }}
+    interval: {{ .Values.prober.interval | quote }}
+    keyPrefix: {{ .Values.prober.keyPrefix | quote }}
+    # This chart has no copy of the release named by .Values.appRelease to
+    # render, so these are a FORMULA over it — {appRelease}-urls and
+    # {appRelease}-redirect, port 8080 — the exact Service names and port
+    # charts/url-shortener/templates/{urls,redirect}.yaml render, never
+    # guessed twice.
+    urls:
+      address: http://{{ .Values.appRelease }}-urls:8080
+    redirect:
+      address: http://{{ .Values.appRelease }}-redirect:8080
+{{- end }}

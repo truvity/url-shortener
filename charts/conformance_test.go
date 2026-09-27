@@ -118,7 +118,15 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the infrastructure chart does not render: %v\n%s", err, infra)
 	}
-	e2e, err := renderE2E(t, e2eDefaults()...)
+	// The prober enabled too, not only the Job: it is the other workload
+	// this chart can render, and the ONLY Deployment it carries at all —
+	// TestTheE2EJobCarriesTheInstanceLabel already covers the Job on its
+	// own, but nothing else exercises the prober's Deployment through this
+	// check unless it is turned on here.
+	e2e, err := renderE2E(t, e2eDefaults(
+		"--set", "prober.enabled=true",
+		"--set", "images.prober.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+	)...)
 	if err != nil {
 		t.Fatalf("the e2e chart does not render: %v\n%s", err, e2e)
 	}

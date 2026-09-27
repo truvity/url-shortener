@@ -1,0 +1,77 @@
+{{/*
+Always-on synthetic traffic (docs/guides/testing.md): a Deployment of ONE
+replica running examples/url-shortener/e2e/cmd/prober against the release
+named by .Values.appRelease — the SAME two Services the e2e Job's own
+suite calls (charts/url-shortener/templates/{urls,redirect}.yaml). See
+templates/prober-config.yaml for the file this Deployment mounts and how
+it addresses them.
+
+A Deployment, not a Job or a hook: this workload is meant to keep running
+for the life of the release, which is the opposite of what either of those
+is for. Off by default (.Values.prober.enabled) — see values.yaml's own
+comment on why.
+*/}}
+{{- if .Values.prober.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener-e2e.proberName" . }}
+  labels:
+    {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prober
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener-e2e
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: prober
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener-e2e.labels" . | nindent 8 }}
+        app.kubernetes.io/component: prober
+      annotations:
+        # Restart on a configuration change — the same rule
+        # charts/url-shortener/templates/redirect.yaml states in full: without
+        # this, a `helm upgrade` that only edits the ConfigMap changes
+        # nothing, because the running pod keeps the file it started with.
+        checksum/config: {{ include (print $.Template.BasePath "/prober-config.yaml") . | sha256sum }}
+    spec:
+      # No Kubernetes API access at all: this workload only ever speaks
+      # HTTP to two Services, on the same terms as
+      # examples/url-shortener/e2e/suite's own client calls — unlike the
+      # e2e Job beside it (templates/rbac.yaml), there is nothing here for
+      # a ServiceAccount token to be for.
+      automountServiceAccountToken: false
+      {{- include "url-shortener-e2e.proberPodSecurity" . | nindent 6 }}
+      containers:
+        - name: prober
+          image: {{ include "url-shortener-e2e.proberImage" . }}
+          imagePullPolicy: {{ .Values.prober.pullPolicy | default "IfNotPresent" }}
+          args: ["-config", "/etc/url-shortener/prober.yaml"]
+          env:
+            {{- include "url-shortener-e2e.telemetryEnv" . | nindent 12 }}
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            # Nothing but the process — a liveness probe that checked a
+            # journey's success would restart a healthy process the moment
+            # its TARGET went down, which is the one time this workload is
+            # doing its job.
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+          resources: {{- toYaml .Values.prober.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener-e2e.proberName" . }}
+{{- end }}

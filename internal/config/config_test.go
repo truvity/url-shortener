@@ -25,6 +25,7 @@ func TestEveryConfigurationTypeMatchesItsSchema(t *testing.T) {
 		"migrate":  {config.Migrate{}, "migrate.json"},
 		"redirect": {config.Redirect{}, "redirect.json"},
 		"urls":     {config.Urls{}, "urls.json"},
+		"prober":   {config.Prober{}, "prober.json"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			conformance.TypeMatchesSchema(t, tc.value, config.Read(tc.schema))
@@ -70,6 +71,19 @@ func TestTheExampleConfigurationsLoad(t *testing.T) {
 		}
 		if cfg.Database.URL == "" {
 			t.Error("the database URL did not decode")
+		}
+	})
+
+	t.Run("prober", func(t *testing.T) {
+		cfg, err := config.LoadProber("testdata/prober.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Interval == "" {
+			t.Error("interval did not decode")
+		}
+		if cfg.Urls.Address == "" || cfg.Redirect.Address == "" {
+			t.Error("urls.address or redirect.address did not decode")
 		}
 	})
 }

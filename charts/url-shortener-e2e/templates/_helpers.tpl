@@ -88,3 +88,89 @@ securityContext:
   runAsGroup: {{ .Values.podSecurity.runAsGroup }}
   fsGroup: {{ .Values.podSecurity.fsGroup }}
 {{- end -}}
+
+{{/*
+The prober's own name, and its security context — read from
+.Values.prober.podSecurity rather than .Values.podSecurity above, because
+the prober is a SEPARATE workload from the Job the rest of this file is
+about, with its own settings rather than a share of the Job's.
+*/}}
+{{- define "url-shortener-e2e.proberName" -}}
+{{- printf "%s-prober" (include "url-shortener-e2e.name" .) -}}
+{{- end -}}
+
+{{- define "url-shortener-e2e.proberPodSecurity" -}}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: {{ .Values.prober.podSecurity.runAsUser }}
+  runAsGroup: {{ .Values.prober.podSecurity.runAsGroup }}
+  fsGroup: {{ .Values.prober.podSecurity.fsGroup }}
+{{- end -}}
+
+{{/*
+The prober image reference — the same shape (and the same fallback order)
+as "url-shortener-e2e.image" above, for the SECOND image this chart
+carries. Read only when .Values.prober.enabled is true (templates/
+prober.yaml), so a chart installed with the prober left off never has to
+name a digest for an image it never runs.
+*/}}
+{{- define "url-shortener-e2e.proberImage" -}}
+{{- $i := .Values.images.prober -}}
+{{- $ref := printf "%s/%s" $i.registry $i.repository -}}
+{{- if $i.digest -}}
+{{ $ref }}@{{ $i.digest }}
+{{- else if $i.tag -}}
+{{ $ref }}:{{ $i.tag }}
+{{- else if .Chart.AppVersion -}}
+{{ $ref }}:{{ .Chart.AppVersion }}
+{{- else -}}
+{{ fail "no image for prober: set images.prober.digest, images.prober.tag, or publish this chart with an appVersion" }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Telemetry for the prober, as OpenTelemetry's own environment variables —
+the SAME rule charts/url-shortener's own "url-shortener.telemetryEnv"
+states in full (decision 0006): no endpoint means the exporters are
+"none", set here rather than decided by the binary, so nothing in this
+chart carries an enable flag.
+
+Only the prober reads this. The e2e Job is a one-shot test run that
+reports its result as a Job condition and its own log, not a workload a
+bake window watches over time, so it carries none of this.
+*/}}
+{{- define "url-shortener-e2e.telemetryEnv" -}}
+{{- $otel := .Values.otel | default dict -}}
+- name: OTEL_SERVICE_NAME
+  value: {{ include "url-shortener-e2e.proberName" . | quote }}
+{{- if $otel.endpoint }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ $otel.endpoint | quote }}
+- name: OTEL_EXPORTER_OTLP_PROTOCOL
+  value: {{ $otel.protocol | default "http/protobuf" | quote }}
+- name: OTEL_TRACES_EXPORTER
+  value: "otlp"
+- name: OTEL_METRICS_EXPORTER
+  value: "otlp"
+{{- /* Logs stay on stdout — see the app chart's identical comment. */}}
+- name: OTEL_LOGS_EXPORTER
+  value: "none"
+- name: OTEL_TRACES_SAMPLER
+  value: {{ $otel.tracesSampler | default "parentbased_traceidratio" | quote }}
+- name: OTEL_TRACES_SAMPLER_ARG
+  value: {{ $otel.sampleRatio | default "0.1" | quote }}
+{{- with $otel.resourceAttributes }}
+{{- $attrs := . }}
+- name: OTEL_RESOURCE_ATTRIBUTES
+  value: {{ range $i, $k := (keys $attrs | sortAlpha) }}{{ if $i }},{{ end }}{{ $k }}={{ get $attrs $k }}{{ end }}
+{{- end }}
+{{- else }}
+{{- /* No endpoint: export nothing, rather than to localhost. */}}
+- name: OTEL_TRACES_EXPORTER
+  value: "none"
+- name: OTEL_METRICS_EXPORTER
+  value: "none"
+- name: OTEL_LOGS_EXPORTER
+  value: "none"
+{{- end }}
+{{- end -}}

@@ -110,6 +110,10 @@ traces:
 # digest.
 images:
   e2e: {registry: ghcr.io, repository: truvity/policy/url-shortener/e2e, tag: "", digest: ""}
+  # Read only when prober.enabled is true (templates/prober.yaml) — a chart
+  # installed with the prober left off need not carry a digest for an image
+  # it never runs.
+  prober: {registry: ghcr.io, repository: truvity/policy/url-shortener/prober, tag: "", digest: ""}
 
 pullPolicy: IfNotPresent
 
@@ -143,3 +147,63 @@ podSecurity:
   runAsUser: 65532
   runAsGroup: 65532
   fsGroup: 65532
+
+# Always-on synthetic traffic (docs/guides/testing.md): the SAME journeys
+# examples/url-shortener/e2e/suite proves once, walked in a loop against
+# THIS release's own `urls` and `redirect` Services, so a bake window (a
+# Kargo gate, or a person watching a rollout) has signal to read even when
+# nothing real is happening yet.
+#
+# Off by default and a Deployment of its own, not the e2e Job above: it is
+# a SEPARATE workload making a SEPARATE claim — the Job proves a release IS
+# healthy, once, and exits; this proves a release STAYS healthy, for as
+# long as it keeps running — and a chart installable by someone with no
+# bake window to feed it must not run one uninvited.
+#
+# The probes listener has no value of its own here: it is ":7070", the
+# fixed convention every workload in this pair of charts answers on
+# (service.md §3) — see templates/prober.yaml.
+prober:
+  enabled: false
+
+  # How often one full pass (create, resolve, watch the counter move)
+  # repeats, as a Go duration.
+  interval: 10s
+
+  # Marks every long URL and key this prober invents, the same role
+  # examples/url-shortener/e2e/suite's own testDataPrefix plays for the
+  # suite: a person reading the urls table or the archive bucket by hand
+  # can tell synthetic traffic from a real caller's at a glance.
+  keyPrefix: "probe-"
+
+  pullPolicy: IfNotPresent
+
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+
+  log:
+    level: info
+
+  # How long the loop is given to finish its current pass after SIGTERM —
+  # service.md §5. There is little to drain: one pass is at most a few HTTP
+  # calls, so the default is small.
+  drain:
+    seconds: 5
+
+  podSecurity:
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+
+# Telemetry for the prober, on exactly the same terms as
+# charts/url-shortener/values.yaml's own `otel` block — see that chart's
+# `_helpers.tpl`'s "url-shortener.telemetryEnv" for the whole rule (decision
+# 0006). Nothing else in this chart is instrumented: the e2e Job is a
+# one-shot test run that reports its result as a Job condition and a log,
+# not a workload a bake window watches over time.
+otel:
+  endpoint: ""
+  protocol: http/protobuf
+  tracesSampler: parentbased_traceidratio
+  sampleRatio: "0.1"
+  resourceAttributes: {}

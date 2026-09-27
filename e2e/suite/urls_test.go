@@ -5,9 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
-
-	v1 "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1"
+	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
 )
 
 // TestUrlsCreateGeneratesAKey proves what hack/smoke.sh never asked: that a
@@ -17,20 +15,19 @@ func TestUrlsCreateGeneratesAKey(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	client := urlsClient(ctx, t)
 	longURL := testLongURL(t)
 
-	resp, err := client.Create(ctx, connect.NewRequest(&v1.CreateRequest{LongUrl: longURL}))
+	url, err := journey.CreateURL(ctx, urlsClient(ctx, t), longURL)
 	if err != nil {
 		t.Fatalf("%s", errString(componentURLs, "create with no key", err))
 	}
 
-	key := resp.Msg.GetUrl().GetKey()
+	key := url.GetKey()
 	if len(key) != 8 {
 		t.Fatalf("a generated key was %q (%d characters), wanted exactly 8", key, len(key))
 	}
-	if resp.Msg.GetUrl().GetLongUrl() != longURL {
-		t.Fatalf("Create echoed long_url %q, wanted %q", resp.Msg.GetUrl().GetLongUrl(), longURL)
+	if url.GetLongUrl() != longURL {
+		t.Fatalf("Create echoed long_url %q, wanted %q", url.GetLongUrl(), longURL)
 	}
 }
 
@@ -45,18 +42,18 @@ func TestUrlsCreateIsIdempotentOnTheSameURL(t *testing.T) {
 	client := urlsClient(ctx, t)
 	longURL := testLongURL(t)
 
-	first, err := client.Create(ctx, connect.NewRequest(&v1.CreateRequest{LongUrl: longURL}))
+	first, err := journey.CreateURL(ctx, client, longURL)
 	if err != nil {
 		t.Fatalf("%s", errString(componentURLs, "create (first)", err))
 	}
 
-	second, err := client.Create(ctx, connect.NewRequest(&v1.CreateRequest{LongUrl: longURL}))
+	second, err := journey.CreateURL(ctx, client, longURL)
 	if err != nil {
 		t.Fatalf("%s", errString(componentURLs, "create (second, same URL)", err))
 	}
 
-	if first.Msg.GetUrl().GetKey() != second.Msg.GetUrl().GetKey() {
+	if first.GetKey() != second.GetKey() {
 		t.Fatalf("shortening the same URL twice returned %q then %q, wanted the same key both times",
-			first.Msg.GetUrl().GetKey(), second.Msg.GetUrl().GetKey())
+			first.GetKey(), second.GetKey())
 	}
 }

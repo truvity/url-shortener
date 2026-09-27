@@ -6,9 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
-
-	v1 "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1"
+	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
 )
 
 // TestRedirectAnswers302 proves the redirect service answers with the long
@@ -20,11 +18,11 @@ func TestRedirectAnswers302(t *testing.T) {
 	defer cancel()
 
 	longURL := testLongURL(t)
-	created, err := urlsClient(ctx, t).Create(ctx, connect.NewRequest(&v1.CreateRequest{LongUrl: longURL}))
+	created, err := journey.CreateURL(ctx, urlsClient(ctx, t), longURL)
 	if err != nil {
 		t.Fatalf("%s", errString(componentURLs, "create the URL under test", err))
 	}
-	key := created.Msg.GetUrl().GetKey()
+	key := created.GetKey()
 
 	location := followRedirect(ctx, t, key)
 	if location != longURL {
@@ -42,25 +40,21 @@ var noRedirectClient = &http.Client{
 }
 
 // followRedirect asks the redirect Service for key and returns the
-// Location header of the 302 it must answer with.
+// Location header of the 302 it must answer with — the "redirect" journey,
+// shared with examples/url-shortener/e2e/cmd/prober via
+// examples/url-shortener/e2e/journey.
 func followRedirect(ctx context.Context, t *testing.T, key string) string {
 	t.Helper()
 
 	base := serviceURL(ctx, t, componentRedirect, httpPort)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/r/"+key, http.NoBody)
-	if err != nil {
-		t.Fatalf("build the redirect request: %v", err)
-	}
-
-	resp, err := noRedirectClient.Do(req)
+	location, status, err := journey.Resolve(ctx, noRedirectClient, base, key)
 	if err != nil {
 		t.Fatalf("%s", errString(componentRedirect, "GET /r/"+key, err))
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("the redirect answered %d, wanted %d", resp.StatusCode, http.StatusFound)
+	if status != http.StatusFound {
+		t.Fatalf("the redirect answered %d, wanted %d", status, http.StatusFound)
 	}
 
-	return resp.Header.Get("Location")
+	return location
 }

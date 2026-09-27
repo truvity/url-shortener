@@ -142,6 +142,29 @@ type (
 			RequestSubject  string `json:"requestSubject"`
 		} `json:"events"`
 	}
+
+	// Prober is the always-on synthetic-traffic loop: no listener of its
+	// own, no database, no broker — it walks the same journeys a caller
+	// does, over the same two Services `urls` and `redirect` already
+	// serve, so a bake window has signal to read even when nothing real is
+	// happening. See examples/url-shortener/e2e/journey and
+	// examples/url-shortener/e2e/cmd/prober.
+	//
+	// It carries no `tls` block, on the same terms as Migrate and the
+	// counter's own schema (stat.json): the peers it calls are the
+	// application's own release, reached in cleartext until a platform
+	// turns transport identity on for the whole release — a second copy
+	// of that decision here would be a field a deployment sets and this
+	// component ignores.
+	Prober struct {
+		Probes    Listen `json:"probes"`
+		Log       Log    `json:"log"`
+		Drain     Drain  `json:"drain"`
+		Interval  string `json:"interval"`
+		KeyPrefix string `json:"keyPrefix"`
+		Urls      Client `json:"urls"`
+		Redirect  Client `json:"redirect"`
+	}
 )
 
 // LoadMigrate reads the migration job's configuration file, validates it
@@ -163,4 +186,11 @@ func LoadRedirect(path string) (Redirect, error) {
 func LoadUrls(path string) (Urls, error) {
 	var c Urls
 	return c, config.Load(path, Read("urls.json"), &c)
+}
+
+// LoadProber reads the prober's configuration file and validates it against
+// its own schema.
+func LoadProber(path string) (Prober, error) {
+	var c Prober
+	return c, config.Load(path, Read("prober.json"), &c)
 }

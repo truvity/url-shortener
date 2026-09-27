@@ -1,0 +1,10 @@
+probes:
+  address: ":7070"
+log:
+  level: info
+interval: 10s
+keyPrefix: "probe-"
+urls:
+  address: http://url-shortener-urls:8080
+redirect:
+  address: http://url-shortener-redirect:8080

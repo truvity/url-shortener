@@ -156,6 +156,27 @@
               "type": "string"
             }
           }
+        },
+        "prober": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["registry", "repository"],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -212,6 +233,94 @@
         "fsGroup": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "prober": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "interval", "keyPrefix"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keyPrefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullPolicy": {
+          "enum": ["Always", "IfNotPresent", "Never"]
+        },
+        "resources": {
+          "type": "object",
+          "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+        },
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "enum": ["debug", "info", "warn", "error"]
+            }
+          }
+        },
+        "drain": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "podSecurity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "runAsUser": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "runAsGroup": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fsGroup": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "otel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "protocol": {
+          "enum": ["http/protobuf", "grpc"]
+        },
+        "tracesSampler": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampleRatio": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceAttributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

@@ -6,6 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/truvity/policy/conformance"
+
+	"github.com/truvity/policy/examples/url-shortener/internal/config"
 )
 
 // e2eDefaults supplies the values the url-shortener-e2e chart refuses to
@@ -250,5 +254,63 @@ func TestTheE2EJobCarriesTheInstanceLabel(t *testing.T) {
 	labels, _ := meta["labels"].(map[string]any)
 	if got, _ := labels["app.kubernetes.io/instance"].(string); got != "example-e2e" {
 		t.Errorf("the Job carries no app.kubernetes.io/instance label (got %q)", got)
+	}
+}
+
+// The prober is off by default: a chart installable by someone with no bake
+// window to feed it must not run one uninvited (values.yaml's own comment
+// on `prober.enabled`).
+func TestTheProberIsOffByDefault(t *testing.T) {
+	out, err := renderE2E(t, e2eDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "component: prober") {
+		t.Error("the prober rendered although prober.enabled was left at its default")
+	}
+}
+
+func proberDefaults(extra ...string) []string {
+	return e2eDefaults(append([]string{
+		"--set", "prober.enabled=true",
+		"--set", "images.prober.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+	}, extra...)...)
+}
+
+// TestWhatTheE2EChartRendersIsWhatTheProberBinaryAccepts is
+// TestWhatTheChartRendersIsWhatTheBinariesAccept's own claim
+// (chart_test.go), proved here for the prober's own configuration file:
+// what this chart renders is validated with the SAME schema
+// examples/url-shortener/e2e/cmd/prober validates against at start-up.
+// Without this, the chart could keep setting a key the binary stopped
+// reading and the prober would run on a default nobody chose, with no
+// signal but behaviour.
+func TestWhatTheE2EChartRendersIsWhatTheProberBinaryAccepts(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	doc := conformance.ConfigMapData(t, []byte(out), "prober.yaml")
+	conformance.ValidDocument(t, doc, config.Read("prober.json"))
+}
+
+// The prober's Deployment carries the instance label, on the same terms as
+// every other workload this pair of charts renders — the render-side half
+// of the render-and-apply rule (conformance_test.go's
+// TestEveryWorkloadAndServiceCarriesTheInstanceLabel proves it generically
+// across all three charts; this asserts it specifically for the prober so
+// a reader does not have to go looking for where that coverage comes from).
+func TestTheProberCarriesTheInstanceLabel(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	deploy := docOfKind(t, out, "Deployment")
+	meta, _ := deploy["metadata"].(map[string]any)
+	labels, _ := meta["labels"].(map[string]any)
+	if got, _ := labels["app.kubernetes.io/instance"].(string); got != "example-e2e" {
+		t.Errorf("the prober's Deployment carries no app.kubernetes.io/instance label (got %q)", got)
 	}
 }

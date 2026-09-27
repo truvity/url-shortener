@@ -6,9 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
-
-	v1 "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1"
+	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
 )
 
 // TestStatMovesTheCounter proves the part hack/smoke.sh existed to prove:
@@ -26,11 +24,11 @@ func TestStatMovesTheCounter(t *testing.T) {
 
 	client := urlsClient(ctx, t)
 	longURL := testLongURL(t)
-	created, err := client.Create(ctx, connect.NewRequest(&v1.CreateRequest{LongUrl: longURL}))
+	created, err := journey.CreateURL(ctx, client, longURL)
 	if err != nil {
 		t.Fatalf("%s", errString(componentURLs, "create the URL under test", err))
 	}
-	key := created.Msg.GetUrl().GetKey()
+	key := created.GetKey()
 
 	// Two redirects, not one: the assertion below is an exact count, which
 	// is the difference between "the counter counts" and "a row exists".
@@ -47,11 +45,11 @@ func TestStatMovesTheCounter(t *testing.T) {
 	// failing because 2 was not what it wanted.
 	want := int64(redirects)
 	eventually(t, 60*time.Second, func() error {
-		resp, err := client.Get(ctx, connect.NewRequest(&v1.GetRequest{Key: key}))
+		got, err := journey.ClickCount(ctx, client, key)
 		if err != nil {
 			return errString(componentURLs, "get the click count", err)
 		}
-		if got := resp.Msg.GetUrl().GetClickCount(); got != want {
+		if got != want {
 			return fmt.Errorf("click_count is %d, want exactly %d", got, want)
 		}
 		return nil
