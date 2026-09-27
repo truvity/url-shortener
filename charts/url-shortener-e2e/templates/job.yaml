@@ -26,7 +26,20 @@ metadata:
 spec:
   backoffLimit: {{ .Values.job.backoffLimit }}
   activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
-  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  {{- /*
+  UNSET unless a deployment opts in — see values.yaml's own comment on
+  `job.ttlSecondsAfterFinished` for why: a GitOps controller applying this
+  chart with self-heal on treats a Job that deleted itself as MISSING from
+  the live state and recreates it, running this whole suite (including its
+  DDL case) again on a loop, forever, at a fixed version. Leaving the key
+  out lets the Job simply persist until the next version's apply prunes it
+  (a new version renders a DIFFERENT name — see
+  "url-shortener-e2e.jobName" below) or somebody `helm uninstall`s the
+  release. See docs/guides/conformance.md.
+  */}}
+  {{- with .Values.job.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
   template:
     metadata:
       labels:

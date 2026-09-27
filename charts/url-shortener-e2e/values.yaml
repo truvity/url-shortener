@@ -118,10 +118,17 @@ images:
 pullPolicy: IfNotPresent
 
 job:
-  # Cleanup, once the Job finishes either way. At least 120s — long enough
-  # for somebody to read `kubectl logs` before the Job disappears — is
-  # required by the schema; 600 is the default.
-  ttlSecondsAfterFinished: 600
+  # UNSET by default, and left out here on purpose — see templates/job.yaml's
+  # own comment and docs/guides/conformance.md: a GitOps controller applying
+  # this chart with self-heal on sees a Job that deleted itself as MISSING
+  # from the live state and recreates it, running this whole suite (its DDL
+  # case included) again on a loop, forever, at a fixed version. Left unset,
+  # the Job simply persists until the next version's apply prunes it, or
+  # `helm uninstall`. Set this only where nothing applies this chart with
+  # self-heal on; the schema still floors it at 120s — long enough for
+  # somebody, or a monitoring read of the Job's status, to see it across at
+  # least two scrapes before it disappears.
+  # ttlSecondsAfterFinished: 600
   # Small: a suite that fails is a real failure to look at, not a fluke to
   # retry into passing.
   backoffLimit: 0

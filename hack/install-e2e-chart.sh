@@ -66,6 +66,20 @@ if kubectl get namespace object-store >/dev/null 2>&1; then
     LOCAL_STORE_ARGS="$LOCAL_STORE_ARGS --set archive.credentialsSecret=${APP}-archive"
 fi
 
+# This chart's Job is named for its OWN version (see
+# charts/url-shortener-e2e/templates/_helpers.tpl's
+# "url-shortener-e2e.jobName"), which on this box never moves off
+# Chart.yaml's 0.0.0 placeholder — so a second run of this script for the
+# SAME snapshot names the SAME immutable Job `helm upgrade --install`
+# cannot change in place. The chart no longer sets
+# ttlSecondsAfterFinished by default (charts/url-shortener-e2e/values.yaml
+# — a GitOps controller's self-heal would recreate a Job that deleted
+# itself), so nothing here can lean on a TTL to have cleared the previous
+# run's Job either. Delete it explicitly, before helm ever tries.
+kubectl -n "$NS" delete job \
+    -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=e2e" \
+    --ignore-not-found
+
 echo "==> the test chart ($CHART_TGZ), mode=$MODE"
 # shellcheck disable=SC2086 # LOCAL_STORE_ARGS is deliberately word-split —
 # see hack/install.sh's identical comment.

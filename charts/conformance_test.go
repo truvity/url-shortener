@@ -166,3 +166,62 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 		t.Fatal("no workload or Service kind was rendered, so the label was not checked")
 	}
 }
+
+// TestNoPlainJobSetsTTLSecondsAfterFinished is the render-side half of
+// docs/guides/conformance.md's row on Job cleanup: a Job with no
+// `helm.sh/hook` annotation is applied the same way by both install paths
+// — `helm upgrade --install` and a GitOps controller's `helm template` +
+// apply — and a controller running with self-heal on treats a Job that
+// deleted itself as MISSING from the live state and recreates it, which
+// `ttlSecondsAfterFinished` guarantees a plain Job eventually does. A HOOK
+// Job is exempt: Helm's own hook machinery is what deletes and recreates
+// it, never self-heal — see templates/migrate.yaml and
+// templates/verification.yaml's own `before-hook-creation` comments.
+func TestNoPlainJobSetsTTLSecondsAfterFinished(t *testing.T) {
+	app, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "verification.enabled=true")...)
+	if err != nil {
+		t.Fatalf("the application chart does not render: %v\n%s", err, app)
+	}
+	infra, err := renderInfra(t, infraDefaults()...)
+	if err != nil {
+		t.Fatalf("the infrastructure chart does not render: %v\n%s", err, infra)
+	}
+	// The prober enabled too, on the same terms as
+	// TestEveryWorkloadAndServiceCarriesTheInstanceLabel above: it renders
+	// no extra Job, but exercising it here keeps this chart's render
+	// covered by every default-values check the same way.
+	e2e, err := renderE2E(t, e2eDefaults(
+		"--set", "prober.enabled=true",
+		"--set", "images.prober.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
+	)...)
+	if err != nil {
+		t.Fatalf("the e2e chart does not render: %v\n%s", err, e2e)
+	}
+
+	var checked int
+	for _, out := range []string{app, infra, e2e} {
+		for _, doc := range documents(t, out) {
+			if kind, _ := doc["kind"].(string); kind != "Job" {
+				continue
+			}
+			checked++
+
+			meta, _ := doc["metadata"].(map[string]any)
+			name, _ := meta["name"].(string)
+			annotations, _ := meta["annotations"].(map[string]any)
+			if _, isHook := annotations["helm.sh/hook"]; isHook {
+				continue
+			}
+
+			spec, _ := doc["spec"].(map[string]any)
+			if _, set := spec["ttlSecondsAfterFinished"]; set {
+				t.Errorf("Job %q has no helm.sh/hook annotation but sets ttlSecondsAfterFinished: "+
+					"a GitOps controller with self-heal on recreates a Job that deleted itself — "+
+					"see docs/guides/conformance.md", name)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no Job was rendered, so the rule was not checked")
+	}
+}

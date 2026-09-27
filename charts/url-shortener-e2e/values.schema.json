@@ -186,10 +186,11 @@
     "job": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ttlSecondsAfterFinished", "backoffLimit", "activeDeadlineSeconds"],
+      "required": ["backoffLimit", "activeDeadlineSeconds"],
       "properties": {
         "ttlSecondsAfterFinished": {
-          "type": "integer",
+          "description": "OPTIONAL, and UNSET by default: a GitOps controller with self-heal on recreates a Job that deleted itself, so templates/job.yaml renders this key only when it is set. Absent or null skip it; a value must still clear the floor below.",
+          "type": ["integer", "null"],
           "minimum": 120
         },
         "backoffLimit": {

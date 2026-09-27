@@ -146,6 +146,42 @@ func TestTheE2EChartRendersNoHook(t *testing.T) {
 	}
 }
 
+// job.ttlSecondsAfterFinished is OPTIONAL and UNSET by default — see
+// values.yaml's own comment on why: a GitOps controller with self-heal on
+// would otherwise recreate the Job the moment it deletes itself. Set, it
+// still has to clear the schema's own 120s floor.
+func TestTheE2EJobTTLIsUnsetByDefault(t *testing.T) {
+	t.Run("unset by default", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults()...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		if strings.Contains(out, "ttlSecondsAfterFinished") {
+			t.Error("ttlSecondsAfterFinished was rendered with nothing set — it must be left out by default")
+		}
+	})
+
+	t.Run("rendered when set", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults("--set", "job.ttlSecondsAfterFinished=900")...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		if !strings.Contains(out, "ttlSecondsAfterFinished: 900") {
+			t.Error("job.ttlSecondsAfterFinished=900 was set but not rendered")
+		}
+	})
+
+	t.Run("below the schema's floor is refused", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults("--set", "job.ttlSecondsAfterFinished=10")...)
+		if err == nil {
+			t.Fatalf("rendered with job.ttlSecondsAfterFinished below 120, and should not have:\n%s", out)
+		}
+		if !strings.Contains(out, "ttlSecondsAfterFinished") {
+			t.Errorf("the refusal does not mention ttlSecondsAfterFinished: %s", out)
+		}
+	})
+}
+
 // mode: full runs every case; mode: tenant skips exactly the one DDL-issuing
 // case — see values.yaml's own comment on `mode` for why.
 func TestTheE2EModeControlsWhichCasesRun(t *testing.T) {
