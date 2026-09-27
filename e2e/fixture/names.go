@@ -136,6 +136,14 @@ func Resolve(o Options) (Names, error) {
 
 	infra, err := helmTemplate(o.AppRelease, filepath.Join(root, "url-shortener-infra"), o.Namespace,
 		"--set", "postgres.runtimePasswordSecret="+appSecret,
+		// The local cluster's one Postgres server is shared by every install
+		// the same way its NATS broker already is — this chart's own
+		// database and role names default to fixed strings for every OTHER
+		// consumer, so this fixture is the one caller that has to turn on
+		// tenant scoping explicitly. See
+		// charts/url-shortener-infra/values.yaml's own comment on
+		// `postgres.tenantScopedNames`.
+		"--set", "postgres.tenantScopedNames=true",
 	)
 	if err != nil {
 		return Names{}, fmt.Errorf("rendering url-shortener-infra: %w", err)

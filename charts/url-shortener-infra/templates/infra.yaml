@@ -33,8 +33,8 @@ spec:
     size: {{ .Values.postgres.storage }}
   bootstrap:
     initdb:
-      database: {{ .Values.postgres.database }}
-      owner: {{ .Values.postgres.ownerRole }}
+      database: {{ include "url-shortener-infra.resolvedDatabase" . }}
+      owner: {{ include "url-shortener-infra.resolvedOwnerRole" . }}
   {{- $sched := .Values.postgres.scheduling | default dict }}
   {{- if or $sched.nodeSelector $sched.tolerations }}
   affinity:
@@ -94,7 +94,7 @@ spec:
       That is the split the application chart's two credentials describe,
       made real on the database's side.
       */}}
-      - name: {{ .Values.postgres.runtimeRole }}
+      - name: {{ include "url-shortener-infra.resolvedAppRole" . }}
         ensure: present
         login: true
         {{- /*

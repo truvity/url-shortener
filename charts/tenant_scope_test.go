@@ -36,9 +36,9 @@ func renderNamed(t *testing.T, chart, release, namespace string, args ...string)
 }
 
 // tenantNames is what one tenant's pair of releases produces: the
-// infrastructure chart's stream and two subjects, and the application
-// chart's own idea of its stream, its two subjects, and its two durable
-// consumer names.
+// infrastructure chart's stream and two subjects, its database and two
+// role names, and the application chart's own idea of its stream, its two
+// subjects, and its two durable consumer names.
 //
 // Both charts are rendered as the SAME release name in the same namespace,
 // which is the pairing platform.md rule 11 describes as the common case
@@ -47,12 +47,21 @@ type tenantNames struct {
 	stream    string
 	subjects  []string // redirect, request
 	consumers []string // stat, log
+	database  string
+	ownerRole string
+	appRole   string
 }
 
 func namesFor(t *testing.T, namespace, install string) tenantNames {
 	t.Helper()
 
-	infra, err := renderNamed(t, "url-shortener-infra", install, namespace, infraDefaults()...)
+	// tenantScopedNames=true: the database and role names are OFF by
+	// default (values.yaml), for every consumer that only ever relied on
+	// this chart's fixed names — this helper is specifically about the
+	// tenant-scoping rule, so it turns the flag on rather than asserting
+	// against the fixed names every other tenant would also get.
+	infra, err := renderNamed(t, "url-shortener-infra", install, namespace,
+		append(infraDefaults(), "--set", "postgres.tenantScopedNames=true")...)
 	if err != nil {
 		t.Fatalf("infra chart does not render for %s/%s: %v\n%s", namespace, install, err, infra)
 	}
@@ -63,6 +72,16 @@ func namesFor(t *testing.T, namespace, install string) tenantNames {
 	for _, s := range spec["subjects"].([]any) {
 		infraSubjects = append(infraSubjects, s.(string))
 	}
+
+	cluster := docOfKind(t, infra, "Cluster")
+	clusterSpec, _ := cluster["spec"].(map[string]any)
+	initdb, _ := clusterSpec["bootstrap"].(map[string]any)["initdb"].(map[string]any)
+	database, _ := initdb["database"].(string)
+	ownerRole, _ := initdb["owner"].(string)
+	managed, _ := clusterSpec["managed"].(map[string]any)
+	roles, _ := managed["roles"].([]any)
+	role, _ := roles[0].(map[string]any)
+	appRole, _ := role["name"].(string)
 
 	app, err := renderNamed(t, "url-shortener", install, namespace, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
@@ -108,6 +127,9 @@ func namesFor(t *testing.T, namespace, install string) tenantNames {
 		stream:    infraStreamName,
 		subjects:  infraSubjects,
 		consumers: []string{stat.Events.Consumer.Durable, log.Events.Consumer.Durable},
+		database:  database,
+		ownerRole: ownerRole,
+		appRole:   appRole,
 	}
 }
 
@@ -128,9 +150,18 @@ func sameSet(a, b []string) bool {
 }
 
 // The rule under test: every cluster-global name — the stream, its
-// subjects, the durable consumer names — derives from namespace AND
-// install name together, so that a tenant sharing either alone with
-// another tenant still gets names of its own.
+// subjects, the durable consumer names, and (with `postgres.tenantScopedNames`
+// on) the database and its two role names — derives from namespace AND
+// install name together, so that a tenant sharing either alone with another
+// tenant still gets names of its own. The database and roles are
+// cluster-global on the SAME terms as the stream: the local box's one
+// Postgres server has never heard of a Kubernetes namespace either, and a
+// `test`-tier install standing in for a `primary` install's own dedicated
+// CNPG Cluster is the one place that matters — which is exactly why that
+// derivation is opt-in rather than the chart's default; see
+// templates/_helpers.tpl's "url-shortener-infra.postgresBase" and
+// TestPostgresNamesStayGlobalByDefault / TestExplicitPostgresNamesWinOverTenantScoping
+// below for the other two sides of that rule.
 //
 // Three tenants, covering both collision shapes that a single input
 // misses:
@@ -165,6 +196,9 @@ func TestClusterGlobalNamesAreTenantScoped(t *testing.T) {
 	}
 
 	assertDisjoint(t, "stream", map[string]string{"alpha": alpha.stream, "beta": beta.stream, "gamma": gamma.stream})
+	assertDisjoint(t, "database", map[string]string{"alpha": alpha.database, "beta": beta.database, "gamma": gamma.database})
+	assertDisjoint(t, "owner role", map[string]string{"alpha": alpha.ownerRole, "beta": beta.ownerRole, "gamma": gamma.ownerRole})
+	assertDisjoint(t, "app role", map[string]string{"alpha": alpha.appRole, "beta": beta.appRole, "gamma": gamma.appRole})
 
 	for _, pair := range [][2]string{{"alpha", "beta"}, {"alpha", "gamma"}, {"beta", "gamma"}} {
 		a, b := tenants[pair[0]], tenants[pair[1]]
@@ -283,4 +317,76 @@ func TestInstallNameIsRefusedWhenItIsNotASafeShape(t *testing.T) {
 
 func containsInstallName(s string) bool {
 	return strings.Contains(s, "installName")
+}
+
+// postgres.tenantScopedNames defaults to false (values.yaml), so a platform
+// that has never heard of it — every existing consumer today, which sets at
+// most `postgres.runtimePasswordSecret` — keeps the three fixed names this
+// chart has always rendered, whatever namespace or release it installs
+// under. A regression here is a silent rename on the next release: an
+// existing CNPG Cluster and the application already pointed at it would be
+// handed a database and owner that do not match what was actually
+// bootstrapped.
+func TestPostgresNamesStayGlobalByDefault(t *testing.T) {
+	one, err := renderNamed(t, "url-shortener-infra", "one", "ns-a", infraDefaults()...)
+	if err != nil {
+		t.Fatalf("infra chart does not render: %v\n%s", err, one)
+	}
+	two, err := renderNamed(t, "url-shortener-infra", "two", "ns-b", infraDefaults()...)
+	if err != nil {
+		t.Fatalf("infra chart does not render: %v\n%s", err, two)
+	}
+
+	for _, out := range []string{one, two} {
+		cluster := docOfKind(t, out, "Cluster")
+		spec, _ := cluster["spec"].(map[string]any)
+		initdb, _ := spec["bootstrap"].(map[string]any)["initdb"].(map[string]any)
+		if got := initdb["database"]; got != "url_shortener" {
+			t.Errorf("database = %v, want the fixed default url_shortener with tenantScopedNames left off", got)
+		}
+		if got := initdb["owner"]; got != "url_shortener_owner" {
+			t.Errorf("owner = %v, want the fixed default url_shortener_owner with tenantScopedNames left off", got)
+		}
+		managed, _ := spec["managed"].(map[string]any)
+		roles, _ := managed["roles"].([]any)
+		role, _ := roles[0].(map[string]any)
+		if got := role["name"]; got != "url_shortener_app" {
+			t.Errorf("runtime role = %v, want the fixed default url_shortener_app with tenantScopedNames left off", got)
+		}
+	}
+}
+
+// An explicit name wins over tenant-scoping unconditionally: a platform that
+// turns `tenantScopedNames` on — for the stream and subjects it wants
+// scoped — but still names its own database explicitly (a name a DBA
+// already chose, a migration path) must get exactly that name, not a
+// derived one. See templates/_helpers.tpl's "url-shortener-infra.resolvedDatabase"
+// and its siblings for how "explicit" is told apart from "left at the
+// chart's own default" once Helm has already merged the two.
+func TestExplicitPostgresNamesWinOverTenantScoping(t *testing.T) {
+	out, err := renderInfra(t, append(infraDefaults(),
+		"--set", "postgres.tenantScopedNames=true",
+		"--set", "postgres.database=chosen_db",
+		"--set", "postgres.ownerRole=chosen_owner",
+		"--set", "postgres.runtimeRole=chosen_app",
+	)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	cluster := docOfKind(t, out, "Cluster")
+	spec, _ := cluster["spec"].(map[string]any)
+	initdb, _ := spec["bootstrap"].(map[string]any)["initdb"].(map[string]any)
+	if got := initdb["database"]; got != "chosen_db" {
+		t.Errorf("database = %v, want the explicit chosen_db even with tenantScopedNames on", got)
+	}
+	if got := initdb["owner"]; got != "chosen_owner" {
+		t.Errorf("owner = %v, want the explicit chosen_owner even with tenantScopedNames on", got)
+	}
+	managed, _ := spec["managed"].(map[string]any)
+	roles, _ := managed["roles"].([]any)
+	role, _ := roles[0].(map[string]any)
+	if got := role["name"]; got != "chosen_app" {
+		t.Errorf("runtime role = %v, want the explicit chosen_app even with tenantScopedNames on", got)
+	}
 }

@@ -85,3 +85,124 @@ otherwise see them all at once.
 {{- define "url-shortener-infra.requestSubject" -}}
 {{- printf "%s.log" (include "url-shortener-infra.eventsScope" .) -}}
 {{- end -}}
+
+{{/*
+The tenant-scoped Postgres identifier the database name and both role names
+below build on.
+
+Postgres is the OTHER place this pair's tenant scope has to travel: the
+local cluster's single Postgres server is shared by every install the same
+way its broker is, so a database or role named the same by two tenants
+finds the other's, exactly like an unscoped stream would — see
+"url-shortener-infra.eventsScope" above and `docs/guides/testing.md`'s "The
+box installs no infra chart" for the collision this closes. A `primary`
+install's own CNPG Cluster is not shared with anything, so this costs it
+nothing; it is the `test` tier, standing in for that Cluster on a box with
+one Postgres for everyone, that needs it.
+
+The scope is folded into the shape Postgres accepts for an unquoted
+identifier: lower-cased (it already is, being built from a namespace and an
+installName Kubernetes and this chart already constrain to lowercase), `-`
+replaced by `_` since Postgres has no hyphen there, anything else stripped,
+and started with a letter if it is not already — Postgres refuses a bare
+digit at the front even though Kubernetes allows one to start a namespace.
+
+Sized to 57 bytes rather than Postgres' own 63, to leave room for the
+LONGER of the two role suffixes below (`_owner`, 6 bytes) — so the database
+name and both role names come from ONE shared base and none of them
+individually risks the limit the others already cleared.
+
+A scope that does not fit even at 57 bytes is TRUNCATED to 48 and given an
+8-hex-character suffix taken from its own SHA-256, rather than just a
+shorter prefix: two DIFFERENT tenants truncated to the same 48 characters
+must still not land on the same name, and the suffix has to come out the
+same on every run of THIS tenant's own install — a random one would orphan
+the role and the database an earlier run already created.
+*/}}
+{{- define "url-shortener-infra.postgresBase" -}}
+{{- $scope := include "url-shortener-infra.eventsScope" . -}}
+{{- $clean := regexReplaceAll "[^a-z0-9_]" (replace "-" "_" (lower $scope)) "" -}}
+{{- if not (regexMatch "^[a-z]" $clean) -}}
+{{- $clean = printf "t%s" $clean -}}
+{{- end -}}
+{{- $max := 57 -}}
+{{- if le (len $clean) $max -}}
+{{- $clean -}}
+{{- else -}}
+{{- printf "%s_%s" (trunc (sub $max 9 | int) $clean) (trunc 8 (sha256sum $scope)) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The database's own name, when a platform has not named its own — see
+"url-shortener-infra.postgresBase" for where it comes from.
+*/}}
+{{- define "url-shortener-infra.postgresDatabase" -}}
+{{- include "url-shortener-infra.postgresBase" . -}}
+{{- end -}}
+
+{{/*
+The owner role migrates as, when a platform has not named its own — see
+"url-shortener-infra.postgresBase".
+*/}}
+{{- define "url-shortener-infra.postgresOwnerRole" -}}
+{{- printf "%s_owner" (include "url-shortener-infra.postgresBase" .) -}}
+{{- end -}}
+
+{{/*
+The role every service connects as, when a platform has not named its own —
+see "url-shortener-infra.postgresBase".
+*/}}
+{{- define "url-shortener-infra.postgresAppRole" -}}
+{{- printf "%s_app" (include "url-shortener-infra.postgresBase" .) -}}
+{{- end -}}
+
+{{/*
+The database name and both role names ACTUALLY USED, once
+`postgres.tenantScopedNames` and whatever a caller set are both taken into
+account.
+
+`postgres.tenantScopedNames` is OFF BY DEFAULT (values.yaml), so every
+existing consumer of this chart — a platform that only ever set
+`postgres.runtimePasswordSecret` and relied on the three fixed defaults
+below — keeps getting them, byte for byte, on every future release. It
+exists for the one install that DOES need the tenant-scoped identifier
+above: the local cluster's `test` tier, where the shared Postgres server
+makes the fixed names collide between tenants exactly like an unscoped
+stream would (see "url-shortener-infra.postgresBase").
+
+"A caller did not set it" is not something a rendered template can ask
+Helm directly — by the time `.Values` reaches here, a value left alone and
+a value explicitly set back to the chart's own default already look
+identical. So each of the three below compares the resolved value against
+THIS CHART'S OWN literal default (values.yaml's `url_shortener` /
+`_owner` / `_app`) rather than against emptiness: still exactly that
+default, and scoping turned on, means "derive it"; anything else — set to
+something else, and every branch when this is off — is used exactly as
+given. That is also what makes an explicit name win over tenant-scoping
+unconditionally: setting `postgres.database` to anything but its own
+default opts that one field back out, whatever `tenantScopedNames` says.
+*/}}
+{{- define "url-shortener-infra.resolvedDatabase" -}}
+{{- if and .Values.postgres.tenantScopedNames (eq .Values.postgres.database "url_shortener") -}}
+{{- include "url-shortener-infra.postgresDatabase" . -}}
+{{- else -}}
+{{- .Values.postgres.database -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "url-shortener-infra.resolvedOwnerRole" -}}
+{{- if and .Values.postgres.tenantScopedNames (eq .Values.postgres.ownerRole "url_shortener_owner") -}}
+{{- include "url-shortener-infra.postgresOwnerRole" . -}}
+{{- else -}}
+{{- .Values.postgres.ownerRole -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "url-shortener-infra.resolvedAppRole" -}}
+{{- if and .Values.postgres.tenantScopedNames (eq .Values.postgres.runtimeRole "url_shortener_app") -}}
+{{- include "url-shortener-infra.postgresAppRole" . -}}
+{{- else -}}
+{{- .Values.postgres.runtimeRole -}}
+{{- end -}}
+{{- end -}}

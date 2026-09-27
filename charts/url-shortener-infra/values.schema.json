@@ -83,6 +83,10 @@
         "runtimePasswordSecret": {
           "type": "string"
         },
+        "tenantScopedNames": {
+          "type": "boolean",
+          "description": "Off by default, so every existing consumer keeps the fixed database and role names byte-for-byte. When true, `database`, `ownerRole` and `runtimeRole` are derived from this install's tenant scope instead, for whichever of the three a caller left at its own chart default; an explicit value always wins regardless of this flag."
+        },
         "runtimePassword": {
           "type": "object",
           "additionalProperties": false,

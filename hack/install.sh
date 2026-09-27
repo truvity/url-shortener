@@ -63,6 +63,15 @@ EXTRA=${EXTRA:-}
 # this script must agree on every one of them, and a shared resolver is
 # what makes agreeing not something either has to remember.
 #
+# DATABASE, OWNER_ROLE and APP_ROLE are passed explicitly below rather than
+# left to this chart's own defaults, which happen to spell the same fixed
+# names (`url_shortener`, `_owner`, `_app`) apply.sh's fixture used to
+# create unconditionally. Now that the fixture asks the infra chart for
+# TENANT-SCOPED names (`postgres.tenantScopedNames=true`, so that two
+# installs on this box's one shared Postgres do not find each other's
+# database), those two no longer agree by coincidence — this script has to
+# say so, the same way it already does for the two password secrets below.
+#
 # Notably absent below: the stream, its subjects and the two durable
 # consumer names. This chart computes all of them from its OWN release
 # name by default, and so does the fixture's template of the infra chart
@@ -102,7 +111,10 @@ echo "==> the application ($CHART_TGZ)"
 helm upgrade --install "$APP" "$CHART_TGZ" -n "$NS" \
     $LOCAL_STORE_ARGS $EXTRA \
     --set "database.host=${DATABASE_HOST}" \
+    --set "database.name=${DATABASE}" \
+    --set "database.owner.role=${OWNER_ROLE}" \
     --set "database.owner.passwordSecret=${OWNER_SECRET}" \
+    --set "database.app.role=${APP_ROLE}" \
     --set "database.app.passwordSecret=${APP_SECRET}" \
     --set events.url=nats://nats.nats.svc:4222 \
     --set "archive.bucket.name=$BUCKET" \

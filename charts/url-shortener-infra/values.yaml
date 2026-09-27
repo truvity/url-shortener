@@ -93,6 +93,26 @@ postgres:
   # the chart does not invent this either, only what goes inside it.
   runtimePasswordSecret: ""
 
+  # OFF BY DEFAULT, so every existing consumer of this chart keeps the three
+  # fixed names above byte-for-byte. Turning this on derives `database`,
+  # `ownerRole` and `runtimeRole` from this install's tenant scope instead —
+  # the same "<namespace>-<installName>" pair the stream is already scoped
+  # by, folded into a valid Postgres identifier (lower-cased, `-` to `_`,
+  # started with a letter, truncated with a hash suffix past 57 bytes) — but
+  # ONLY for whichever of the three a caller left at its own default above;
+  # any of them set to something else is used exactly as given, on either
+  # setting of this flag. See templates/_helpers.tpl's
+  # "url-shortener-infra.postgresBase" for the exact rule.
+  #
+  # A `primary` install's own CNPG Cluster is never shared with anything, so
+  # the fixed names are fine there and this stays off. It exists for the
+  # `test` tier: the local cluster's one Postgres server IS shared, the same
+  # way its NATS broker already is, and two `test`-tier installs on it — two
+  # engineers, or an engineer beside CI — collide on all three fixed names
+  # otherwise. `examples/url-shortener/e2e/fixture` turns this on for
+  # exactly that reason; nothing else needs to.
+  tenantScopedNames: false
+
   # WHO fills the name above. False (the default) means a platform
   # generates the password and hands over the name it used. True has the
   # chart mint one itself, from the ExternalSecrets Password generator,
