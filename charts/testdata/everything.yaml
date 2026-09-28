@@ -45,7 +45,6 @@ images:
   stat: {registry: example.io, repository: shortener/stat, tag: "9.9.9", digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"}
   log: {registry: example.io, repository: shortener/log, tag: "9.9.9", digest: "sha256:5555555555555555555555555555555555555555555555555555555555555555"}
   web: {registry: example.io, repository: shortener/web, tag: "9.9.9", digest: "sha256:6666666666666666666666666666666666666666666666666666666666666666"}
-  e2e: {registry: example.io, repository: shortener/e2e, tag: "9.9.9", digest: "sha256:7777777777777777777777777777777777777777777777777777777777777777"}
 pullPolicy: Always
 log:
   level: debug

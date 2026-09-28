@@ -467,8 +467,7 @@
         "urls",
         "stat",
         "log",
-        "web",
-        "e2e"
+        "web"
       ],
       "properties": {
         "migrate": {
@@ -592,30 +591,6 @@
           }
         },
         "web": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "registry",
-            "repository"
-          ],
-          "properties": {
-            "registry": {
-              "type": "string",
-              "minLength": 1
-            },
-            "repository": {
-              "type": "string",
-              "minLength": 1
-            },
-            "tag": {
-              "type": "string"
-            },
-            "digest": {
-              "type": "string"
-            }
-          }
-        },
-        "e2e": {
           "type": "object",
           "additionalProperties": false,
           "required": [

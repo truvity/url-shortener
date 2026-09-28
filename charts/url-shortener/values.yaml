@@ -132,14 +132,6 @@ images:
   stat: {registry: ghcr.io, repository: truvity/policy/url-shortener/stat, tag: "", digest: ""}
   log: {registry: ghcr.io, repository: truvity/policy/url-shortener/log, tag: "", digest: ""}
   web: {registry: ghcr.io, repository: truvity/policy/url-shortener/web, tag: "", digest: ""}
-  # The e2e suite's own image, released alongside every other component
-  # here — SAME version. This chart's own templates do not read it: the
-  # suite runs against a release either from outside (fixture.Resolve) or
-  # as the SEPARATE url-shortener-e2e chart's Job, which carries its own
-  # `images.e2e` entry — see docs/guides/testing.md. Required here anyway,
-  # so a release still stamps a digest for the image every install of this
-  # pair ships beside it.
-  e2e: {registry: ghcr.io, repository: truvity/policy/url-shortener/e2e, tag: "", digest: ""}
 
 pullPolicy: IfNotPresent
 
