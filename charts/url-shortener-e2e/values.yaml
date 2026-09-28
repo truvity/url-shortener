@@ -183,6 +183,20 @@ job:
   # run before Kubernetes kills it.
   activeDeadlineSeconds: 300
 
+  # Rendered on the JOB'S OWN metadata, never the pod template's — for a
+  # GitOps controller that must replace, not patch, an immutable Job when
+  # this chart's values change at the same version, e.g. a force/replace
+  # sync option some controllers key off an annotation to select which
+  # objects they are allowed to delete-and-recreate rather than apply in
+  # place. `url-shortener-e2e.jobName`'s own comment already sidesteps the
+  # immutability problem across VERSIONS by folding the version into the
+  # name; this is for the narrower case where a platform changes only the
+  # VALUES this chart renders (e.g. turning on traces.tokenExchange) at a
+  # version already deployed, which the name alone does not cover. Empty
+  # by default: nothing here decides what a controller's own annotation is
+  # called or what it does, only that this chart lets a platform set it.
+  annotations: {}
+
 resources:
   requests: { cpu: 50m, memory: 64Mi }
 

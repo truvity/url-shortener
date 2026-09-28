@@ -182,6 +182,49 @@ func TestTheE2EJobTTLIsUnsetByDefault(t *testing.T) {
 	})
 }
 
+// job.annotations is OPTIONAL, EMPTY by default, and rendered on the Job's
+// own metadata ONLY — never the pod template's — so a GitOps controller can
+// key a force/replace sync off it without the chart taking a position on
+// what the annotation is called or what it does. See values.yaml's own
+// comment on `job.annotations` for the immutable-Job problem this solves.
+func TestTheE2EJobAnnotationsAreOptional(t *testing.T) {
+	t.Run("unset by default", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults()...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+
+		job := docOfKind(t, out, "Job")
+		meta, _ := job["metadata"].(map[string]any)
+		if _, set := meta["annotations"]; set {
+			t.Errorf("the Job carries annotations with job.annotations left at its default: %v", meta["annotations"])
+		}
+	})
+
+	t.Run("set", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults(
+			"--set", "job.annotations.example\\.test/replace-strategy=force",
+		)...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+
+		job := docOfKind(t, out, "Job")
+		meta, _ := job["metadata"].(map[string]any)
+		annotations, _ := meta["annotations"].(map[string]any)
+		if got, _ := annotations["example.test/replace-strategy"].(string); got != "force" {
+			t.Errorf("job.annotations was set but not rendered on the Job's metadata (got %v)", annotations)
+		}
+
+		spec, _ := job["spec"].(map[string]any)
+		template, _ := spec["template"].(map[string]any)
+		podMeta, _ := template["metadata"].(map[string]any)
+		if _, set := podMeta["annotations"]; set {
+			t.Errorf("job.annotations leaked onto the pod template's metadata: %v", podMeta["annotations"])
+		}
+	})
+}
+
 // mode: full runs every case; mode: tenant skips exactly the one DDL-issuing
 // case — see values.yaml's own comment on `mode` for why.
 func TestTheE2EModeControlsWhichCasesRun(t *testing.T) {

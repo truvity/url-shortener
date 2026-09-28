@@ -227,6 +227,13 @@
         "activeDeadlineSeconds": {
           "type": "integer",
           "minimum": 1
+        },
+        "annotations": {
+          "description": "Rendered on the Job's own metadata, never the pod template's — for a GitOps controller that must replace, not patch, an immutable Job when this chart's values change at the same version, e.g. a force/replace sync option.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },

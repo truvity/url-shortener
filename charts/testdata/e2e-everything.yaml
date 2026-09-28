@@ -49,6 +49,8 @@ job:
   ttlSecondsAfterFinished: 900
   backoffLimit: 2
   activeDeadlineSeconds: 600
+  annotations:
+    example.test/replace-strategy: force
 resources:
   requests: { cpu: 100m, memory: 128Mi }
   limits: { cpu: 200m, memory: 256Mi }

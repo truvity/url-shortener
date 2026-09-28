@@ -187,6 +187,8 @@ metadata:
     app.kubernetes.io/instance: example-e2e
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: e2e
+  annotations:
+    example.test/replace-strategy: force
 spec:
   backoffLimit: 2
   activeDeadlineSeconds: 600
