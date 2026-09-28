@@ -100,6 +100,52 @@ archive:
 traces:
   url: ""
 
+  # Optional, and goes together: a trace store that authenticates its
+  # readers, on exactly the same terms as
+  # charts/url-shortener/values.yaml's own `events.auth.audience` — a
+  # PROJECTED ServiceAccount token this Job cannot forge, never a
+  # credential these values hold. tokenURL empty (the default) means
+  # traces.url — if even that is set — admits anonymous readers, and the
+  # suite sends no Authorization header at all.
+  tokenExchange:
+    # The issuer's token endpoint (RFC 8693 token exchange). Verified
+    # against the SUITE IMAGE's own default trust store — appropriate for
+    # a public issuer; see examples/url-shortener/e2e/traceauth's package
+    # doc comment for why this is never traces.caConfigMap below.
+    tokenURL: ""
+    # Both the RFC 8693 `audience` this exchange asks for and the HTTP
+    # Basic auth username it authenticates the request with — see
+    # traceauth.Config.Client's own doc comment for why nothing else
+    # authenticates it.
+    client: ""
+    # The audience THIS JOB'S OWN projected token carries when it is
+    # exchanged — the proof it presents, never the client it is asking to
+    # become (that is `client` above). "access-issuer" is the
+    # conventional audience an identity broker's own exchange endpoint
+    # expects of every workload's subject token, whatever it is
+    # exchanging for; a platform using a different broker can set this to
+    # whatever ITS issuer expects instead.
+    audience: access-issuer
+    # Comfortably longer than trace_test.go's own polling bound (60s
+    # total, including this exchange), short enough that a leaked log
+    # line ages out on its own — the same value
+    # charts/url-shortener/values.yaml's `events.auth.expirationSeconds`
+    # defaults to.
+    expirationSeconds: 3600
+
+  # Optional CA bundle for traces.url ALONE, never for tokenExchange.tokenURL
+  # above (see traceauth's own package doc comment for why the two are
+  # never the same trust store) — a ConfigMap name, mounted read-only,
+  # for a private trace store whose leaf the suite image's own trust
+  # store does not sign. Empty means the suite image's own default trust
+  # store, appropriate wherever the store is reachable the same way a
+  # public issuer is.
+  caConfigMap: ""
+  # The key inside caConfigMap holding the PEM bundle. "ca-certificates.crt"
+  # is the key a trust-manager Bundle target commonly writes; a platform
+  # using a different ConfigMap shape sets this to match it.
+  caConfigMapKey: ca-certificates.crt
+
 # The e2e image, on exactly the same terms as
 # charts/url-shortener/values.yaml's images map: ONE entry, stamped with a
 # digest by the same `helmctl package --manifest` a release already runs

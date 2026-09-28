@@ -59,6 +59,26 @@ const (
 	// one either) skips the one trace-shaped test — see trace_test.go.
 	envTracesURL = "E2E_TRACES_URL"
 
+	// envTracesTokenURL, envTracesClient and envTracesTokenFile are
+	// OPTIONAL, and go together: a trace store that authenticates its
+	// readers, on exactly the same terms as E2E_APP_PASSWORD's Secret
+	// above — see trace_test.go's own doc comment and
+	// examples/url-shortener/e2e/traceauth for the RFC 8693 exchange this
+	// triggers. All three unset (the common case, and the kind tier's
+	// only case) means traces.url — if even that is set — admits
+	// anonymous readers, and trace_test.go sends no Authorization header
+	// at all.
+	envTracesTokenURL  = "E2E_TRACES_TOKEN_URL"
+	envTracesClient    = "E2E_TRACES_CLIENT"
+	envTracesTokenFile = "E2E_TRACES_TOKEN_FILE"
+
+	// envTracesCAFile is OPTIONAL and independent of the three above: a CA
+	// bundle for traces.url ALONE, never for envTracesTokenURL — see
+	// traceauth's own package doc comment for why the two are never the
+	// same trust store. Unset, traceauth.HTTPClient falls back to the
+	// process's own default trust store.
+	envTracesCAFile = "E2E_TRACES_CA_FILE"
+
 	// envS3Endpoint and envS3Region override where log_test.go's archive
 	// check reaches the object store. Unset, it falls back to the kind
 	// box's own S3 stand-in (object-store/s3) — which does not exist
@@ -129,7 +149,11 @@ type env struct {
 	cluster *harness.Cluster
 	names   fixture.Names
 
-	tracesURL string
+	tracesURL       string
+	tracesTokenURL  string
+	tracesClient    string
+	tracesTokenFile string
+	tracesCAFile    string
 }
 
 // getenv reads name, or def when unset or blank.
@@ -251,9 +275,13 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 	cluster := &harness.Cluster{Kubecontext: kubecontextFromEnv()}
 
 	return env{
-		cluster:   cluster,
-		names:     names,
-		tracesURL: strings.TrimSpace(os.Getenv(envTracesURL)),
+		cluster:         cluster,
+		names:           names,
+		tracesURL:       strings.TrimSpace(os.Getenv(envTracesURL)),
+		tracesTokenURL:  strings.TrimSpace(os.Getenv(envTracesTokenURL)),
+		tracesClient:    strings.TrimSpace(os.Getenv(envTracesClient)),
+		tracesTokenFile: strings.TrimSpace(os.Getenv(envTracesTokenFile)),
+		tracesCAFile:    strings.TrimSpace(os.Getenv(envTracesCAFile)),
 	}, nil
 }
 

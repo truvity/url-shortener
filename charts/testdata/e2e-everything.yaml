@@ -26,6 +26,13 @@ archive:
   secretAccessKeyKey: sk
 traces:
   url: https://jaeger.example.test
+  tokenExchange:
+    tokenURL: https://issuer.example.test/token
+    client: trace-reader
+    audience: custom-issuer-audience
+    expirationSeconds: 1800
+  caConfigMap: custom-traces-ca
+  caConfigMapKey: bundle.pem
 images:
   e2e:
     registry: registry.example.test

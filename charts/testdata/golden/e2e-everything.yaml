@@ -287,6 +287,18 @@ spec:
                   key: sk
             - name: E2E_TRACES_URL
               value: "https://jaeger.example.test"
+            # RFC 8693 token exchange for traces.url — see
+            # templates/_helpers.tpl's "url-shortener-e2e.tracesTokenVolume"
+            # for the projected token this trades, and values.yaml's own
+            # comment on traces.tokenExchange for what each field is.
+            - name: E2E_TRACES_TOKEN_URL
+              value: "https://issuer.example.test/token"
+            - name: E2E_TRACES_CLIENT
+              value: "trace-reader"
+            - name: E2E_TRACES_TOKEN_FILE
+              value: /var/run/traces/token
+            - name: E2E_TRACES_CA_FILE
+              value: /var/run/traces-ca/bundle.pem
           resources:
             limits:
               cpu: 200m
@@ -294,3 +306,21 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+          volumeMounts:
+            - name: traces-token
+              mountPath: /var/run/traces
+              readOnly: true
+            - name: traces-ca
+              mountPath: /var/run/traces-ca
+              readOnly: true
+      volumes:
+        - name: traces-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: "custom-issuer-audience"
+                  expirationSeconds: 1800
+                  path: token
+        - name: traces-ca
+          configMap:
+            name: custom-traces-ca

@@ -128,6 +128,33 @@
       "properties": {
         "url": {
           "type": "string"
+        },
+        "tokenExchange": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenURL": {
+              "type": "string"
+            },
+            "client": {
+              "type": "string"
+            },
+            "audience": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expirationSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "caConfigMap": {
+          "type": "string"
+        },
+        "caConfigMapKey": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

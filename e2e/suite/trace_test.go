@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/truvity/policy/examples/url-shortener/e2e/traceauth"
 )
 
 // TestRedirectTraceCrossesEveryComponent proves the ONE thing none of the
@@ -25,15 +27,29 @@ import (
 // this is a t.Skip everywhere E2E_TRACES_URL is unset — which is every run
 // on kind today. It is meant to run unchanged wherever a trace store IS
 // reachable: a private repository's shared cluster, or after a promotion.
+//
+// A trace store that authenticates its readers is handled the same way —
+// nothing here decides on its own; see env_test.go's envTracesTokenURL,
+// envTracesClient and envTracesTokenFile doc comment and
+// examples/url-shortener/e2e/traceauth for the RFC 8693 exchange this
+// triggers when they are set. All three unset (the kind tier's own case,
+// and any tier whose trace store admits anonymous readers) sends the same
+// unauthenticated request this test always sent.
 func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 	if shared.tracesURL == "" {
 		t.Skipf("%s is not set — no trace store on this tier", envTracesURL)
 	}
 
 	// Long enough to outlast the 30s polling bound below with margin for
-	// setup — see log_test.go's identical reasoning.
+	// setup, PLUS a token exchange — see log_test.go's identical
+	// reasoning for the base budget.
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+
+	bearer, httpClient, err := tracesAuth(ctx)
+	if err != nil {
+		t.Fatalf("set up the trace store's credentials: %v", err)
+	}
 
 	traceID, err := randomTraceID()
 	if err != nil {
@@ -58,7 +74,7 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 	_ = resp.Body.Close()
 
 	eventually(t, 30*time.Second, func() error {
-		services, err := traceServices(ctx, shared.tracesURL, traceID)
+		services, err := traceServices(ctx, httpClient, shared.tracesURL, bearer, traceID)
 		if err != nil {
 			return err
 		}
@@ -73,6 +89,36 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// tracesAuth builds what traceServices needs to reach shared.tracesURL: a
+// bearer token (empty when the store needs none) and the http.Client to
+// send the request with — carrying shared.tracesCAFile's bundle when one
+// was given, on top of the process's own default trust store (see
+// traceauth.HTTPClient's own doc comment).
+//
+// The exchange itself (traceauth.Exchange) is skipped entirely when
+// shared.tracesTokenURL is unset — that is what "this store needs no
+// auth" means here, and it is also every run on the kind tier today.
+func tracesAuth(ctx context.Context) (bearer string, httpClient *http.Client, err error) {
+	httpClient, err = traceauth.HTTPClient(shared.tracesCAFile)
+	if err != nil {
+		return "", nil, fmt.Errorf("build the traces http.Client: %w", err)
+	}
+
+	if shared.tracesTokenURL == "" {
+		return "", httpClient, nil
+	}
+
+	bearer, err = traceauth.Exchange(ctx, traceauth.Config{
+		TokenURL:  shared.tracesTokenURL,
+		Client:    shared.tracesClient,
+		TokenFile: shared.tracesTokenFile,
+	})
+	if err != nil {
+		return "", nil, fmt.Errorf("exchange for a traces bearer token: %w", err)
+	}
+	return bearer, httpClient, nil
 }
 
 func randomTraceID() (string, error) {
@@ -116,14 +162,19 @@ type jaegerTraceResponse struct {
 }
 
 // traceServices fetches a trace by id from a Jaeger-API query endpoint and
-// returns the distinct service names that contributed a span to it.
-func traceServices(ctx context.Context, tracesURL, traceID string) ([]string, error) {
+// returns the distinct service names that contributed a span to it. bearer
+// is sent as an Authorization header only when it is non-empty — see
+// tracesAuth's own doc comment for when that is.
+func traceServices(ctx context.Context, httpClient *http.Client, tracesURL, bearer, traceID string) ([]string, error) {
 	url := strings.TrimRight(tracesURL, "/") + "/api/traces/" + traceID
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("query %s: %w", url, err)
 	}

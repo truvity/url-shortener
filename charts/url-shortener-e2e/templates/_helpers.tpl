@@ -90,6 +90,62 @@ securityContext:
 {{- end -}}
 
 {{/*
+The token this Job exchanges at traces.tokenExchange.tokenURL for a bearer
+token scoped to traces.tokenExchange.client — the SAME projected-token
+shape as charts/url-shortener's own "url-shortener.eventsTokenVolume": a
+token this Job cannot forge, which expires on its own, never a secret this
+chart or its values ever hold.
+
+Rendered only when traces.tokenExchange.tokenURL is set — an empty
+tokenURL means traces.url (if set at all) admits anonymous readers, and
+there is nothing here to project a token for.
+*/}}
+{{- define "url-shortener-e2e.tracesTokenVolume" -}}
+{{- $te := .Values.traces.tokenExchange | default dict -}}
+{{- if $te.tokenURL -}}
+- name: traces-token
+  projected:
+    sources:
+      - serviceAccountToken:
+          audience: {{ $te.audience | default "access-issuer" | quote }}
+          expirationSeconds: {{ $te.expirationSeconds | default 3600 }}
+          path: token
+{{- end -}}
+{{- end -}}
+
+{{- define "url-shortener-e2e.tracesTokenMount" -}}
+{{- $te := .Values.traces.tokenExchange | default dict -}}
+{{- if $te.tokenURL -}}
+- name: traces-token
+  mountPath: /var/run/traces
+  readOnly: true
+{{- end -}}
+{{- end -}}
+
+{{/*
+The CA bundle traces.url is verified against, when its leaf is not signed
+by the suite image's own default trust store — see
+examples/url-shortener/e2e/traceauth's own package doc comment for why
+this is NEVER the trust store traces.tokenExchange.tokenURL is verified
+against. Rendered only when traces.caConfigMap is set.
+*/}}
+{{- define "url-shortener-e2e.tracesCAVolume" -}}
+{{- with .Values.traces.caConfigMap -}}
+- name: traces-ca
+  configMap:
+    name: {{ . }}
+{{- end -}}
+{{- end -}}
+
+{{- define "url-shortener-e2e.tracesCAMount" -}}
+{{- with .Values.traces.caConfigMap -}}
+- name: traces-ca
+  mountPath: /var/run/traces-ca
+  readOnly: true
+{{- end -}}
+{{- end -}}
+
+{{/*
 The prober's own name, and its security context — read from
 .Values.prober.podSecurity rather than .Values.podSecurity above, because
 the prober is a SEPARATE workload from the Job the rest of this file is

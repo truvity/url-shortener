@@ -275,6 +275,87 @@ func TestTheE2EChartWiresStaticS3CredentialsWhenGiven(t *testing.T) {
 	})
 }
 
+// Optional trace-store auth is on exactly the same terms as
+// TestTheE2EChartWiresStaticS3CredentialsWhenGiven above: a shape that
+// renders nothing extra unless traces.tokenExchange.tokenURL and
+// traces.caConfigMap are set, so a store that admits anonymous readers
+// never gets a projected token or a volume it has no use for.
+func TestTheE2EChartWiresTracesAuthWhenGiven(t *testing.T) {
+	t.Run("unset", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults("--set", "traces.url=https://jaeger.example.test")...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		for _, unwanted := range []string{
+			"E2E_TRACES_TOKEN_URL", "E2E_TRACES_CLIENT", "E2E_TRACES_TOKEN_FILE",
+			"E2E_TRACES_CA_FILE", "traces-token", "traces-ca", "volumeMounts", "volumes:",
+		} {
+			if strings.Contains(out, unwanted) {
+				t.Errorf("%q was rendered with no traces.tokenExchange.tokenURL or traces.caConfigMap set", unwanted)
+			}
+		}
+	})
+
+	t.Run("token exchange set", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults(
+			"--set", "traces.url=https://jaeger.example.test",
+			"--set", "traces.tokenExchange.tokenURL=https://issuer.example.test/token",
+			"--set", "traces.tokenExchange.client=trace-reader",
+		)...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		for _, want := range []string{
+			"E2E_TRACES_TOKEN_URL", "https://issuer.example.test/token",
+			"E2E_TRACES_CLIENT", "trace-reader",
+			"E2E_TRACES_TOKEN_FILE", "/var/run/traces/token",
+			"name: traces-token", "audience: \"access-issuer\"",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("traces.tokenExchange.tokenURL is set but %q is missing", want)
+			}
+		}
+		if strings.Contains(out, "E2E_TRACES_CA_FILE") {
+			t.Error("E2E_TRACES_CA_FILE was rendered with no traces.caConfigMap set")
+		}
+	})
+
+	t.Run("CA bundle set", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults(
+			"--set", "traces.url=https://jaeger.example.test",
+			"--set", "traces.caConfigMap=custom-traces-ca",
+		)...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		for _, want := range []string{
+			"E2E_TRACES_CA_FILE", "/var/run/traces-ca/ca-certificates.crt",
+			"name: traces-ca", "name: custom-traces-ca",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("traces.caConfigMap is set but %q is missing", want)
+			}
+		}
+		if strings.Contains(out, "E2E_TRACES_TOKEN_URL") {
+			t.Error("E2E_TRACES_TOKEN_URL was rendered with no traces.tokenExchange.tokenURL set")
+		}
+	})
+
+	t.Run("caConfigMapKey overrides the mounted file name", func(t *testing.T) {
+		out, err := renderE2E(t, e2eDefaults(
+			"--set", "traces.url=https://jaeger.example.test",
+			"--set", "traces.caConfigMap=custom-traces-ca",
+			"--set", "traces.caConfigMapKey=bundle.pem",
+		)...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		if !strings.Contains(out, "/var/run/traces-ca/bundle.pem") {
+			t.Error("traces.caConfigMapKey did not change the mounted CA file path")
+		}
+	})
+}
+
 // Every workload and Service carries the instance label — the render-side
 // half of docs/guides/conformance.md's render-and-apply rule, proved here
 // on the same terms as TestEveryWorkloadAndServiceCarriesTheInstanceLabel

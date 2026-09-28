@@ -140,4 +140,43 @@ spec:
             - name: E2E_TRACES_URL
               value: {{ . | quote }}
             {{- end }}
+            {{- $te := .Values.traces.tokenExchange | default dict }}
+            {{- if $te.tokenURL }}
+            # RFC 8693 token exchange for traces.url — see
+            # templates/_helpers.tpl's "url-shortener-e2e.tracesTokenVolume"
+            # for the projected token this trades, and values.yaml's own
+            # comment on traces.tokenExchange for what each field is.
+            - name: E2E_TRACES_TOKEN_URL
+              value: {{ $te.tokenURL | quote }}
+            - name: E2E_TRACES_CLIENT
+              value: {{ $te.client | quote }}
+            - name: E2E_TRACES_TOKEN_FILE
+              value: /var/run/traces/token
+            {{- end }}
+            {{- with .Values.traces.caConfigMap }}
+            - name: E2E_TRACES_CA_FILE
+              value: /var/run/traces-ca/{{ $.Values.traces.caConfigMapKey | default "ca-certificates.crt" }}
+            {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
+          {{- $tokenMount := include "url-shortener-e2e.tracesTokenMount" . }}
+          {{- $caMount := include "url-shortener-e2e.tracesCAMount" . }}
+          {{- if or (trim $tokenMount) (trim $caMount) }}
+          volumeMounts:
+            {{- with trim $tokenMount }}
+            {{- . | nindent 12 }}
+            {{- end }}
+            {{- with trim $caMount }}
+            {{- . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      {{- $tokenVolume := include "url-shortener-e2e.tracesTokenVolume" . }}
+      {{- $caVolume := include "url-shortener-e2e.tracesCAVolume" . }}
+      {{- if or (trim $tokenVolume) (trim $caVolume) }}
+      volumes:
+        {{- with trim $tokenVolume }}
+        {{- . | nindent 8 }}
+        {{- end }}
+        {{- with trim $caVolume }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      {{- end }}
