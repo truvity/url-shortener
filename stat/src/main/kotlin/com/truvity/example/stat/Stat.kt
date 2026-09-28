@@ -2,7 +2,7 @@ package com.truvity.example.stat
 
 import com.connectrpc.ProtocolClientConfig
 import io.nats.client.impl.Headers
-import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.context.Context
@@ -77,10 +77,26 @@ typealias Nats_ = com.truvity.example.stat.Nats
 // handshake below has to configure it directly -- so the starter's own
 // instrumentation never sees it: that instruments what Spring manages,
 // and manages nothing here (server.port is -1; application.yaml explains
-// why). GlobalOpenTelemetry is what the starter can publish for code
-// outside that graph -- but only when told to, and only before anything
-// has touched it. enableGlobalOpenTelemetry() in Application.kt does that
-// as the first thing main() runs, and says why it is not in the chart.
+// why).
+//
+// [openTelemetry] is passed in rather than read from GlobalOpenTelemetry
+// on purpose. The starter builds its OWN OpenTelemetrySdk -- the one
+// carrying TelemetryConfig's allow-list exporter -- and exposes it as an
+// `OpenTelemetry` bean for exactly this situation (code outside Spring's
+// instrumented graph), but it never publishes that SDK as the process
+// GlobalOpenTelemetry: `OpenTelemetryAutoConfiguration` calls
+// `AutoConfiguredOpenTelemetrySdkBuilder.build()`, never
+// `.setResultAsGlobal()`. `GlobalOpenTelemetry.get()` is a SEPARATE SDK:
+// its own reflective bootstrap (gated by
+// otel.java.global-autoconfigure.enabled) builds a second
+// AutoConfiguredOpenTelemetrySdk from ServiceLoader-registered
+// customizers only, which is empty here because TelemetryConfig's
+// allow-list is a Spring `@Bean`, not a META-INF/services entry -- so a
+// client wired to the global gets every attribute the OkHttp
+// instrumentation adds (url.full, server.address,
+// network.protocol.version...) with nothing filtering it out. Measured:
+// exactly those three keys, on this client's own "POST" span, in the
+// store.
 //
 // `newInterceptor()` is the deprecated half of this library's API, and it
 // is still the one this needs: the replacement, `newCallFactory`, wraps a
@@ -88,7 +104,7 @@ typealias Nats_ = com.truvity.example.stat.Nats
 // ConnectOkHttpClient's constructor takes. The interceptor is the only
 // shape that fits into a Builder that is still being configured below.
 @Suppress("DEPRECATION")
-internal fun urlsHttpClientBuilder(tls: Tls?): OkHttpClient.Builder {
+internal fun urlsHttpClientBuilder(tls: Tls?, openTelemetry: OpenTelemetry): OkHttpClient.Builder {
     val builder =
         OkHttpClient.Builder()
             .callTimeout(Duration.ofSeconds(10))
@@ -106,7 +122,7 @@ internal fun urlsHttpClientBuilder(tls: Tls?): OkHttpClient.Builder {
                     ),
                 ),
             )
-            .addInterceptor(OkHttpTelemetry.create(GlobalOpenTelemetry.get()).newInterceptor())
+            .addInterceptor(OkHttpTelemetry.create(openTelemetry).newInterceptor())
     val identity = Identity.load(tls)
     if (identity == null) {
         builder.protocols(listOf(Protocol.H2_PRIOR_KNOWLEDGE))
@@ -126,14 +142,16 @@ internal fun urlsHttpClientBuilder(tls: Tls?): OkHttpClient.Builder {
     return builder
 }
 
-fun urlsClient(address: String, tls: Tls?): UrlsServiceClient {
+fun urlsClient(address: String, tls: Tls?, openTelemetry: OpenTelemetry): UrlsServiceClient {
     val config =
         ProtocolClientConfig(
             host = address,
             serializationStrategy = GoogleJavaProtobufStrategy(),
             networkProtocol = NetworkProtocol.GRPC,
         )
-    return UrlsServiceClient(ProtocolClient(ConnectOkHttpClient(urlsHttpClientBuilder(tls).build()), config))
+    return UrlsServiceClient(
+        ProtocolClient(ConnectOkHttpClient(urlsHttpClientBuilder(tls, openTelemetry).build()), config),
+    )
 }
 
 /**
@@ -206,12 +224,17 @@ internal object NatsHeaders : TextMapGetter<Headers> {
  * one message: the span describes the same piece of work, later. The span
  * is made CURRENT for the block, which is what lets the outbound call made
  * inside it become its child in turn.
+ *
+ * Takes [openTelemetry] rather than reading GlobalOpenTelemetry for the
+ * same reason [urlsHttpClientBuilder] does: that is a different SDK, one
+ * the allow-list exporter never wraps. This span's own attributes are all
+ * on the allow-list today, but a span built against the wrong SDK is the
+ * same class of bug regardless of what it happens to set.
  */
-internal fun <T> consumed(subject: String, headers: Headers?, block: () -> T): T {
-    val otel = GlobalOpenTelemetry.get()
-    val parent = otel.propagators.textMapPropagator.extract(Context.root(), headers ?: Headers(), NatsHeaders)
+internal fun <T> consumed(subject: String, headers: Headers?, openTelemetry: OpenTelemetry, block: () -> T): T {
+    val parent = openTelemetry.propagators.textMapPropagator.extract(Context.root(), headers ?: Headers(), NatsHeaders)
     val span =
-        otel.getTracer("url-shortener-stat")
+        openTelemetry.getTracer("url-shortener-stat")
             .spanBuilder("$subject process")
             .setParent(parent)
             .setSpanKind(SpanKind.CONSUMER)

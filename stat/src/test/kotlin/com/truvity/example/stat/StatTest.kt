@@ -3,7 +3,7 @@ package com.truvity.example.stat
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sun.net.httpserver.HttpServer
 import io.nats.client.impl.Headers
-import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
@@ -11,10 +11,11 @@ import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.ReadableSpan
 import io.opentelemetry.sdk.trace.SdkTracerProvider
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
+import io.opentelemetry.sdk.trace.export.SpanExporter
 import java.net.InetSocketAddress
 import okhttp3.Protocol
 import okhttp3.Request
-import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -65,6 +66,18 @@ class IdentityTest {
     }
 }
 
+/** An [OpenTelemetrySdk] wired exactly like production: real instrumentation, filtered export. */
+private fun filteredSdk(recorder: SpanExporter): OpenTelemetrySdk =
+    OpenTelemetrySdk.builder()
+        .setTracerProvider(
+            SdkTracerProvider
+                .builder()
+                .addSpanProcessor(SimpleSpanProcessor.create(FilteringSpanExporter(recorder, DEFAULT_ALLOWED_ATTRIBUTES)))
+                .build(),
+        )
+        .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+        .build()
+
 class UrlsClientTest {
     @Test
     fun `the outbound client carries a span for every call`() {
@@ -75,67 +88,83 @@ class UrlsClientTest {
         // call and no span anywhere describing it, which is exactly the
         // gap found: a tracer provider connected and exporting nothing,
         // because nothing created a span.
-        val client = urlsHttpClientBuilder(null).build()
+        val client = urlsHttpClientBuilder(null, filteredSdk(RecordingSpanExporter())).build()
         assertTrue(
             client.interceptors.any { it.javaClass.name.startsWith("io.opentelemetry.") },
             "no OpenTelemetry interceptor on the client that makes the one outbound call this service makes",
         )
     }
-}
 
-class GlobalOpenTelemetryTest {
-    @AfterTest
-    fun reset() {
-        System.clearProperty("otel.java.global-autoconfigure.enabled")
-        GlobalOpenTelemetry.resetForTest()
-    }
-
+    /**
+     * The regression this repository's example actually had, on a real
+     * trace store: this client's own span -- the one instrumentation
+     * builds for the ONE outbound call this service makes -- carried
+     * `network.protocol.version`, `server.address` and `url.full`, none
+     * of which are on the allow-list. Not because the allow-list was
+     * wrong: because the client was built against `GlobalOpenTelemetry`,
+     * a completely different, unfiltered `AutoConfiguredOpenTelemetrySdk`
+     * that Spring's own SDK -- the one carrying the allow-list -- is never
+     * published as.
+     *
+     * This drives a REAL HTTP call through the REAL OkHttp instrumentation
+     * library (the same call [urlsClient] makes), behind the SAME
+     * [FilteringSpanExporter] production installs (`SpanAttributeAllowlist.kt`),
+     * reached the SAME way production reaches it: as the `openTelemetry`
+     * this test passes to [urlsHttpClientBuilder], never through
+     * `GlobalOpenTelemetry`. Before the fix this test cannot even be
+     * written this way -- `urlsHttpClientBuilder` took no SDK to wire in,
+     * only `GlobalOpenTelemetry.get()`, which is exactly the structural
+     * gap this asserts is closed.
+     */
     @Test
-    fun `once enabled the global SDK produces real spans, not no-op ones`() {
-        // The claim is about what the outbound client will actually get,
-        // so this asks for exactly that: a span from GlobalOpenTelemetry
-        // and whether it is real. A no-op span has an invalid context, and
-        // that is what the process had for the entire time it exported
-        // nothing -- no error, no log, an interceptor tracing into a void.
-        System.clearProperty("otel.java.global-autoconfigure.enabled")
-        GlobalOpenTelemetry.resetForTest()
+    fun `the outbound client span carries no attribute outside the allow-list`() {
+        val recorder = RecordingSpanExporter()
+        val sdk = filteredSdk(recorder)
 
-        enableGlobalOpenTelemetry()
-
-        val span = GlobalOpenTelemetry.get().getTracer("test").spanBuilder("probe").startSpan()
-        try {
-            assertTrue(span.spanContext.isValid, "the global SDK is a no-op: nothing this service traces is recorded")
-        } finally {
-            span.end()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            exchange.sendResponseHeaders(200, -1)
+            exchange.close()
         }
-    }
+        server.start()
+        try {
+            val client = urlsHttpClientBuilder(null, sdk).protocols(listOf(Protocol.HTTP_1_1)).build()
+            client
+                .newCall(Request.Builder().url("http://127.0.0.1:${server.address.port}/").build())
+                .execute()
+                .close()
+        } finally {
+            server.stop(0)
+        }
 
-    @Test
-    fun `an operator's explicit setting wins over the default`() {
-        System.setProperty("otel.java.global-autoconfigure.enabled", "false")
+        val span = recorder.exported.single()
+        assertEquals(SpanKind.CLIENT, span.kind)
 
-        enableGlobalOpenTelemetry()
+        // The filter really ran: an allow-listed attribute the OkHttp
+        // instrumentation DOES set for this call survives it.
+        assertEquals("GET", span.attributes.get(AttributeKey.stringKey("http.request.method")))
 
-        assertEquals("false", System.getProperty("otel.java.global-autoconfigure.enabled"))
+        // The exact leak found on a live trace store: none of these three
+        // reach the exporter, or anything else outside the allow-list --
+        // the fix is structural (every attribute passes the same filter),
+        // not three keys removed from what the instrumentation adds.
+        for (leaked in listOf("network.protocol.version", "server.address", "url.full")) {
+            assertNull(span.attributes.asMap().keys.find { it.key == leaked }, "'$leaked' reached the exporter")
+        }
+        val unlisted = span.attributes.asMap().keys.map { it.key }.filterNot { it in DEFAULT_ALLOWED_ATTRIBUTES }
+        assertTrue(unlisted.isEmpty(), "attribute(s) outside the allow-list reached the exporter: $unlisted")
     }
 }
 
 class TraceContinuityTest {
-    @AfterTest
-    fun reset() {
-        GlobalOpenTelemetry.resetForTest()
-    }
-
-    private fun sdk(): OpenTelemetrySdk {
-        GlobalOpenTelemetry.resetForTest()
-        val sdk =
-            OpenTelemetrySdk.builder()
-                .setTracerProvider(SdkTracerProvider.builder().build())
-                .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
-                .build()
-        GlobalOpenTelemetry.set(sdk)
-        return sdk
-    }
+    // No GlobalOpenTelemetry to reset between tests any more: `consumed`
+    // and `urlsHttpClientBuilder` are handed this SDK directly, the same
+    // way production hands them the Spring-built one.
+    private fun sdk(): OpenTelemetrySdk =
+        OpenTelemetrySdk.builder()
+            .setTracerProvider(SdkTracerProvider.builder().build())
+            .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+            .build()
 
     @Test
     fun `a consumed message continues the publishers trace`() {
@@ -145,7 +174,7 @@ class TraceContinuityTest {
         headers.add("traceparent", "00-${publisher.spanContext.traceId}-${publisher.spanContext.spanId}-01")
 
         var inside: Span? = null
-        consumed("events.redirect", headers) { inside = Span.current() }
+        consumed("events.redirect", headers, sdk) { inside = Span.current() }
 
         val span = inside as ReadableSpan
         assertEquals(publisher.spanContext.traceId, span.spanContext.traceId, "the consumer started a trace of its own")
@@ -155,9 +184,9 @@ class TraceContinuityTest {
 
     @Test
     fun `a message with no context still gets a span`() {
-        sdk()
+        val sdk = sdk()
         var inside: Span? = null
-        consumed("events.redirect", null) { inside = Span.current() }
+        consumed("events.redirect", null, sdk) { inside = Span.current() }
         assertTrue(inside!!.spanContext.isValid)
     }
 
@@ -176,12 +205,12 @@ class TraceContinuityTest {
             val publisher = sdk.getTracer("test").spanBuilder("redirect").startSpan()
             val headers = Headers()
             headers.add("traceparent", "00-${publisher.spanContext.traceId}-${publisher.spanContext.spanId}-01")
-            val client = urlsHttpClientBuilder(null).protocols(listOf(Protocol.HTTP_1_1)).build()
+            val client = urlsHttpClientBuilder(null, sdk).protocols(listOf(Protocol.HTTP_1_1)).build()
 
             // ENQUEUED, as the Connect client does: the call runs on a
             // dispatcher thread, and only the wrapped executor lets it see
             // the span that is current here.
-            consumed("events.redirect", headers) {
+            consumed("events.redirect", headers, sdk) {
                 val latch = java.util.concurrent.CountDownLatch(1)
                 client.newCall(Request.Builder().url("http://127.0.0.1:${server.address.port}/").build())
                     .enqueue(

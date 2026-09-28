@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /** A double that keeps whatever it was asked to export, for reading back in a test. */
-private class RecordingSpanExporter : SpanExporter {
+internal class RecordingSpanExporter : SpanExporter {
     val exported = mutableListOf<SpanData>()
 
     override fun export(spans: Collection<SpanData>): CompletableResultCode {
