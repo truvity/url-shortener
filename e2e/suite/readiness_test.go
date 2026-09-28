@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/truvity/policy/examples/url-shortener/e2e/rollout"
 )
 
 // TestDeploymentsAreReady asserts every Deployment this release owns —
@@ -50,8 +52,30 @@ func TestDeploymentsAreReady(t *testing.T) {
 	// only returns nil once every one of them has every replica updated,
 	// available and ready — belt-and-suspenders after helm --wait, and the
 	// whole story for a suite that reused a standing install rather than
-	// deploying it itself.
+	// deploying it itself. TestMain's own waitForPromotedRollout already
+	// proved this (and, when the promoted version is known, proved it
+	// against THAT version specifically) before this test — or any other
+	// in this package — ran at all, so this is a second, cheap
+	// confirmation rather than the suite's only line of defense against a
+	// rollout still in progress.
 	if err := shared.cluster.WaitForDeployments(ctx, shared.names.Namespace, shared.names.AppRelease); err != nil {
 		t.Fatalf("not every Deployment of release %q in %q is ready: %v", shared.names.AppRelease, shared.names.Namespace, err)
 	}
+}
+
+// waitForPromotedRollout is the suite's PRE-FLIGHT gate: called once from
+// TestMain, before m.Run(), so that no test — whichever one Go happens to
+// run first, which this package does not control — can observe a release
+// still catching up to what was promoted.
+//
+// The decision itself (which of gemaal's two waits to call, how to default
+// a timeout, how to wrap an error) lives in e2e/rollout, a package of its
+// own: this package's TestMain (main_test.go) skips every test here unless
+// E2E_NAMESPACE names a real cluster, which is the wrong gate for logic
+// that needs neither — see rollout's own package doc comment, and
+// e2e/traceattrs / e2e/traceauth for the same reasoning applied to this
+// suite's other cluster-independent pieces. rollout_test.go, in that
+// package, is where this is actually unit-tested.
+func waitForPromotedRollout(ctx context.Context, e env) error {
+	return rollout.WaitForPromoted(ctx, e.cluster, e.names.Namespace, e.names.AppRelease, e.appVersion)
 }

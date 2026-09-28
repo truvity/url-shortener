@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   maxUnavailable: 2
   selector:
@@ -26,6 +27,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   maxUnavailable: 2
   selector:
@@ -44,6 +46,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
   annotations:
     example.invalid/role: app
 
@@ -57,6 +60,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 data:
   redirect.yaml: |
     listen:
@@ -201,6 +205,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 rules:
   - apiGroups: ["cert-manager.io"]
     resources: ["certificaterequests"]
@@ -216,6 +221,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -235,6 +241,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   selector:
     app.kubernetes.io/name: url-shortener
@@ -258,6 +265,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   selector:
     app.kubernetes.io/name: url-shortener
@@ -281,6 +289,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   selector:
     app.kubernetes.io/name: url-shortener
@@ -301,6 +310,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   replicas: 5
   strategy:
@@ -320,9 +330,10 @@ spec:
         app.kubernetes.io/name: url-shortener
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: c0a81e9363da238eb559aac123d83e4f0850f61ef899b27c8df4b4f1e4ac44ec
+        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -424,6 +435,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   replicas: 3
   strategy:
@@ -445,12 +457,13 @@ spec:
         app.kubernetes.io/name: url-shortener
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: redirect
       annotations:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: c0a81e9363da238eb559aac123d83e4f0850f61ef899b27c8df4b4f1e4ac44ec
+        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -551,6 +564,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   replicas: 4
   strategy:
@@ -572,9 +586,10 @@ spec:
         app.kubernetes.io/name: url-shortener
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: c0a81e9363da238eb559aac123d83e4f0850f61ef899b27c8df4b4f1e4ac44ec
+        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -668,6 +683,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   replicas: 6
   strategy:
@@ -687,9 +703,10 @@ spec:
         app.kubernetes.io/name: url-shortener
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: c0a81e9363da238eb559aac123d83e4f0850f61ef899b27c8df4b4f1e4ac44ec
+        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -785,6 +802,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   replicas: 7
   strategy:
@@ -803,9 +821,10 @@ spec:
         app.kubernetes.io/name: url-shortener
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: c0a81e9363da238eb559aac123d83e4f0850f61ef899b27c8df4b4f1e4ac44ec
+        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -894,6 +913,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
 spec:
   parentRefs:
     - name: example-gateway
@@ -934,6 +954,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     # Before the migration's own configuration at -5, and well before the
@@ -952,6 +973,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
@@ -976,6 +998,7 @@ metadata:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "0"
@@ -988,6 +1011,7 @@ spec:
         app.kubernetes.io/name: url-shortener
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
     spec:
       restartPolicy: Never
       serviceAccountName: migrate-account

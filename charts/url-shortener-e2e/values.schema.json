@@ -22,6 +22,9 @@
     "mode": {
       "enum": ["full", "tenant"]
     },
+    "rolloutTimeout": {
+      "type": "string"
+    },
     "database": {
       "type": "object",
       "additionalProperties": false,

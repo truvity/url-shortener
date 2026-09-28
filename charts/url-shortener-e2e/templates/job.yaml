@@ -84,6 +84,29 @@ spec:
               value: ""
             - name: E2E_NAMES_FROM_ENV
               value: "1"
+            # This chart's OWN version — released under the SAME version as
+            # the application chart it tests (see .github/workflows/
+            # release.yaml's own comment on why the two, plus
+            # url-shortener-infra, ship as one), so it is exactly what the
+            # application release's own pods are stamped with (see
+            # charts/url-shortener/templates/_helpers.tpl's
+            # "url-shortener.labels"). The suite's own env_test.go and
+            # readiness_test.go read it back to prove a test run is judging
+            # the version THIS Job's release actually promoted, not merely
+            # whatever generation happened to be live when this Job started
+            # — see docs/guides/testing.md and e2e/suite/readiness_test.go's
+            # waitForPromotedRollout for the race this closes.
+            - name: E2E_APP_VERSION
+              value: {{ .Chart.AppVersion | quote }}
+            {{- with .Values.rolloutTimeout }}
+            # OPTIONAL: how long waitForPromotedRollout gives EACH of the
+            # application release's Deployments to finish rolling out to
+            # E2E_APP_VERSION, bounded well inside job.activeDeadlineSeconds
+            # above — see values.yaml's own comment on rolloutTimeout for
+            # why this is a Go duration and why it is unset by default.
+            - name: E2E_ROLLOUT_TIMEOUT
+              value: {{ . | quote }}
+            {{- end }}
             - name: E2E_DATABASE
               value: {{ .Values.database.name | quote }}
             - name: E2E_DATABASE_HOST

@@ -104,6 +104,20 @@ spec:
               value: ""
             - name: E2E_NAMES_FROM_ENV
               value: "1"
+            # This chart's OWN version — released under the SAME version as
+            # the application chart it tests (see .github/workflows/
+            # release.yaml's own comment on why the two, plus
+            # url-shortener-infra, ship as one), so it is exactly what the
+            # application release's own pods are stamped with (see
+            # charts/url-shortener/templates/_helpers.tpl's
+            # "url-shortener.labels"). The suite's own env_test.go and
+            # readiness_test.go read it back to prove a test run is judging
+            # the version THIS Job's release actually promoted, not merely
+            # whatever generation happened to be live when this Job started
+            # — see docs/guides/testing.md and e2e/suite/readiness_test.go's
+            # waitForPromotedRollout for the race this closes.
+            - name: E2E_APP_VERSION
+              value: "0.0.0"
             - name: E2E_DATABASE
               value: "url_shortener"
             - name: E2E_DATABASE_HOST

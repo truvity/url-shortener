@@ -7,10 +7,32 @@ the only thing that guarantees it.
 {{- .Release.Name -}}
 {{- end -}}
 
+{{/*
+app.kubernetes.io/version is this chart's OWN version — never a value,
+because THREE charts release under one version together (see
+.github/workflows/release.yaml's own comment on why url-shortener,
+url-shortener-infra and url-shortener-e2e ship as one) and a value could
+disagree with what the release actually stamped. Quoted: an appVersion
+that happens to look like a number (e.g. a bare "2") must still render as
+a label VALUE, not a YAML integer metadata.labels rejects.
+
+Never in a Deployment's own selector — see
+templates/{stat,redirect,urls,web,log}.yaml and
+templates/poddisruptionbudget.yaml, which hand-write their selectors from
+name/instance/component alone: a selector that included this would stop
+matching the incumbent replicas the moment a rollout changed it, which is
+the opposite of what a rolling update needs.
+
+This is also the ONE label examples/url-shortener/e2e's own suite reads
+off a live pod to prove a test is judging the version that was actually
+promoted — see e2e/suite/readiness_test.go's waitForPromotedRollout and
+charts/url-shortener-e2e/templates/job.yaml's E2E_APP_VERSION.
+*/}}
 {{- define "url-shortener.labels" -}}
 app.kubernetes.io/name: url-shortener
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end -}}
 
 {{/*

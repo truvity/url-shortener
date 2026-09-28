@@ -54,6 +54,34 @@ const (
 	// context that does not exist there.
 	envKubecontext = "E2E_KCTX"
 
+	// envAppVersion is the application release's promoted version — the
+	// url-shortener-e2e chart's own Job always sets it to THAT CHART'S
+	// .Chart.AppVersion, which is the application chart's own too: the
+	// two (plus url-shortener-infra) release under one version together
+	// (see .github/workflows/release.yaml). waitForPromotedRollout
+	// (readiness_test.go) reads it back to prove every live pod of the
+	// release carries the SAME version, in the
+	// app.kubernetes.io/version label charts/url-shortener/templates/
+	// _helpers.tpl's "url-shortener.labels" stamps — closing the race
+	// where a GitOps controller applies this Job before the application
+	// release's own Deployments have finished catching up: WITHOUT this,
+	// a plain rollout-complete wait sees the OLD generation already
+	// fully rolled out and returns immediately, and the suite goes on to
+	// judge the PREVIOUS version.
+	//
+	// Unset (the outside-in / kind loop, which runs this suite directly
+	// rather than through the chart's Job — there is no "chart under
+	// test" version to know there) skips the version check and falls
+	// back to a plain rollout-complete wait, which is still worth doing
+	// once, up front.
+	envAppVersion = "E2E_APP_VERSION"
+
+	// envRolloutTimeout overrides how long waitForPromotedRollout gives
+	// EACH Deployment of the application release to finish rolling out —
+	// a Go duration (e.g. "3m"). Unset or not a valid duration means
+	// harness.DefaultRolloutTimeout.
+	envRolloutTimeout = "E2E_ROLLOUT_TIMEOUT"
+
 	// envTracesURL is a Jaeger-API query endpoint. Unset (the kind box
 	// carries no trace store, and an in-cluster Job may have no route to
 	// one either) skips the one trace-shaped test — see trace_test.go.
@@ -149,6 +177,11 @@ type env struct {
 	cluster *harness.Cluster
 	names   fixture.Names
 
+	// appVersion is envAppVersion's value — empty unless the
+	// url-shortener-e2e chart's own Job set it. See waitForPromotedRollout
+	// (readiness_test.go) for what an empty value falls back to.
+	appVersion string
+
 	tracesURL       string
 	tracesTokenURL  string
 	tracesClient    string
@@ -177,6 +210,26 @@ func kubecontextFromEnv() string {
 		return strings.TrimSpace(v)
 	}
 	return defaultKubecontext
+}
+
+// rolloutTimeoutFromEnv reports how long waitForPromotedRollout gives EACH
+// Deployment to finish rolling out — zero (harness.DefaultRolloutTimeout)
+// when envRolloutTimeout is unset, blank, or not a valid Go duration. A
+// malformed value is treated the same as unset rather than failing the
+// whole run: this bounds a BELT-AND-SUSPENDERS wait, not the tests
+// themselves.
+func rolloutTimeoutFromEnv() time.Duration {
+	v := strings.TrimSpace(os.Getenv(envRolloutTimeout))
+	if v == "" {
+		return 0
+	}
+
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0
+	}
+
+	return d
 }
 
 // namespaceFromEnv reports the namespace to run against, and whether the
@@ -272,11 +325,15 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 		}
 	}
 
-	cluster := &harness.Cluster{Kubecontext: kubecontextFromEnv()}
+	cluster := &harness.Cluster{
+		Kubecontext:    kubecontextFromEnv(),
+		RolloutTimeout: rolloutTimeoutFromEnv(),
+	}
 
 	return env{
 		cluster:         cluster,
 		names:           names,
+		appVersion:      strings.TrimSpace(os.Getenv(envAppVersion)),
 		tracesURL:       strings.TrimSpace(os.Getenv(envTracesURL)),
 		tracesTokenURL:  strings.TrimSpace(os.Getenv(envTracesTokenURL)),
 		tracesClient:    strings.TrimSpace(os.Getenv(envTracesClient)),

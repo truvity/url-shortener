@@ -36,6 +36,19 @@ appRelease: ""
 # call, a redirect, a counter, the archive — and runs in both modes.
 mode: full
 
+# How long the suite's own pre-flight wait (waitForPromotedRollout,
+# e2e/suite/readiness_test.go) gives EACH of the application release's
+# Deployments to finish rolling out to THIS chart's version before any
+# test runs — a Go duration (e.g. "3m"). Empty (the default) means the
+# harness's own DefaultRolloutTimeout (2m), which is comfortably inside
+# job.activeDeadlineSeconds below.
+#
+# A STRING, not an integer: rendered straight into E2E_ROLLOUT_TIMEOUT,
+# which time.ParseDuration reads — the same shape Go's own flag and env
+# conventions use everywhere else, so a platform that already writes "90s"
+# or "3m" for a timeout elsewhere writes the same shape here.
+rolloutTimeout: ""
+
 # Where the release under test keeps its database, and under what names —
 # read off url-shortener-infra's own render (or a platform's equivalent),
 # never invented here. Two roles, because the migration and the services

@@ -1,6 +1,7 @@
 package suite
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -32,6 +33,15 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	shared = resolved
+
+	// The suite's PRE-FLIGHT gate — see readiness_test.go's
+	// waitForPromotedRollout for the race this closes. Run here, before
+	// m.Run(), so it bounds every test in this package rather than only
+	// whichever one Go happens to run first.
+	if err := waitForPromotedRollout(context.Background(), shared); err != nil {
+		fmt.Fprintf(os.Stderr, "suite: %v\n", err)
+		os.Exit(1)
+	}
 
 	code := m.Run()
 

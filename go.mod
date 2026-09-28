@@ -21,7 +21,7 @@ require (
 	github.com/nats-io/nats.go v1.54.0
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
-	github.com/truvity/gemaal v0.24.1
+	github.com/truvity/gemaal v0.24.3
 	github.com/truvity/policy v0.0.0-20260923133553-7af306cdbbcb
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/metric v1.46.0
