@@ -68,6 +68,22 @@ cloud:
   # The boundary the platform requires on roles it allows to exist.
   permissionsBoundary: ""
 
+  # The project this install belongs to, stamped as a `project` tag
+  # beside `cluster` above on every AWS resource this chart creates. Some
+  # platforms' permissions boundaries condition resource creation (an
+  # IAM Role, for instance) on both tags being present, not just one.
+  #
+  # Empty means this release's own namespace: on the platforms this chart
+  # targets, a namespace already IS a project, so a caller that has not
+  # named one explicitly gets one derived rather than none at all.
+  project: ""
+
+  # Extra tags folded into every AWS resource this chart creates, beside
+  # `cluster` and the `project` tag above. A value here under either of
+  # those two keys is dropped — this cannot rename which cluster or
+  # project a resource is tagged as belonging to.
+  tags: {}
+
 postgres:
   # One instance is an example's answer. A deployment sizes it.
   instances: 1

@@ -45,6 +45,17 @@
         },
         "permissionsBoundary": {
           "type": "string"
+        },
+        "project": {
+          "type": "string",
+          "description": "The project this install belongs to, tagged as `project` beside `cluster` on every AWS resource this chart creates. Empty means this release's own namespace — the platforms this chart targets already treat a namespace as a project."
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here."
         }
       }
     },

@@ -351,6 +351,122 @@ func TestAPrimaryInstallMintsWhatItOwns(t *testing.T) {
 	}
 }
 
+// tagValue returns the value for a key in an ACK list-of-{key,value} tag
+// field — Role, Policy and the Bucket's own tagging.tagSet all take this
+// shape — or "" with ok=false if the key is absent.
+func tagValue(tags []any, key string) (string, bool) {
+	for _, raw := range tags {
+		tag, _ := raw.(map[string]any)
+		if tag["key"] == key {
+			v, _ := tag["value"].(string)
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// A platform's permissions boundary on the controller that creates these
+// resources can condition creation on specific request tags being
+// present — found on an install whose boundary denied iam:CreateRole
+// because the Role carried `cluster` but not `project`, which left the
+// PodIdentityAssociation pointing at a Role that was never created. This
+// is the property the boundary depends on: both tags land on the Role,
+// the Policy, the Bucket's own tagSet and the PodIdentityAssociation, on
+// the same terms.
+func TestCloudResourcesCarryClusterAndProjectTags(t *testing.T) {
+	args := infraDefaults(
+		"--set", "tier=primary",
+		"--set", "cloud.bucket=a-bucket",
+		"--set", "cloud.iamName=an-identity",
+		"--set", "cloud.clusterName=a-cluster",
+		"--set", "cloud.accountID=example-account-id",
+		"--set", "cloud.region=a-region",
+		"--set", "cloud.serviceAccount=an-account",
+	)
+
+	t.Run("default project is the release namespace", func(t *testing.T) {
+		out, err := renderInfra(t, args...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+
+		role := docOfKind(t, out, "Role")["spec"].(map[string]any)
+		roleTags, _ := role["tags"].([]any)
+		if v, ok := tagValue(roleTags, "cluster"); !ok || v != "a-cluster" {
+			t.Errorf("Role cluster tag = %q, %v; want a-cluster, true", v, ok)
+		}
+		if v, ok := tagValue(roleTags, "project"); !ok || v != "default" {
+			t.Errorf("Role project tag = %q, %v; want the release namespace (default), true", v, ok)
+		}
+
+		policy := docOfKind(t, out, "Policy")["spec"].(map[string]any)
+		policyTags, _ := policy["tags"].([]any)
+		if _, ok := tagValue(policyTags, "cluster"); !ok {
+			t.Error("Policy has no cluster tag")
+		}
+		if _, ok := tagValue(policyTags, "project"); !ok {
+			t.Error("Policy has no project tag")
+		}
+
+		bucket := docOfKind(t, out, "Bucket")["spec"].(map[string]any)
+		tagging, _ := bucket["tagging"].(map[string]any)
+		bucketTags, _ := tagging["tagSet"].([]any)
+		if _, ok := tagValue(bucketTags, "cluster"); !ok {
+			t.Error("Bucket tagSet has no cluster tag")
+		}
+		if _, ok := tagValue(bucketTags, "project"); !ok {
+			t.Error("Bucket tagSet has no project tag")
+		}
+		// The bucket's own fixed tags survive alongside the new ones.
+		if _, ok := tagValue(bucketTags, "truvity.io/preserve"); !ok {
+			t.Error("Bucket lost its own truvity.io/preserve tag")
+		}
+
+		pia := docOfKind(t, out, "PodIdentityAssociation")["spec"].(map[string]any)
+		piaTags, _ := pia["tags"].(map[string]any)
+		if piaTags["cluster"] != "a-cluster" {
+			t.Errorf("PodIdentityAssociation cluster tag = %v, want a-cluster", piaTags["cluster"])
+		}
+		if piaTags["project"] != "default" {
+			t.Errorf("PodIdentityAssociation project tag = %v, want the release namespace (default)", piaTags["project"])
+		}
+	})
+
+	t.Run("cloud.project overrides the namespace", func(t *testing.T) {
+		out, err := renderInfra(t, append(append([]string{}, args...), "--set", "cloud.project=payments")...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		role := docOfKind(t, out, "Role")["spec"].(map[string]any)
+		roleTags, _ := role["tags"].([]any)
+		if v, _ := tagValue(roleTags, "project"); v != "payments" {
+			t.Errorf("Role project tag = %q, want payments", v)
+		}
+	})
+
+	t.Run("cloud.tags cannot override cluster or project", func(t *testing.T) {
+		out, err := renderInfra(t, append(append([]string{}, args...),
+			"--set", "cloud.tags.cluster=hijacked",
+			"--set", "cloud.tags.project=hijacked",
+			"--set", "cloud.tags.team=payments",
+		)...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		role := docOfKind(t, out, "Role")["spec"].(map[string]any)
+		roleTags, _ := role["tags"].([]any)
+		if v, _ := tagValue(roleTags, "cluster"); v != "a-cluster" {
+			t.Errorf("cloud.tags overrode the cluster tag: got %q", v)
+		}
+		if v, _ := tagValue(roleTags, "project"); v != "default" {
+			t.Errorf("cloud.tags overrode the project tag: got %q", v)
+		}
+		if v, ok := tagValue(roleTags, "team"); !ok || v != "payments" {
+			t.Errorf("cloud.tags' own extra tag did not survive: team = %q, %v", v, ok)
+		}
+	})
+}
+
 // The name is required whether or not the chart is asked to fill it.
 //
 // generate decides WHO writes the secret, not what it is called -- the

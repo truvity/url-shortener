@@ -206,3 +206,36 @@ default opts that one field back out, whatever `tenantScopedNames` says.
 {{- .Values.postgres.runtimeRole -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+The project a primary install's AWS resources belong to, for whichever
+platform tags on it beside `cluster` — see templates/cloud.yaml's Role for
+why a boundary can need both.
+
+Explicit `cloud.project` wins. Unset, this install's own namespace stands
+in: on the platforms this chart targets, a namespace IS a project, the same
+assumption values.yaml's `cloud.project` comment spells out.
+*/}}
+{{- define "url-shortener-infra.cloudProject" -}}
+{{- .Values.cloud.project | default .Release.Namespace -}}
+{{- end -}}
+
+{{/*
+The tags every AWS resource this chart creates carries: `cluster` and the
+project above, with `cloud.tags` layered UNDER them — extras fill in
+additional keys but can never override either, so a platform cannot use
+its own tag to relabel which cluster or project a resource belongs to.
+
+Rendered as YAML (`fromYaml` it back into a Helm dict at the call site,
+e.g. `{{- $tags := include "url-shortener-infra.cloudTags" . | fromYaml }}`)
+rather than returned as a dict directly, because a named template can only
+return a string. templates/cloud.yaml then renders that one dict in
+whichever shape each CRD's own tag field wants: Role, Policy and the
+Bucket's tagSet each take a list of `{key, value}` pairs, while
+PodIdentityAssociation takes a plain map.
+*/}}
+{{- define "url-shortener-infra.cloudTags" -}}
+{{- $extra := .Values.cloud.tags | default dict -}}
+{{- $base := dict "cluster" .Values.cloud.clusterName "project" (include "url-shortener-infra.cloudProject" .) -}}
+{{- merge $base $extra | toYaml -}}
+{{- end -}}

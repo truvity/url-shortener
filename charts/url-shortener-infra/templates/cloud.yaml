@@ -3,6 +3,7 @@
 {{- $bucket := required "cloud.bucket is required for a primary install: the chart is told the store's name and derives nothing" $c.bucket }}
 {{- $iam := required "cloud.iamName is required for a primary install" $c.iamName }}
 {{- $account := required "cloud.serviceAccount is required for a primary install: the trust below is scoped to it" $c.serviceAccount }}
+{{- $tags := include "url-shortener-infra.cloudTags" . | fromYaml }}
 {{/*
 The objects this install owns.
 
@@ -47,6 +48,10 @@ spec:
         value: {{ .Release.Name }}
       - key: truvity.io/preserve
         value: "true"
+      {{- range $k, $v := $tags }}
+      - key: {{ $k }}
+        value: {{ $v | quote }}
+      {{- end }}
 ---
 {{/*
 Write-only on the bucket's CONTENTS, and list on the bucket itself.
@@ -73,6 +78,11 @@ metadata:
 spec:
   name: {{ $iam }}
   description: {{ printf "%s: append-only on the archive store" .Release.Name | quote }}
+  tags:
+    {{- range $k, $v := $tags }}
+    - key: {{ $k }}
+      value: {{ $v | quote }}
+    {{- end }}
   policyDocument: |
     {
       "Version": "2012-10-17",
@@ -90,6 +100,15 @@ namespace and the account, so the conditions below are what make this a
 workload identity rather than a role any pod in the account can assume.
 A trust that names the cluster and stops there is not an identity, it is
 a shared secret with extra steps.
+
+The `tags` below matter beyond bookkeeping: a platform's permissions
+boundary on the controller that creates this Role can condition
+`iam:CreateRole` on specific request tags being present (see
+"url-shortener-infra.cloudTags" in _helpers.tpl), and a boundary that
+requires both `cluster` and `project` denies the create outright if
+either is missing — found on an install where only `cluster` was sent,
+which failed with an explicit deny in the boundary and left the
+PodIdentityAssociation below pointing at a Role that was never created.
 */}}
 apiVersion: iam.services.k8s.aws/v1alpha1
 kind: Role
@@ -120,8 +139,10 @@ spec:
       }]
     }
   tags:
-    - key: cluster
-      value: {{ $c.clusterName | quote }}
+    {{- range $k, $v := $tags }}
+    - key: {{ $k }}
+      value: {{ $v | quote }}
+    {{- end }}
   policyRefs:
     - from:
         name: {{ $iam }}
@@ -138,6 +159,10 @@ spec:
   namespace: {{ .Release.Namespace | quote }}
   serviceAccount: {{ $account | quote }}
   roleARN: "arn:aws:iam::{{ $c.accountID }}:role/{{ $iam }}"
+  tags:
+    {{- range $k, $v := $tags }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
 ---
 {{/*
 Egress to the store, for the component that writes it, and for no other.

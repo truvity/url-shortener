@@ -29,6 +29,8 @@ spec:
   tags:
     - key: cluster
       value: "example-cluster"
+    - key: project
+      value: "default"
   policyRefs:
     - from:
         name: example-identity
@@ -79,6 +81,10 @@ spec:
         value: example
       - key: truvity.io/preserve
         value: "true"
+      - key: cluster
+        value: "example-cluster"
+      - key: project
+        value: "default"
 
 ---
 # Source: url-shortener-infra/templates/infra.yaml
@@ -141,6 +147,9 @@ spec:
   namespace: "default"
   serviceAccount: "example-account"
   roleARN: "arn:aws:iam::example-account-id:role/example-identity"
+  tags:
+    cluster: "example-cluster"
+    project: "default"
 
 ---
 # Source: url-shortener-infra/templates/cloud.yaml
@@ -154,6 +163,11 @@ metadata:
 spec:
   name: example-identity
   description: "example: append-only on the archive store"
+  tags:
+    - key: cluster
+      value: "example-cluster"
+    - key: project
+      value: "default"
   policyDocument: |
     {
       "Version": "2012-10-17",
