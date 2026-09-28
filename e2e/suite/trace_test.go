@@ -13,12 +13,18 @@ import (
 	"time"
 
 	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
+	"github.com/truvity/policy/examples/url-shortener/e2e/traceattrs"
 	"github.com/truvity/policy/examples/url-shortener/e2e/traceauth"
 )
 
 // TestRedirectTraceCrossesEveryComponent proves the ONE thing none of the
 // other tests can: that a single request is a single TRACE across every
-// hop it touches.
+// hop it touches — and, on the same trace, that every span attribute
+// exported from that hop is one its own service was configured to allow
+// (see traceattrs.ServiceExtensions and traceattrs.CheckAttributes),
+// which is telemetry/attributes.go's own claim ("an attribute nobody
+// allow-listed is exported") proved from OUTSIDE the process rather than
+// by that package's own unit tests alone.
 //
 // The real call graph of one GET /r/{key}, read off the code rather than
 // assumed:
@@ -124,11 +130,20 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
+	// Captured by the closure below and read again once eventually
+	// returns, so the attribute check after it runs on the SAME fetch that
+	// proved every service present — never a second query for the same
+	// trace.
+	var trace traceattrs.Response
+
 	eventually(t, 30*time.Second, func() error {
-		services, err := traceServices(ctx, httpClient, shared.tracesURL, bearer, traceID)
+		fetched, err := fetchTrace(ctx, httpClient, shared.tracesURL, bearer, traceID)
 		if err != nil {
 			return err
 		}
+		trace = fetched
+
+		services := trace.Services()
 		var missing []string
 		for _, want := range []string{componentRedirect, componentStat, componentURLs} {
 			if !anyContains(services, want) {
@@ -140,9 +155,24 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 		}
 		return nil
 	})
+
+	// The other half of this test's claim: not just that redirect, stat
+	// and urls each contributed a span, but that none of those spans (or
+	// any other service's, on the same trace) carries an attribute its own
+	// telemetry setup was never configured to let through — see
+	// traceattrs.ServiceExtensions for where each service's own allow-list
+	// comes from and traceattrs' storeAddedTags for the handful of tags
+	// this exempts as the trace store's own, not any service's.
+	if offenses := traceattrs.CheckAttributes(trace, traceattrs.ServiceExtensions); len(offenses) > 0 {
+		lines := make([]string, len(offenses))
+		for i, offense := range offenses {
+			lines[i] = offense.String()
+		}
+		t.Fatalf("span attributes outside the allow-list:\n%s", strings.Join(lines, "\n"))
+	}
 }
 
-// tracesAuth builds what traceServices needs to reach shared.tracesURL: a
+// tracesAuth builds what fetchTrace needs to reach shared.tracesURL: a
 // bearer token (empty when the store needs none) and the http.Client to
 // send the request with — carrying shared.tracesCAFile's bundle when one
 // was given, on top of the process's own default trust store (see
@@ -198,70 +228,47 @@ func anyContains(haystack []string, needle string) bool {
 	return false
 }
 
-// jaegerTraceResponse is the small subset of Jaeger's own JSON query API
-// (GET {tracesURL}/api/traces/{traceID}) this test reads: which services
-// contributed a span to the trace.
-type jaegerTraceResponse struct {
-	Data []struct {
-		Spans []struct {
-			ProcessID string `json:"processID"`
-		} `json:"spans"`
-		Processes map[string]struct {
-			ServiceName string `json:"serviceName"`
-		} `json:"processes"`
-	} `json:"data"`
-}
-
-// traceServices fetches a trace by id from a Jaeger-API query endpoint and
-// returns the distinct service names that contributed a span to it. bearer
-// is sent as an Authorization header only when it is non-empty — see
-// tracesAuth's own doc comment for when that is.
-func traceServices(ctx context.Context, httpClient *http.Client, tracesURL, bearer, traceID string) ([]string, error) {
+// fetchTrace fetches a trace by id from a Jaeger-API query endpoint,
+// parsed into the shape traceattrs.CheckAttributes and Response.Services
+// both read. bearer is sent as an Authorization header only when it is
+// non-empty — see tracesAuth's own doc comment for when that is.
+//
+// Called exactly once per eventually poll and never again afterwards —
+// TestRedirectTraceCrossesEveryComponent keeps the last parsed Response
+// and runs its attribute check on THAT, rather than fetching the same
+// trace a second time once the service-presence check above has already
+// succeeded.
+func fetchTrace(ctx context.Context, httpClient *http.Client, tracesURL, bearer, traceID string) (traceattrs.Response, error) {
 	url := strings.TrimRight(tracesURL, "/") + "/api/traces/" + traceID
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return nil, err
+		return traceattrs.Response{}, err
 	}
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("query %s: %w", url, err)
+		return traceattrs.Response{}, fmt.Errorf("query %s: %w", url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("query %s: answered %d", url, resp.StatusCode)
+		return traceattrs.Response{}, fmt.Errorf("query %s: answered %d", url, resp.StatusCode)
 	}
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return traceattrs.Response{}, err
 	}
 
-	var parsed jaegerTraceResponse
+	var parsed traceattrs.Response
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return nil, fmt.Errorf("parse the trace response: %w", err)
+		return traceattrs.Response{}, fmt.Errorf("parse the trace response: %w", err)
 	}
 	if len(parsed.Data) == 0 {
-		return nil, fmt.Errorf("no trace %s yet", traceID)
+		return traceattrs.Response{}, fmt.Errorf("no trace %s yet", traceID)
 	}
 
-	seen := map[string]bool{}
-	var services []string
-	for _, trace := range parsed.Data {
-		names := make(map[string]string, len(trace.Processes))
-		for id, p := range trace.Processes {
-			names[id] = p.ServiceName
-		}
-		for _, span := range trace.Spans {
-			name := names[span.ProcessID]
-			if name != "" && !seen[name] {
-				seen[name] = true
-				services = append(services, name)
-			}
-		}
-	}
-	return services, nil
+	return parsed, nil
 }
