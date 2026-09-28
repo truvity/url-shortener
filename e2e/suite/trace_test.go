@@ -12,15 +12,52 @@ import (
 	"testing"
 	"time"
 
+	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
 	"github.com/truvity/policy/examples/url-shortener/e2e/traceauth"
 )
 
 // TestRedirectTraceCrossesEveryComponent proves the ONE thing none of the
 // other tests can: that a single request is a single TRACE across every
-// hop it touches — redirect, the broker, stat and log's own consumers, and
-// urls, which stat calls back into (docs/decisions on tracing; see
-// internal/api/tracing.go's doc comment on why the incoming context is
-// extracted before every span starts).
+// hop it touches.
+//
+// The real call graph of one GET /r/{key}, read off the code rather than
+// assumed:
+//
+//   - redirect answers the request itself — internal/business/redirect/
+//     manager.go's Manager.RedirectWithInfo reads the long URL from ITS OWN
+//     store (URLResolver.GetURLString); there is no synchronous RPC to urls
+//     on this path.
+//   - the SAME handler publishes a URLRedirect event to the broker before it
+//     answers (manager.go's emitRedirectEvent), and — because every Huma
+//     operation is wrapped in NewURLRequestMiddleware
+//     (internal/middleware's doc comment, wired in
+//     internal/business/redirect/routes.go's RegisterHumaRoutes) — a
+//     URLRequest event too, once the handler returns.
+//   - stat's consumer (stat/src/.../Stat.kt's `consumed`) continues that
+//     trace as a CONSUMER span per URLRedirect message, and — still inside
+//     it — calls UrlsService/RecordClick on urls (Stat.kt's recordClick,
+//     dispatched through an executor wrapped in Context.taskWrapping so the
+//     CLIENT span keeps the same parent). That RPC is the one and only way
+//     urls enters a redirect's trace.
+//   - log's consumer (log/src/.../tracing.py's `receive`) does the same for
+//     the URLRequest message: one child span per message, continuing the
+//     SAME trace. Its own write (archive.flush) is only LINKED to that span,
+//     not a child of it — log holds a batch of messages from many requests
+//     and cannot make the write a child of any single one of them
+//     (tracing.py's own doc comment) — so the flush lands in a trace of its
+//     own, not this one; only the per-message "receive" span is asserted
+//     below.
+//
+// So redirect, stat and urls are asserted here: all three finish within the
+// request/consume/RPC chain above, no batching involved. log's "receive"
+// span belongs to the same trace too, but it is exported only once its
+// batch flushes — bounded by archive.batch.maxSeconds, a value this test
+// does not control and which varies by tier (e.g. hack/install.sh sets it
+// to 5s for kind-shaped installs) — so asserting it here would tie this
+// test's timeout to a chart value it has no way to read. That is a gap in
+// coverage, not evidence log's context is broken; TestLogArchivesTheRecord
+// already proves log processes the right record, just not on this trace's
+// clock.
 //
 // The kind box carries no trace store (docs/decisions/0005-kind-is-the-gate.md's
 // amendment: cloud and platform integrations are switched off there), so
@@ -51,13 +88,27 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 		t.Fatalf("set up the trace store's credentials: %v", err)
 	}
 
+	// A real short link. GET /r/{key} is what runs the graph above — GET
+	// /version does not: it is registered directly on the fiber app (see
+	// cmd/redirect/main.go), never through humaAPI, so
+	// NewURLRequestMiddleware never wraps it and it publishes no event at
+	// all. A trace seeded there can carry a "redirect" span and nothing
+	// downstream of it, structurally, no matter how long this test waits.
+	client := urlsClient(ctx, t)
+	longURL := testLongURL(t)
+	created, err := journey.CreateURL(ctx, client, longURL)
+	if err != nil {
+		t.Fatalf("%s", errString(componentURLs, "create the URL under test", err))
+	}
+	key := created.GetKey()
+
 	traceID, err := randomTraceID()
 	if err != nil {
 		t.Fatalf("draw a trace id: %v", err)
 	}
 
 	base := serviceURL(ctx, t, componentRedirect, httpPort)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/version", http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/r/"+key, http.NoBody)
 	if err != nil {
 		t.Fatalf("build the request: %v", err)
 	}
@@ -67,9 +118,9 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 	// property this asserts by using it.
 	req.Header.Set("traceparent", fmt.Sprintf("00-%s-%s-01", traceID, randomSpanID(t)))
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := noRedirectClient.Do(req)
 	if err != nil {
-		t.Fatalf("%s", errString(componentRedirect, "GET /version (to seed the trace)", err))
+		t.Fatalf("%s", errString(componentRedirect, "GET /r/"+key+" (to seed the trace)", err))
 	}
 	_ = resp.Body.Close()
 
@@ -79,7 +130,7 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 			return err
 		}
 		var missing []string
-		for _, want := range []string{componentRedirect, componentURLs} {
+		for _, want := range []string{componentRedirect, componentStat, componentURLs} {
 			if !anyContains(services, want) {
 				missing = append(missing, want)
 			}
