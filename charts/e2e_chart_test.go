@@ -313,6 +313,24 @@ func proberDefaults(extra ...string) []string {
 	}, extra...)...)
 }
 
+// The prober's Deployment recreates rather than rolling — see
+// templates/prober.yaml's own comment on why a single-replica synthetic
+// traffic generator must not leave the old pod running (and probing)
+// while a broken new one fails to come up.
+func TestTheProberDeploymentRecreates(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	deploy := docOfKind(t, out, "Deployment")
+	spec, _ := deploy["spec"].(map[string]any)
+	strategy, _ := spec["strategy"].(map[string]any)
+	if got, _ := strategy["type"].(string); got != "Recreate" {
+		t.Errorf("the prober's Deployment strategy is %q, want Recreate", got)
+	}
+}
+
 // TestWhatTheE2EChartRendersIsWhatTheProberBinaryAccepts is
 // TestWhatTheChartRendersIsWhatTheBinariesAccept's own claim
 // (chart_test.go), proved here for the prober's own configuration file:

@@ -21,6 +21,17 @@ metadata:
     app.kubernetes.io/component: prober
 spec:
   replicas: 1
+  # Recreate, not the RollingUpdate default: with one replica, a
+  # maxUnavailable of 25% rounds down to 0, so RollingUpdate would leave the
+  # OLD pod running — and producing synthetic traffic — for as long as the
+  # new one fails to come up. That hides a broken prober from anything
+  # reading its metrics as a monitoring gate. Recreate stops the old pod
+  # first, so a bad rollout shows up as MISSING traffic instead. Not
+  # configurable: this is the chart's own design choice for a single-replica
+  # traffic generator, not something a deployment should be able to opt out
+  # of.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: url-shortener-e2e
