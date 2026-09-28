@@ -133,9 +133,9 @@ func TestTheE2EJobNameIncludesTheChartVersion(t *testing.T) {
 // same way `helm upgrade --install` and a GitOps controller's `helm
 // template` + apply already handle any ordinary resource. See
 // templates/job.yaml's own doc comment for why: unlike
-// charts/url-shortener/templates/verification.yaml's hook Job, this
-// chart's identity is its OWN version (folded into the Job's name), not
-// "the one verification Helm re-creates on every sync".
+// charts/url-shortener/templates/migrate.yaml's hook Job, this chart's
+// identity is its OWN version (folded into the Job's name), not "the one
+// Helm re-creates on every sync".
 func TestTheE2EChartRendersNoHook(t *testing.T) {
 	out, err := renderE2E(t, e2eDefaults()...)
 	if err != nil {

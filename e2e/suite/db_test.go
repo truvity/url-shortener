@@ -26,10 +26,9 @@ import (
 // appPasswordOrSkip reads the runtime role's password Secret, the one thing
 // this test needs that no other test in this package touches — see
 // env_test.go's resolveEnv doc comment for why it is resolved HERE and not
-// eagerly in TestMain: a caller with no permission to read Secrets (a
-// verification Job scoped to exactly what the rest of this suite needs, and
-// nothing more privileged) skips only this test, cleanly, rather than
-// failing the whole binary before any test runs.
+// eagerly in TestMain: a caller with no permission to read Secrets skips
+// only this test, cleanly, rather than failing the whole binary before any
+// test runs.
 //
 // kubectl reports a permission denial as "Forbidden" in its own error text
 // (there is no structured exit code to test instead — see `kubectl get
@@ -76,18 +75,6 @@ const (
 //     right nobody meant to grant, and internal/migration/migrate.go exists
 //     specifically to keep it off that role.
 func TestMigrationRanAndRolesAreSeparate(t *testing.T) {
-	// shared.names.AppSecret is empty exactly when this run resolved no
-	// infra-chart names at all — verificationHookMode, in env_test.go's
-	// resolveEnv. The database name and both role names are the platform's
-	// own values there (postgres.database, postgres.ownerRole,
-	// postgres.runtimeRole — none of them this chart's convention to
-	// assume), so there is nothing here to compare or connect with; skip
-	// cleanly rather than fail on two empty strings comparing equal below.
-	if shared.names.AppSecret == "" {
-		t.Skip("no infra-chart names resolved in this environment (see env_test.go's verificationHookMode) " +
-			"— the database and role names are the platform's own values, which this suite is not told " +
-			"and cannot render without helm; skipping the role-separation check")
-	}
 	if shared.names.OwnerRole == shared.names.AppRole {
 		t.Fatalf("the owner role and the app role resolved to the SAME name (%q) — there is no separation to test",
 			shared.names.OwnerRole)

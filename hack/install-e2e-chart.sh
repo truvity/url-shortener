@@ -12,9 +12,7 @@
 # fixture directly — see charts/url-shortener-e2e/values.yaml. It proves
 # what `just example-smoke` cannot: that the suite still runs every case
 # when it is the Job the chart ships, through that Job's own scoped RBAC,
-# with no fixture and no `helm` in its image (examples/url-shortener/e2e/Dockerfile)
-# — the same gap hack/verify-hook.sh exists to close for the application
-# chart's OWN hook, closed here for this chart's plain Job instead.
+# with no fixture and no `helm` in its image (examples/url-shortener/e2e/Dockerfile).
 set -euo pipefail
 
 # The cluster this example is installed into, BY NAME — see hack/install.sh's

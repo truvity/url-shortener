@@ -110,7 +110,7 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 		"CronJob": true, "Job": true, "Service": true,
 	}
 
-	app, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "verification.enabled=true")...)
+	app, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("the application chart does not render: %v\n%s", err, app)
 	}
@@ -175,10 +175,10 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 // deleted itself as MISSING from the live state and recreates it, which
 // `ttlSecondsAfterFinished` guarantees a plain Job eventually does. A HOOK
 // Job is exempt: Helm's own hook machinery is what deletes and recreates
-// it, never self-heal — see templates/migrate.yaml and
-// templates/verification.yaml's own `before-hook-creation` comments.
+// it, never self-heal — see templates/migrate.yaml's own
+// `before-hook-creation` comments.
 func TestNoPlainJobSetsTTLSecondsAfterFinished(t *testing.T) {
-	app, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "verification.enabled=true")...)
+	app, err := render(t, defaults("--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("the application chart does not render: %v\n%s", err, app)
 	}

@@ -48,13 +48,14 @@ const (
 	//
 	// Set to the EMPTY STRING (present in the environment, not merely
 	// unset — see kubecontextFromEnv) to run with no `--context` at all:
-	// that is what an in-cluster verification Job wants, so `kubectl` and
-	// the harness fall back to the Pod's own ServiceAccount rather than a
-	// kubeconfig context that does not exist there.
+	// that is what an in-cluster Job wants (the url-shortener-e2e chart's
+	// own Job always sets it this way), so `kubectl` and the harness fall
+	// back to the Pod's own ServiceAccount rather than a kubeconfig
+	// context that does not exist there.
 	envKubecontext = "E2E_KCTX"
 
 	// envTracesURL is a Jaeger-API query endpoint. Unset (the kind box
-	// carries no trace store, and a verification Job may have no route to
+	// carries no trace store, and an in-cluster Job may have no route to
 	// one either) skips the one trace-shaped test — see trace_test.go.
 	envTracesURL = "E2E_TRACES_URL"
 
@@ -80,17 +81,15 @@ const (
 	envS3AccessKeyID     = "E2E_S3_ACCESS_KEY_ID"
 	envS3SecretAccessKey = "E2E_S3_SECRET_ACCESS_KEY"
 
-	// envNamesFromEnv switches the suite to a THIRD source of names,
-	// beside fixture.Resolve (kind, via helm) and verificationHookMode's
-	// zero-value skip: every name the suite needs, read from its own
-	// E2E_* variable rather than rendered from a chart. This is what the
-	// url-shortener-e2e chart's Job sets — it carries no copy of
-	// charts/url-shortener-infra to render (same reason
-	// verificationHookMode's Job carries none — see that doc comment)
-	// and, unlike the hook, is meant to run EVERY case rather than skip
-	// the ones a missing name would otherwise silence. Any value turns it
-	// on; unlike envKubecontext, an empty one is not itself a distinct
-	// signal — see namesFromEnvMode.
+	// envNamesFromEnv switches the suite to its SECOND source of names,
+	// beside fixture.Resolve (kind, via helm): every name the suite
+	// needs, read from its own E2E_* variable rather than rendered from a
+	// chart. This is what the url-shortener-e2e chart's Job sets — see
+	// its own templates/job.yaml doc comment for why it carries no copy
+	// of charts/url-shortener-infra to render (no `helm` in the e2e
+	// image) — and it runs EVERY case, never skipping one for a missing
+	// name. Any value turns it on; unlike envKubecontext, an empty one is
+	// not itself a distinct signal — see namesFromEnvMode.
 	envNamesFromEnv = "E2E_NAMES_FROM_ENV"
 
 	// The rest of fixture.Names, one variable per field the
@@ -113,8 +112,8 @@ const (
 	// `secretKeyRef`, which needs no RBAC grant at all (the value is
 	// resolved when the Pod is admitted, never read back by this Pod's
 	// own ServiceAccount token) — unlike `kubectl get secret`, which is
-	// what a caller with no Secret permission (verificationHookMode's own
-	// hook Job) is exactly meant to skip on instead.
+	// what a caller with no Secret permission is exactly meant to skip on
+	// instead — see db_test.go's appPasswordOrSkip.
 	envAppPassword = "E2E_APP_PASSWORD"
 
 	defaultKubecontext = "kind-policy"
@@ -143,11 +142,12 @@ func getenv(name, def string) string {
 
 // kubecontextFromEnv reports the kubeconfig context to run with.
 //
-// This is NOT getenv: a verification Job needs to set envKubecontext to the
-// empty string ON PURPOSE, to get no `--context` flag at all rather than
-// this package's kind-box default — and an env var present with an empty
-// value is exactly that, distinguishable from the var being absent only by
-// os.LookupEnv (os.Getenv, and therefore getenv, collapse both to "").
+// This is NOT getenv: an in-cluster Job (the url-shortener-e2e chart's own)
+// needs to set envKubecontext to the empty string ON PURPOSE, to get no
+// `--context` flag at all rather than this package's kind-box default — and
+// an env var present with an empty value is exactly that, distinguishable
+// from the var being absent only by os.LookupEnv (os.Getenv, and therefore
+// getenv, collapse both to "").
 func kubecontextFromEnv() string {
 	if v, ok := os.LookupEnv(envKubecontext); ok {
 		return strings.TrimSpace(v)
@@ -162,49 +162,17 @@ func namespaceFromEnv() (string, bool) {
 	return ns, ns != ""
 }
 
-// verificationHookMode reports whether this run IS the chart's own
-// post-install/post-upgrade verification hook (templates/verification.yaml),
-// running in-cluster rather than from a laptop or CI runner against the kind
-// box or a caller's own kubeconfig context.
-//
-// The hook Job sets envKubecontext to the empty string ON PURPOSE — see
-// kubecontextFromEnv — which is otherwise a shape nothing else produces: a
-// human or a CI runner either leaves it unset (getting this package's kind
-// default) or points it at a real context, never at "set, but empty". That
-// same signal is also this suite's only way to know it must not shell out to
-// `helm`: the hook Job runs the e2e image, which carries no helm binary (see
-// e2e/Dockerfile) and no copy of the charts' embedded source the way this
-// checkout does, so fixture.Resolve — which renders url-shortener-infra to
-// read back a real install's database, role and secret names — cannot run
-// there. Those names are also the PLATFORM's own values in the first place
-// (postgres.database, postgres.ownerRole, postgres.runtimeRole,
-// postgres.runtimePasswordSecret in charts/url-shortener-infra/values.yaml,
-// each a `--set` on the install this Job was never told), so there would be
-// nothing trustworthy to resolve even with helm on PATH.
-//
-// resolveEnv skips fixture.Resolve entirely in this mode; db_test.go and
-// log_test.go's archive check notice the resulting zero-value names and skip
-// cleanly instead of asserting a name nobody gave them.
-func verificationHookMode() bool {
-	v, ok := os.LookupEnv(envKubecontext)
-	return ok && strings.TrimSpace(v) == ""
-}
-
 // namesFromEnvMode reports whether this run should build fixture.Names
-// entirely from environment variables rather than rendering
-// charts/url-shortener-infra with helm (the kind flow) or zeroing every
-// chart-derived name out (verificationHookMode) — see envNamesFromEnv's
-// doc comment.
+// entirely from environment variables — the url-shortener-e2e chart's Job
+// — rather than rendering charts/url-shortener-infra with helm (the kind
+// flow) — see envNamesFromEnv's doc comment.
 func namesFromEnvMode() bool {
 	return strings.TrimSpace(os.Getenv(envNamesFromEnv)) != ""
 }
 
 // namesFromEnv builds fixture.Names entirely from this Job's own
-// environment. Unlike verificationHookMode, which leaves every
-// chart-derived name at its zero value so the tests that need one skip
-// cleanly, this mode exists to run every case — so every name
-// fixture.Resolve would otherwise have rendered from
-// charts/url-shortener-infra arrives here as a value the
+// environment: every name fixture.Resolve would otherwise have rendered
+// from charts/url-shortener-infra arrives here as a value the
 // url-shortener-e2e chart's Job was given instead, one environment
 // variable per field.
 //
@@ -250,22 +218,10 @@ func resolveEnvWithTimeout(namespace string, timeout time.Duration) (env, error)
 //
 // It does NOT read the role passwords apply.sh generated into Secrets —
 // that used to happen here, unconditionally, which meant a caller with no
-// permission to read Secrets (a verification Job scoped to exactly what the
-// suite's other tests need) failed EVERY test in this package before any of
-// them ran. db_test.go's appPasswordOrSkip resolves that password lazily,
-// inside the one test that needs it, so a missing permission skips that
-// test alone.
-//
-// In verificationHookMode it skips fixture.Resolve altogether, for the same
-// reason and the same way: that call needs `helm` (absent from the e2e
-// image) and the platform's own install-time values (never handed to this
-// Job) to mean anything, so running it here traded one whole-binary failure
-// (a Secret this account cannot read) for another (a binary this image does
-// not carry) — see verificationHookMode's doc comment. The returned Names
-// carries only what this Job WAS given — its namespace and release, and the
-// archive bucket's default or E2E_BUCKET override, neither of which the
-// infra chart's render decides — leaving every chart-derived field at its
-// zero value for the tests that need one to skip on.
+// permission to read Secrets failed EVERY test in this package before any
+// of them ran. db_test.go's appPasswordOrSkip resolves that password
+// lazily, inside the one test that needs it, so a missing permission skips
+// that test alone.
 func resolveEnv(_ context.Context, namespace string) (env, error) {
 	// ctx is unused today: fixture.Resolve takes none, and nothing else
 	// here shells out any more (see the doc comment above). Kept in the
@@ -280,14 +236,6 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 	switch {
 	case namesFromEnvMode():
 		names = namesFromEnv(namespace, appRelease, bucket)
-	case verificationHookMode():
-		names = fixture.Names{
-			Options: fixture.Options{
-				Namespace:  namespace,
-				AppRelease: appRelease,
-				Bucket:     bucket,
-			},
-		}
 	default:
 		var err error
 		names, err = fixture.Resolve(fixture.Options{

@@ -45,26 +45,6 @@ func TestLogArchivesTheRecord(t *testing.T) {
 	// Long enough to outlast the 90s polling bound below with margin — a
 	// context that expires mid-poll fails every remaining attempt with its
 	// OWN error and hides whatever findArchivedRecord was actually seeing.
-	// shared.names.RequestSubject is empty exactly when this run resolved
-	// no infra-chart names — verificationHookMode, in env_test.go's
-	// resolveEnv. It is folded into the infra chart's Stream, computed by
-	// a formula rather than taken as a value (see
-	// charts/url-shortener-infra/templates/_helpers.tpl), so there is no
-	// platform value to fall back to either; skip cleanly rather than
-	// filter every archived record against an empty string forever.
-	//
-	// This is checked ahead of s3ClientOrSkip, which today skips first in
-	// the common case anyway (no object-store Service and no
-	// E2E_S3_ENDPOINT in-cluster) — but a platform that sets
-	// E2E_S3_ENDPOINT via verification.env to run this check for real
-	// must still see a clean skip here, not a 90-second timeout against a
-	// filter that can never match.
-	if shared.names.RequestSubject == "" {
-		t.Skip("no infra-chart names resolved in this environment (see env_test.go's verificationHookMode) " +
-			"— the request subject is computed from the infra chart's own render, which this suite " +
-			"cannot do without helm; skipping the archive check")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -101,8 +81,8 @@ func TestLogArchivesTheRecord(t *testing.T) {
 // identity to fall back to: the kind box's own S3 stand-in, reached at a
 // real endpoint (http://s3.object-store.svc:4566) but authenticated with
 // nothing an IMDS-shaped credential chain can discover. Unset, credentials
-// come from this process's own default AWS credential chain instead — a
-// verification Job's Pod identity, in production — never the kind box's
+// come from this process's own default AWS credential chain instead — an
+// in-cluster Job's Pod identity, in production — never the kind box's
 // static test credentials, which are meaningless anywhere else.
 //
 // envS3Endpoint unset falls back to the kind box's own S3 stand-in
@@ -112,9 +92,9 @@ func TestLogArchivesTheRecord(t *testing.T) {
 // plane to hand the client instead (docs/decisions/0005-kind-is-the-gate.md's
 // amendment). Outside kind, that Service does not exist, so this SKIPS
 // rather than fails: reading a bucket from outside the application's own
-// IAM is a permission a verification Job should not be handed just to run
-// this one check, and the operator can opt in by setting envS3Endpoint
-// (see env_test.go).
+// IAM is a permission a caller should not be handed just to run this one
+// check, and the operator can opt in by setting envS3Endpoint (see
+// env_test.go).
 func s3ClientOrSkip(ctx context.Context, t *testing.T) *s3.Client {
 	t.Helper()
 
