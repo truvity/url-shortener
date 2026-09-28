@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"sort"
 	"strconv"
 	"testing"
 
@@ -192,10 +191,11 @@ func TestGoServicesMatchServiceExtensions(t *testing.T) {
 			got, err := withAllowedAttributesArgs(tc.file)
 			require.NoError(t, err)
 
-			want := append([]string{}, ServiceExtensions[tc.component]...)
-			sort.Strings(got)
-			sort.Strings(want)
-			require.Equal(t, want, got,
+			// ElementsMatch, not Equal: it treats "no call" (nil) and "a
+			// call with zero keys" ([]string{}) as the same empty set,
+			// which a plain Equal does not, and it does not care about
+			// argument order either.
+			require.ElementsMatch(t, ServiceExtensions[tc.component], got,
 				"%s's own WithAllowedAttributes call no longer matches traceattrs.ServiceExtensions[%q] — update whichever one is stale",
 				tc.file, tc.component)
 		})

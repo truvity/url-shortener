@@ -110,16 +110,17 @@ func processNames(trace Trace) map[string]string {
 // Every entry names its own source below, because this example's four
 // languages cannot share one Go-importable list:
 //
-//   - "urls", "redirect" (Go): cmd/urls/main.go and cmd/redirect/main.go
-//     both call policytelemetry.WithAllowedAttributes("error") — the
-//     boolean internal/api.Tracing sets on a failed request
-//     (internal/api/tracing.go, `attribute.Bool("error", true)`).
+//   - "urls", "redirect" (Go): only cmd/redirect/main.go calls
+//     policytelemetry.WithAllowedAttributes("error") — the boolean
+//     internal/api.Tracing sets on a failed request (internal/api/tracing.go,
+//     `attribute.Bool("error", true)`). urls serves only Connect RPC and
+//     never imports internal/api, so it has no extension of its own.
 //     TestGoServicesMatchServiceExtensions, in traceattrs_test.go, parses
-//     both files' source and fails the moment the literal keys they pass
-//     drift from what is written here. It reads the SOURCE rather than
-//     importing a shared var because both files are `package main`, which
-//     nothing outside them can import — the nearest either language gets
-//     to one shared list without restructuring a live service's entry
+//     both files' source and fails the moment the literal keys either
+//     passes drift from what is written here. It reads the SOURCE rather
+//     than importing a shared var because both files are `package main`,
+//     which nothing outside them can import — the nearest either language
+//     gets to one shared list without restructuring a live service's entry
 //     point just to satisfy a test.
 //   - "stat" (Kotlin): stat's own DEFAULT_ALLOWED_ATTRIBUTES
 //     (stat/src/main/kotlin/com/truvity/example/stat/SpanAttributeAllowlist.kt),
@@ -139,7 +140,7 @@ func processNames(trace Trace) map[string]string {
 // per-language default; policytelemetry.DefaultAllowedAttributes stands
 // in for all four.
 var ServiceExtensions = map[string][]string{
-	"urls":     {"error"},
+	"urls":     {},
 	"redirect": {"error"},
 	"stat":     {},
 	"log":      {"archive.records", "archive.key"},

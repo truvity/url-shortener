@@ -73,11 +73,12 @@ func run() error {
 	// With no endpoint configured this installs exporters that do nothing,
 	// so a laptop and a cluster run the same code down the same path.
 	//
-	// "error" is this service's own addition to the default span-attribute
-	// allow-list: api.Tracing sets it as a boolean on a failed request, and
-	// it carries no request data of its own, so it is extended here rather
-	// than folded into the package's default list.
-	shutdownTelemetry, err := policytelemetry.Start(ctx, policytelemetry.WithAllowedAttributes("error"))
+	// No allow-list extension here: this service serves only Connect RPC
+	// through otelconnect, and never imports internal/api, so nothing in
+	// its own request path sets an attribute outside the package's default
+	// list. redirect is the one that extends it, because it is the one
+	// that imports internal/api's Tracing middleware.
+	shutdownTelemetry, err := policytelemetry.Start(ctx)
 	if err != nil {
 		return err
 	}
