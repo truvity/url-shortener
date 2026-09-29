@@ -76,14 +76,22 @@ spec:
             periodSeconds: 5
           {{- include "url-shortener.preStop" . | nindent 10 }}
           volumeMounts:
+            {{- if include "url-shortener.eventsIdentityOn" . }}
+            {{- include "url-shortener.eventsCAMount" . | nindent 12 }}
+            {{- else }}
             {{- include "url-shortener.eventsTokenMount" . | nindent 12 }}
+            {{- end }}
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
             {{- include "url-shortener.identityMount" . | nindent 12 }}
           resources: {{- toYaml .Values.resources.redirect | nindent 12 }}
       volumes:
+        {{- if include "url-shortener.eventsIdentityOn" . }}
+        {{- include "url-shortener.eventsCAVolume" . | nindent 8 }}
+        {{- else }}
         {{- include "url-shortener.eventsTokenVolume" . | nindent 8 }}
+        {{- end }}
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-config

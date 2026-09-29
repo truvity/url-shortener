@@ -106,6 +106,25 @@
               "minimum": 600
             }
           }
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "serverName": {
+              "type": "string"
+            },
+            "caConfigMap": {
+              "type": "string"
+            },
+            "caKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },

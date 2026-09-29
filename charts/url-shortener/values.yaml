@@ -69,6 +69,28 @@ events:
     audience: ""
     expirationSeconds: 3600
 
+  # Authenticate the REDIRECT component to the broker with its workload
+  # identity instead of a token: the certificate the platform mounts for
+  # `tls` (so `tls.mode` must not be off for redirect) is presented over
+  # TLS, and the broker maps the identity in it to a user with its own
+  # permissions -- what redirect may publish is the broker's decision.
+  # Off by default, and then redirect sends its token exactly as before.
+  #
+  # When on, redirect sends NO token: a certificate the broker cannot map
+  # must fail at connect, not fall through to the token path and succeed
+  # with the account's full rights, which would read as a working setup.
+  # `stat` and `log` are unaffected and keep their tokens.
+  tls:
+    enabled: false
+    # The name the broker's certificate was issued for, when that is not
+    # the host in `events.url`. Empty verifies the host dialled.
+    serverName: ""
+    # A ConfigMap in this namespace holding the trust bundle the broker's
+    # certificate is verified against. Required when enabled. The
+    # BROKER's chain, which is usually not the workload identity's.
+    caConfigMap: ""
+    caKey: ca-certificates.crt
+
 # Where the request archive goes.
 #
 # The vendor is not in here. An endpoint, a region and a path-style flag

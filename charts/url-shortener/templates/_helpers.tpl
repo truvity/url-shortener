@@ -356,6 +356,45 @@ audience the broker demands; everything else follows from that.
 Empty audience renders nothing, which is a broker that admits anonymous
 clients. That is what a local one does, and what a laptop needs.
 */}}
+{{/*
+Whether redirect authenticates to the broker with its workload identity
+(`events.tls.enabled`) instead of a token. It needs the identity to exist, so
+it is refused where redirect has none: TLS to a broker that verifies clients,
+with no client certificate, fails at the handshake with an error that names
+neither setting.
+*/}}
+{{- define "url-shortener.eventsIdentityOn" -}}
+{{- if .Values.events.tls.enabled -}}
+{{- if eq (include "url-shortener.tlsMode" (dict "root" . "component" "redirect")) "off" -}}
+{{- fail "events.tls.enabled presents redirect's workload identity to the broker, but redirect has none: set tls.mode (or tls.components.redirect.mode) to permissive so an identity is mounted" -}}
+{{- end -}}
+{{- if not .Values.events.tls.caConfigMap -}}
+{{- fail "events.tls.caConfigMap is required when events.tls.enabled: the trust bundle the broker's certificate is verified against" -}}
+{{- end -}}
+yes
+{{- end -}}
+{{- end -}}
+
+{{/*
+The broker's trust bundle, mounted into redirect when it authenticates with
+its identity. A ConfigMap volume: the platform writes it, this only reads it.
+*/}}
+{{- define "url-shortener.eventsCAVolume" -}}
+{{- if include "url-shortener.eventsIdentityOn" . }}
+- name: events-ca
+  configMap:
+    name: {{ .Values.events.tls.caConfigMap }}
+{{- end }}
+{{- end -}}
+
+{{- define "url-shortener.eventsCAMount" -}}
+{{- if include "url-shortener.eventsIdentityOn" . }}
+- name: events-ca
+  mountPath: /var/run/events-ca
+  readOnly: true
+{{- end }}
+{{- end -}}
+
 {{- define "url-shortener.eventsTokenVolume" -}}
 {{- with .Values.events.auth.audience -}}
 - name: events-token

@@ -1,11 +1,15 @@
 package runtime
 
 import (
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/nats-io/nats.go"
+
+	"github.com/truvity/policy/transport"
 )
 
 // NATSToken authenticates with a token the platform mounts as a file.
@@ -54,4 +58,45 @@ func NATSOptions(name, tokenFile string) ([]nats.Option, error) {
 	}
 
 	return append(opts, NATSToken(tokenFile)), nil
+}
+
+// NATSIdentity authenticates to the broker with the workload identity the
+// platform mounted, over TLS, INSTEAD of a token: the certificate is the
+// credential, and the broker maps the identity in it to a user with its own
+// permissions.
+//
+// The certificate is the same one the service's own `tls` block serves, read
+// through the same loader. It is re-read on every connect, not once at
+// start-up, for the reason NATSToken re-reads its file: the platform rotates
+// it within the hour, and a client that cached the first one connects fine
+// until its first reconnect after the expiry and then fails at three in the
+// morning. A connection already made is not affected by a rotation — the
+// broker checks the certificate at the handshake only — so a rotation drops
+// nothing; it is the NEXT connect that must present a fresh certificate.
+//
+// caFile is the trust bundle for the BROKER's certificate, and serverName is
+// the name that certificate was issued for. Both are the broker's, not the
+// workload identity's: a broker has a name and no workload identity.
+//
+// It refuses to build without an identity rather than dialling TLS with no
+// client certificate. A broker that verifies clients refuses that at the
+// handshake with an error about a missing certificate that says nothing about
+// which setting was left off; this says it here.
+func NATSIdentity(id *transport.Identity, caFile, serverName string) (nats.Option, error) {
+	if id == nil {
+		return nil, errors.New("events.nats.tls asks to present a workload identity, but this service has none: " +
+			"set tls.mode to permissive or strict so an identity is mounted and loaded")
+	}
+
+	pem, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("read the broker's trust bundle: %w", err)
+	}
+
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pem) {
+		return nil, fmt.Errorf("the broker's trust bundle at %s holds no certificate", caFile)
+	}
+
+	return nats.Secure(id.ClientTo(roots, serverName)), nil
 }

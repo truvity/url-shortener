@@ -61,8 +61,18 @@ type (
 
 	// NATS is a connection, and nothing about what is done with it.
 	NATS struct {
-		URL       string `json:"url"`
-		TokenFile string `json:"tokenFile"`
+		URL       string  `json:"url"`
+		TokenFile string  `json:"tokenFile"`
+		TLS       NATSTLS `json:"tls"`
+	}
+
+	// NATSTLS is how a connection to the broker is secured and
+	// authenticated with the service's own workload identity. Empty means
+	// neither: the connection is as it was, and the token file, if any,
+	// is what authenticates it.
+	NATSTLS struct {
+		CAFile     string `json:"caFile"`
+		ServerName string `json:"serverName"`
 	}
 
 	// Consumer is what a durable consumer binds to.

@@ -58,10 +58,21 @@ data:
     events:
       nats:
         url: {{ .Values.events.url }}
+        {{- if include "url-shortener.eventsIdentityOn" . }}
+        {{- /* The certificate is the credential: no token file, so a
+        certificate the broker cannot map is refused instead of falling
+        through to the token path. */}}
+        tls:
+          caFile: /var/run/events-ca/{{ .Values.events.tls.caKey }}
+          {{- with .Values.events.tls.serverName }}
+          serverName: {{ . }}
+          {{- end }}
+        {{- else }}
         {{- with .Values.events.auth.audience }}
         {{- /* The broker authenticates its clients; the token is
         a projected ServiceAccount token this pod cannot forge. */}}
         tokenFile: /var/run/events/token
+        {{- end }}
         {{- end }}
       redirectSubject: {{ include "url-shortener.redirectSubject" . }}
       requestSubject: {{ include "url-shortener.requestSubject" . }}

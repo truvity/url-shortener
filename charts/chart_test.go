@@ -1467,3 +1467,92 @@ func TestNoTwoWorkloadsShareAServiceAccount(t *testing.T) {
 		})
 	}
 }
+
+// Redirect authenticates to the broker with its workload identity when asked,
+// and ONLY redirect: `stat` and `log` keep their tokens, because the change
+// is a pilot on one publisher and a schema that admits the key in a file
+// nothing reads would be a field somebody eventually sets.
+func TestEventsIdentityReplacesTheTokenForRedirectAlone(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "events.auth.audience=nats",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.trustDomain=example.internal",
+		"--set", "events.tls.enabled=true",
+		"--set", "events.tls.caConfigMap=broker-ca",
+		"--set", "events.tls.serverName=broker.example.internal")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	redirect := conformance.ConfigMapData(t, []byte(out), "redirect.yaml")
+	conformance.ValidDocument(t, redirect, config.Read("redirect.json"))
+
+	for _, want := range []string{
+		"caFile: /var/run/events-ca/ca-certificates.crt",
+		"serverName: broker.example.internal",
+	} {
+		if !strings.Contains(string(redirect), want) {
+			t.Errorf("redirect.yaml is missing %q:\n%s", want, redirect)
+		}
+	}
+
+	if strings.Contains(string(redirect), "tokenFile") {
+		t.Errorf("redirect.yaml still names a token file: the certificate must be the only credential, or a certificate the broker cannot map falls through to the token path and succeeds as somebody else:\n%s", redirect)
+	}
+
+	for _, other := range []string{"stat.yaml", "log.yaml"} {
+		doc := conformance.ConfigMapData(t, []byte(out), other)
+		if !strings.Contains(string(doc), "tokenFile: /var/run/events/token") {
+			t.Errorf("%s lost its token: the identity is redirect's alone", other)
+		}
+
+		if strings.Contains(string(doc), "events-ca") {
+			t.Errorf("%s was given the broker's trust bundle: the identity is redirect's alone", other)
+		}
+	}
+}
+
+// Off by default, and then the render carries no trace of it: the broker
+// trust bundle volume, the config key. A golden would catch it; this names it.
+func TestEventsIdentityOffLeavesNoTrace(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "events.auth.audience=nats")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	for _, trace := range []string{"events-ca", "events-ca/", "serverName"} {
+		if strings.Contains(out, trace) {
+			t.Errorf("the default render mentions %q; with events.tls off it must carry no trace of it", trace)
+		}
+	}
+}
+
+// The refusals: an identity with nothing mounted, and no trust bundle for the
+// broker, each name the setting rather than failing later at a handshake.
+func TestEventsIdentityIsRefusedWhereItCannotWork(t *testing.T) {
+	for name, tc := range map[string]struct {
+		set  []string
+		want string
+	}{
+		"redirect has no identity": {
+			set:  []string{"--set", "events.tls.enabled=true", "--set", "events.tls.caConfigMap=broker-ca"},
+			want: "redirect has none",
+		},
+		"no trust bundle for the broker": {
+			set: []string{"--set", "tls.mode=permissive", "--set", "tls.trustDomain=example.internal",
+				"--set", "events.tls.enabled=true"},
+			want: "events.tls.caConfigMap is required",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, defaults(append([]string{"--set", "images.web.tag=dev"}, tc.set...)...)...)
+			if err == nil {
+				t.Fatalf("the render was accepted:\n%s", out)
+			}
+
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("the refusal does not say what is wrong (want %q): %s", tc.want, out)
+			}
+		})
+	}
+}

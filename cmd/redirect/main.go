@@ -99,7 +99,16 @@ func run() error {
 	}
 	defer closeDB()
 
-	nc, err := connect(cfg.Events.NATS)
+	// The mounted identity, if the platform provides one. A nil identity is
+	// not an error: it is the default, and it means cleartext. Loaded before
+	// the broker is dialled, because the broker may be the first thing that
+	// asks for it.
+	identity, err := transport.Load(cfg.TLS, log)
+	if err != nil {
+		return fmt.Errorf("transport identity: %w", err)
+	}
+
+	nc, err := connect(cfg.Events.NATS, identity)
 	if err != nil {
 		return err
 	}
@@ -128,13 +137,6 @@ func run() error {
 		publisher: publisher,
 		subject:   cfg.Events.RequestSubject,
 	})
-
-	// The mounted identity, if the platform provides one. A nil identity is
-	// not an error: it is the default, and it means cleartext.
-	identity, err := transport.Load(cfg.TLS, log)
-	if err != nil {
-		return fmt.Errorf("transport identity: %w", err)
-	}
 
 	app := fiber.New()
 	// A span per request, and the incoming trace continued.
@@ -257,10 +259,22 @@ func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error
 	return db, func() { _ = sqlDB.Close() }, nil
 }
 
-func connect(cfg config.NATS) (*nats.Conn, error) {
+func connect(cfg config.NATS, identity *transport.Identity) (*nats.Conn, error) {
 	opts, err := runtime.NATSOptions("url-shortener-redirect", cfg.TokenFile)
 	if err != nil {
 		return nil, err
+	}
+
+	// A certificate, when the platform asks for one, is the credential:
+	// the chart sends no token alongside it, so a certificate the broker
+	// cannot map fails here rather than succeeding as somebody else.
+	if cfg.TLS.CAFile != "" {
+		withIdentity, err := runtime.NATSIdentity(identity, cfg.TLS.CAFile, cfg.TLS.ServerName)
+		if err != nil {
+			return nil, err
+		}
+
+		opts = append(opts, withIdentity)
 	}
 
 	nc, err := nats.Connect(cfg.URL, opts...)

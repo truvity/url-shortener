@@ -166,7 +166,26 @@ export const sharedSchemas: Record<string, object> = {
       "tokenFile": {
         "type": "string",
         "minLength": 1,
-        "description": "Path to a file holding the token the client authenticates with, mounted by the platform and re-read on every reconnect so that a rotated token is picked up without a restart. It is the workload's own account token: the broker asks an authorisation service who the bearer is, and that service answers from the account rather than from anything the client claims. Unset means no authentication, which is a test configuration and not a deployment."
+        "description": "Path to a file holding the token the client authenticates with, mounted by the platform and re-read on every reconnect so that a rotated token is picked up without a restart. It is the workload's own account token: the broker asks an authorisation service who the bearer is, and that service answers from the account rather than from anything the client claims. Unset with `tls` unset means no authentication, which is a test configuration and not a deployment; unset with `tls` set means the certificate is the credential."
+      },
+      "tls": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caFile"
+        ],
+        "description": "Connect over TLS and authenticate with the service's own workload identity instead of a token. The certificate presented is the one the service's own top-level `tls` block loads (its mode must not be `off`); the broker maps the identity in it to a user with its own permissions, so what the service may do is the broker's decision and nothing in this file. The certificate is re-read on every connect, so the platform's rotation is picked up without a restart and a rotation drops no connection already made. Only a service that declares this key in its own schema acts on it.",
+        "properties": {
+          "caFile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path to the trust bundle the BROKER's certificate is verified against. The broker's, not the workload identity's: a broker has a name and no workload identity, and usually a different chain."
+          },
+          "serverName": {
+            "type": "string",
+            "description": "The name the broker's certificate was issued for, when that is not the host in `url`. Empty verifies the host dialled."
+          }
+        }
       }
     }
   },
