@@ -19,6 +19,7 @@ data:
       seconds: 3
     interval: "5s"
     keyPrefix: "synthetic-"
+    statSettle: "60s"
     tls:
       mode: strict
       certFile: /var/run/example-identity/tls.crt
@@ -129,7 +130,7 @@ spec:
         # charts/url-shortener/templates/redirect.yaml states in full: without
         # this, a `helm upgrade` that only edits the ConfigMap changes
         # nothing, because the running pod keeps the file it started with.
-        checksum/config: 121bfc46333467489f4c69149b7be69c8cbedd17d74981420e5e65d9f6c507e8
+        checksum/config: 49c48f1bc6486260b98cae86e09157cd2ac7bdd0574145bdfdf8b6d61bc1f152
     spec:
       # Named only while the transport identity is on: the CSI driver
       # derives this pod's SPIFFE identity from the account it runs as, and
