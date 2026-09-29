@@ -1,0 +1,17 @@
+# The migration has its own account (`serviceAccount.migrate`); it is not a
+# per-component name, and a typo must not be silently ignored.
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+serviceAccount:
+  components:
+    migrate:
+      name: somebody

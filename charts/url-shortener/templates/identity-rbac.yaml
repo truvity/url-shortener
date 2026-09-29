@@ -34,7 +34,10 @@ roleRef:
   kind: Role
   name: {{ include "url-shortener.name" . }}-request-identity
 subjects:
+  {{- /* Every workload mounts the identity volume, so every one may ask. */}}
+  {{- range (list "redirect" "urls" "web" "stat" "log") }}
   - kind: ServiceAccount
-    name: {{ include "url-shortener.appServiceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
+    name: {{ include "url-shortener.componentServiceAccountName" (dict "root" $ "component" .) }}
+    namespace: {{ $.Release.Namespace }}
+  {{- end }}
 {{- end }}

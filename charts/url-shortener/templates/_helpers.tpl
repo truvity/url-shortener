@@ -90,10 +90,48 @@ migration and the services cannot accidentally be handed the same credential.
 {{- end -}}
 
 {{/*
-The two account names: what was asked for, or the release's own, suffixed.
+The account ONE component runs as. EVERY component has its own, always:
+`redirect`, `urls`, `web`, `stat` and `log` never share an account, because a
+workload identity is namespace plus account, and a shared account makes two
+components indistinguishable to an allow-list.
+
+The order: `serviceAccount.components.<component>.name`; for `log` only,
+`serviceAccount.app.name` (the account a platform already bound a cloud role
+to for the archive bucket, which is still log's own account: nothing else
+runs as it); then `<release>-<component>`.
+
+Takes the root context and the component name.
 */}}
-{{- define "url-shortener.appServiceAccountName" -}}
-{{- .Values.serviceAccount.app.name | default (printf "%s-app" (include "url-shortener.name" .)) -}}
+{{- define "url-shortener.componentServiceAccountName" -}}
+{{- $sa := .root.Values.serviceAccount -}}
+{{- $own := (get ($sa.components | default dict) .component | default dict).name -}}
+{{- if $own -}}
+{{- $own -}}
+{{- else if and (eq .component "log") $sa.app.name -}}
+{{- $sa.app.name -}}
+{{- else -}}
+{{- printf "%s-%s" (include "url-shortener.name" .root) .component -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Refuses two workloads sharing an account: an identity must name ONE
+component, and a shared name quietly turns an allow-list for `web` into one
+for `stat` too. The migration counts, so its rights stay off the request path.
+*/}}
+{{- define "url-shortener.checkComponentAccounts" -}}
+{{- $seen := dict -}}
+{{- range (list "redirect" "urls" "web" "stat" "log") -}}
+{{- $n := include "url-shortener.componentServiceAccountName" (dict "root" $ "component" .) -}}
+{{- if hasKey $seen $n -}}
+{{- fail (printf "serviceAccount: %s and %s would both run as %q; every component needs its own account, or the identity cannot tell them apart" (get $seen $n) . $n) -}}
+{{- end -}}
+{{- $_ := set $seen $n . -}}
+{{- end -}}
+{{- $m := include "url-shortener.migrateServiceAccountName" . -}}
+{{- if hasKey $seen $m -}}
+{{- fail (printf "serviceAccount: %s and the migration would both run as %q; the migration's rights must stay off the request path" (get $seen $m) $m) -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "url-shortener.migrateServiceAccountName" -}}

@@ -41,12 +41,65 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: example-app
+  name: example-redirect
   labels:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: redirect
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: urls
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: web
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: stat
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-log
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: log
 
 ---
 # Source: url-shortener/templates/config.yaml
@@ -244,7 +297,7 @@ spec:
       annotations:
         checksum/config: a650b20276ed38567032047b757d5d0ec96d7f9268fb70053014a8e5f292feda
     spec:
-      serviceAccountName: example-app
+      serviceAccountName: example-log
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -344,7 +397,7 @@ spec:
         # the file they started with, and the deploy reads as successful.
         checksum/config: a650b20276ed38567032047b757d5d0ec96d7f9268fb70053014a8e5f292feda
     spec:
-      serviceAccountName: example-app
+      serviceAccountName: example-redirect
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -450,7 +503,7 @@ spec:
       annotations:
         checksum/config: a650b20276ed38567032047b757d5d0ec96d7f9268fb70053014a8e5f292feda
     spec:
-      serviceAccountName: example-app
+      serviceAccountName: example-stat
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -550,7 +603,7 @@ spec:
       annotations:
         checksum/config: a650b20276ed38567032047b757d5d0ec96d7f9268fb70053014a8e5f292feda
     spec:
-      serviceAccountName: example-app
+      serviceAccountName: example-urls
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -649,7 +702,7 @@ spec:
       annotations:
         checksum/config: a650b20276ed38567032047b757d5d0ec96d7f9268fb70053014a8e5f292feda
     spec:
-      serviceAccountName: example-app
+      serviceAccountName: example-web
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532

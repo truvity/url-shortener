@@ -437,6 +437,11 @@ tls:
   # application chart's OWN `tls.peers.urls` and `tls.peers.redirect` —
   # otherwise `strict` refuses the prober at the handshake, and the error
   # names a certificate rather than a list nobody filled in.
+  #
+  # `urls` and `redirect` answer as their OWN accounts (every component of
+  # the application release has one), so name those here:
+  # `<application release>-urls` and `<application release>-redirect`,
+  # unless renamed in its `serviceAccount.components`.
   peers: []
 
 # Telemetry for the prober, on exactly the same terms as

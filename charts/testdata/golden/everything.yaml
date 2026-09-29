@@ -41,12 +41,65 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: redirect
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: urls
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: web
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: stat
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
   name: app-account
   labels:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: log
   annotations:
     example.invalid/role: app
 
@@ -108,7 +161,9 @@ data:
       trustDomain: example.invalid
       peers:
         - namespace: default
-          serviceAccount: app-account
+          serviceAccount: example-web
+        - namespace: default
+          serviceAccount: example-stat
         - namespace: other
           serviceAccount: reader
     database:
@@ -131,7 +186,7 @@ data:
       trustDomain: example.invalid
       peers:
         - namespace: default
-          serviceAccount: app-account
+          serviceAccount: example-urls
     urls:
       address: https://example-urls:8080
     events:
@@ -159,7 +214,7 @@ data:
       trustDomain: example.invalid
       peers:
         - namespace: default
-          serviceAccount: app-account
+          serviceAccount: example-urls
     urls:
       address: https://example-urls:8080
     assets:
@@ -226,6 +281,18 @@ roleRef:
   kind: Role
   name: example-request-identity
 subjects:
+  - kind: ServiceAccount
+    name: example-redirect
+    namespace: default
+  - kind: ServiceAccount
+    name: example-urls
+    namespace: default
+  - kind: ServiceAccount
+    name: example-web
+    namespace: default
+  - kind: ServiceAccount
+    name: example-stat
+    namespace: default
   - kind: ServiceAccount
     name: app-account
     namespace: default
@@ -329,7 +396,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
+        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -459,9 +526,9 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
+        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
     spec:
-      serviceAccountName: app-account
+      serviceAccountName: example-redirect
       securityContext:
         runAsNonRoot: true
         runAsUser: 1234
@@ -585,9 +652,9 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
+        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
     spec:
-      serviceAccountName: app-account
+      serviceAccountName: example-stat
       securityContext:
         runAsNonRoot: true
         runAsUser: 1234
@@ -702,9 +769,9 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
+        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
     spec:
-      serviceAccountName: app-account
+      serviceAccountName: example-urls
       securityContext:
         runAsNonRoot: true
         runAsUser: 1234
@@ -818,9 +885,9 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
+        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
     spec:
-      serviceAccountName: app-account
+      serviceAccountName: example-web
       securityContext:
         runAsNonRoot: true
         runAsUser: 1234

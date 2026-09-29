@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -168,7 +169,7 @@ func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 //
 // Regenerate with `just golden` after reading the diff, never before.
 func TestWhatTheChartRenders(t *testing.T) {
-	for _, name := range []string{"minimal", "everything"} {
+	for _, name := range []string{"minimal", "everything", "per-component"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := render(t, "-f", filepath.Join("testdata", name+".yaml"))
 			if err != nil {
@@ -1275,5 +1276,194 @@ func TestPerComponentModeStillRendersEmptyPeersAsAnArray(t *testing.T) {
 	peers, ok := tlsOf(t, out, "redirect.yaml")["peers"].([]any)
 	if !ok || len(peers) != 0 {
 		t.Errorf("redirect tls.peers = %#v, want an empty array", tlsOf(t, out, "redirect.yaml")["peers"])
+	}
+}
+
+// serviceAccountsOf maps every Deployment and Job in a render to the account
+// it runs as, keyed by component (the name after the release's own prefix).
+func serviceAccountsOf(t *testing.T, out string) map[string]string {
+	t.Helper()
+
+	got := map[string]string{}
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if !strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job") {
+			continue
+		}
+
+		var m struct {
+			Metadata struct{ Name string } `yaml:"metadata"`
+			Spec     struct {
+				Template struct {
+					Spec struct {
+						ServiceAccountName string `yaml:"serviceAccountName"`
+					} `yaml:"spec"`
+				} `yaml:"template"`
+			} `yaml:"spec"`
+		}
+		if err := yaml.Unmarshal([]byte(doc), &m); err != nil {
+			t.Fatalf("not YAML: %v", err)
+		}
+
+		got[strings.TrimPrefix(m.Metadata.Name, "example-")] = m.Spec.Template.Spec.ServiceAccountName
+	}
+
+	return got
+}
+
+// peerAccounts is the ServiceAccount names in one file's tls.peers.
+func peerAccounts(t *testing.T, out, file string) []string {
+	t.Helper()
+
+	peers, _ := tlsOf(t, out, file)["peers"].([]any)
+	names := []string{}
+
+	for _, p := range peers {
+		names = append(names, p.(map[string]any)["serviceAccount"].(string))
+	}
+
+	return names
+}
+
+func componentArgs(extra ...string) []string {
+	return defaults(append([]string{
+		"--set", "images.web.tag=dev",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.trustDomain=example.internal",
+	}, extra...)...)
+}
+
+// THE point of the switch: with it on, every component has its own account,
+// and the URL service's allow-list is exactly its real internal callers.
+func TestEveryComponentRunsAsItsOwnAccount(t *testing.T) {
+	out, err := render(t, componentArgs()...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	got := serviceAccountsOf(t, out)
+	want := map[string]string{
+		"redirect": "example-redirect",
+		"urls":     "example-urls",
+		"web":      "example-web",
+		"stat":     "example-stat",
+		"log":      "example-log",
+		"migrate":  "example-migrate",
+	}
+
+	for c, sa := range want {
+		if got[c] != sa {
+			t.Errorf("%s runs as %q, want %q (all: %v)", c, got[c], sa, got)
+		}
+	}
+
+	if got, want := peerAccounts(t, out, "urls.yaml"), []string{"example-web", "example-stat"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("urls admits %v, want exactly %v", got, want)
+	}
+
+	if got := peerAccounts(t, out, "redirect.yaml"); len(got) != 0 {
+		t.Errorf("redirect admits %v internally, want nobody", got)
+	}
+
+	// The callers accept an answer only from the URL service's OWN account.
+	for _, f := range []string{"web.yaml", "stat.yaml"} {
+		if got, want := peerAccounts(t, out, f), []string{"example-urls"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s accepts an answer from %v, want %v", f, got, want)
+		}
+	}
+
+	for _, c := range rendered() {
+		conformance.ValidDocument(t, conformance.ConfigMapData(t, []byte(out), c.file), c.schema())
+	}
+
+	for _, sa := range []string{"example-redirect", "example-urls", "example-web", "example-stat", "example-log"} {
+		if !strings.Contains(out, "kind: ServiceAccount\nmetadata:\n  name: "+sa+"\n") {
+			t.Errorf("no ServiceAccount %s is created", sa)
+		}
+	}
+
+	if strings.Contains(out, "example-app") {
+		t.Errorf("a shared application account is still rendered")
+	}
+}
+
+// External grants are the operator's and do not move.
+func TestExternalGrantsAndRenamedAccounts(t *testing.T) {
+	out, err := render(t, componentArgs(
+		"--set", "serviceAccount.components.stat.name=counter",
+		"--set", "tls.peers.urls[0].namespace=other",
+		"--set", "tls.peers.urls[0].serviceAccount=reader")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	if got, want := peerAccounts(t, out, "urls.yaml"), []string{"example-web", "counter", "reader"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("urls admits %v, want %v", got, want)
+	}
+
+	if got := serviceAccountsOf(t, out)["stat"]; got != "counter" {
+		t.Errorf("stat runs as %q, want counter", got)
+	}
+}
+
+// `serviceAccount.app.name` is the account `log` runs as, and nothing else:
+// it is what a platform bound the archive bucket's cloud role to, and log is
+// the only component that needs it.
+func TestTheAppAccountNameIsLogsAndOnlyLogs(t *testing.T) {
+	out, err := render(t, componentArgs(
+		"--set", "serviceAccount.app.name=archiver",
+		"--set", "serviceAccount.app.annotations.example\\.invalid/role=archive")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	for c, sa := range serviceAccountsOf(t, out) {
+		if (sa == "archiver") != (c == "log") {
+			t.Errorf("%s runs as %q: only log may run as the app account", c, sa)
+		}
+	}
+
+	// The cloud-binding annotation lands on log's account alone.
+	if n := strings.Count(out, "example.invalid/role: archive"); n != 1 {
+		t.Errorf("the app annotations are on %d accounts, want 1 (log's)", n)
+	}
+}
+
+// THE contract rule (component.md C14): no two workloads of the chart share a
+// ServiceAccount, in the default render and in a fully-set one. A workload
+// identity is namespace plus account, so sharing one makes two components
+// indistinguishable to an allow-list. The migration hook is NOT exempt: its
+// rights create tables and must stay off the request path.
+func TestNoTwoWorkloadsShareAServiceAccount(t *testing.T) {
+	for name, args := range map[string][]string{
+		"defaults":   defaults("--set", "images.web.tag=dev"),
+		"everything": {"-f", filepath.Join("testdata", "everything.yaml")},
+		"identity":   {"-f", filepath.Join("testdata", "per-component.yaml")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, args...)
+			if err != nil {
+				t.Fatalf("render: %v\n%s", err, out)
+			}
+
+			byAccount := map[string]string{}
+
+			for c, sa := range serviceAccountsOf(t, out) {
+				if sa == "" {
+					t.Errorf("%s names no account", c)
+				}
+
+				if other, dup := byAccount[sa]; dup {
+					t.Errorf("%s and %s both run as %q", other, c, sa)
+				}
+
+				byAccount[sa] = c
+			}
+
+			if len(byAccount) < 6 {
+				t.Errorf("expected five components and the migration, found %v", byAccount)
+			}
+		})
 	}
 }

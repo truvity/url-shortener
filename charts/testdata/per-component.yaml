@@ -1,0 +1,37 @@
+# The transport on, with one account per component (which is always): what the allow-lists
+# look like once `urls` can tell `web` from `stat` from everything else.
+#
+# `stat` is renamed, so the golden proves a name given is used everywhere
+# it must agree (the Deployment, the account, and the URL service's
+# allow-list); the others take the release's own `<release>-<component>`.
+database:
+  host: pg
+  owner:
+    passwordSecret: owner
+  app:
+    passwordSecret: app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+serviceAccount:
+  app:
+    name: archiver
+    annotations:
+      example.invalid/role: archive
+  components:
+    stat:
+      name: counter
+      annotations:
+        example.invalid/role: counter
+tls:
+  mode: permissive
+  components:
+    urls:
+      mode: strict
+  trustDomain: example.invalid
+  peers:
+    urls:
+      - namespace: other
+        serviceAccount: reader

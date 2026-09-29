@@ -1,0 +1,19 @@
+# Two components on one account would make an allow-list for one of them an
+# allow-list for both, which is what this switch exists to end.
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+serviceAccount:
+  components:
+    web:
+      name: shared
+    stat:
+      name: shared

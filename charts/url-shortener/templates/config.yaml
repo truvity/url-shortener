@@ -106,9 +106,16 @@ data:
       the handshake, and the error names a certificate rather than a list
       nobody filled in. Measured on a cluster, not imagined.
       */}}
+      {{- /*
+      The chart's own callers of this service are exactly `web` and `stat`,
+      each as its own account. `redirect` and `log` never call it, so they
+      are not admitted.
+      */}}
       peers:
-        - namespace: {{ .Release.Namespace }}
-          serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
+        {{- range (list "web" "stat") }}
+        - namespace: {{ $.Release.Namespace }}
+          serviceAccount: {{ include "url-shortener.componentServiceAccountName" (dict "root" $ "component" .) }}
+        {{- end }}
         {{- with .Values.tls.peers.urls }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -153,14 +160,12 @@ data:
       certificate chain would accept any workload in the trust domain that
       happened to answer on that address.
 
-      It is the account the URL service runs as. In this chart every
-      component shares one application account, so that is this release's;
-      a deployment that gave each component its own would name the URL
-      service's here, and the two lists would stop looking alike.
+      It is the URL service's OWN account, which is not any caller's: the
+      two lists name different components.
       */}}
       peers:
         - namespace: {{ .Release.Namespace }}
-          serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
+          serviceAccount: {{ include "url-shortener.componentServiceAccountName" (dict "root" . "component" "urls") }}
     {{- end }}
     urls:
       {{- /*
@@ -215,7 +220,7 @@ data:
       trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
       peers:
         - namespace: {{ .Release.Namespace }}
-          serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
+          serviceAccount: {{ include "url-shortener.componentServiceAccountName" (dict "root" . "component" "urls") }}
     {{- end }}
     urls:
       {{- $urlsMode := (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) }}

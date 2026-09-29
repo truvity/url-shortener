@@ -166,28 +166,48 @@ otel:
 log:
   level: info
 
-# The account these workloads run as.
+# The accounts these workloads run as.
 #
-# The chart grants nothing. It names an account and puts annotations on it;
-# which mechanism binds that account to a cloud role is the platform's, and
+# The chart grants nothing. It names accounts and puts annotations on them;
+# which mechanism binds an account to a cloud role is the platform's, and
 # it differs between clusters in the same estate. A chart that hard-codes one
 # of them can only be installed on half the clusters it should run on, and
 # the failure arrives as a permissions error a long way from the cause.
+#
+# EVERY component runs as its OWN account, always: `redirect`, `urls`,
+# `web`, `stat` and `log`, `<release>-<component>` by default. A workload
+# identity is namespace plus account, so a shared account would make two
+# components indistinguishable to an allow-list. The chart's own grants
+# follow: `urls` admits exactly `web`'s and `stat`'s accounts, `redirect`
+# admits nothing internally, and `web` and `stat` accept an answer only from
+# `urls`' own account. External callers, in `tls.peers`, are unchanged.
+#
+# The migration has its own too, for the reason it has its own database
+# credential: it creates tables and grants rights.
+#
+# No two may resolve to the same name, nor one to the migration's: the
+# render refuses it.
 serviceAccount:
+  # false where the platform creates the accounts (they must then exist).
   create: true
-  # TWO accounts, for the same reason there are two database credentials:
-  # the migration creates tables and grants rights, the services read and
-  # write rows. Giving both jobs one account is what makes "the service
-  # dropped a table" a sentence anyone can say.
-  #
-  # Empty names mean the release's own, suffixed. Set one to bind to an
-  # account the platform created.
+
+  # The account `log` runs as when `components.log.name` is empty: the one
+  # a platform bound a cloud role to for the archive bucket, which `log`
+  # alone needs. Empty means `<release>-log`. NOTHING ELSE runs as it.
+  # These annotations go on `log`'s account only.
   app:
     name: ""
     annotations: {}
   migrate:
     name: ""
     annotations: {}
+
+  # Per-component overrides. Keys: redirect, urls, web, stat, log. An empty
+  # name means the default above.
+  components: {}
+  #  urls:
+  #    name: ""
+  #    annotations: {}
 
 # How long a replacement takes, and how long the old one is allowed to
 # finish.

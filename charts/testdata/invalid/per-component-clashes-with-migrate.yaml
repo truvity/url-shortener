@@ -1,0 +1,19 @@
+# A component on the migration's account puts the migration's rights on the
+# request path.
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+serviceAccount:
+  migrate:
+    name: migrator
+  components:
+    web:
+      name: migrator

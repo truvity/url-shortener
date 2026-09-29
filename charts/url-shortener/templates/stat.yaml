@@ -34,7 +34,7 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
     spec:
-      serviceAccountName: {{ include "url-shortener.appServiceAccountName" . }}
+      serviceAccountName: {{ include "url-shortener.componentServiceAccountName" (dict "root" . "component" "stat") }}
       {{- include "url-shortener.podSecurity" . | nindent 6 }}
       {{- include "url-shortener.drain" . | nindent 6 }}
       {{- include "url-shortener.spread" (dict "Release" .Release "component" "stat") | nindent 6 }}
