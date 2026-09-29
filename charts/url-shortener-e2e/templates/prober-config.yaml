@@ -27,6 +27,7 @@ data:
       seconds: {{ .Values.prober.drain.seconds | default 5 }}
     interval: {{ .Values.prober.interval | quote }}
     keyPrefix: {{ .Values.prober.keyPrefix | quote }}
+    statSettle: {{ .Values.prober.statSettle | default "60s" | quote }}
     {{- if include "url-shortener-e2e.tlsOn" . }}
     tls:
       {{- /*

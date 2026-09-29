@@ -279,6 +279,16 @@ prober:
   # can tell synthetic traffic from a real caller's at a glance.
   keyPrefix: "probe-"
 
+  # How long the "stat" journey keeps watching a link's click count after it
+  # first reads exactly 1, and fails if it moves again. A click that the
+  # counter fails to acknowledge is redelivered after the consumer's ack
+  # wait (30s), and counted again: it reads 1 at the first look and 2 half a
+  # minute later. The hold has to outlast a redelivery, so it defaults to
+  # twice the ack wait. One pass therefore takes about this long plus the
+  # time the count takes to arrive, and passes run back to back, so `interval`
+  # is the pause between them, not the period. "0s" turns the hold off.
+  statSettle: 60s
+
   pullPolicy: IfNotPresent
 
   resources:

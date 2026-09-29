@@ -19,7 +19,7 @@ import (
 // Read through the SAME Service the counter itself asks — stat has none of
 // its own; this is its effect, not its endpoint.
 func TestStatMovesTheCounter(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	client := urlsClient(ctx, t)
@@ -54,4 +54,21 @@ func TestStatMovesTheCounter(t *testing.T) {
 		}
 		return nil
 	})
+
+	// Reading the wanted number once proves the counter moves; it cannot
+	// prove each click was counted ONCE. The consumer acknowledges a
+	// message only after a successful call, and an unacknowledged one is
+	// redelivered after its ack wait (30s) and counted again — so a click
+	// counted twice reads right now and wrong half a minute later. Hold the
+	// count for twice the ack wait and require it not to move.
+	const settle = 60 * time.Second
+	for stop := time.Now().Add(settle); time.Now().Before(stop); time.Sleep(time.Second) {
+		got, err := journey.ClickCount(ctx, client, key)
+		if err != nil {
+			continue
+		}
+		if got != want {
+			t.Fatalf("click_count moved to %d within %s of reading %d: a click was counted more than once (a redelivery)", got, settle, want)
+		}
+	}
 }

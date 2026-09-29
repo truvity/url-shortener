@@ -160,6 +160,14 @@ func run() error {
 
 	urlsClient := urlshortenerv1connect.NewUrlsServiceClient(urlsHTTPClient, cfg.Urls.Address)
 
+	statSettle := 60 * time.Second
+	if cfg.StatSettle != "" {
+		statSettle, err = time.ParseDuration(cfg.StatSettle)
+		if err != nil {
+			return fmt.Errorf("statSettle %q: %w", cfg.StatSettle, err)
+		}
+	}
+
 	prober := &prober{
 		log:            log,
 		journeys:       journeys,
@@ -170,6 +178,7 @@ func run() error {
 		keyPrefix:      cfg.KeyPrefix,
 		statPatience:   30 * time.Second,
 		statPollPeriod: time.Second,
+		statSettle:     statSettle,
 	}
 
 	// --- serving ---
@@ -212,6 +221,14 @@ type prober struct {
 	// not a failure of the product.
 	statPatience   time.Duration
 	statPollPeriod time.Duration
+
+	// How long the count must STAY at exactly 1 once it gets there. The
+	// consumer acknowledges a message only after a successful call, and an
+	// unacknowledged one is redelivered after its ack wait (30s) and
+	// counted again — so a click counted twice reads 1 at the first look
+	// and 2 half a minute later. Reading "1" once proves the counter
+	// moves; it cannot prove the counter moved ONCE.
+	statSettle time.Duration
 }
 
 // loop runs one pass immediately, then one every interval, until ctx is
@@ -274,9 +291,10 @@ func (p *prober) once(ctx context.Context) {
 
 // waitForOneClick polls ClickCount until it reads exactly 1 — this journey's
 // own short link, resolved exactly once above — or gives up after
-// statPatience. Exactly, not "at least": this key is unique to this one
-// pass, so anything but 1 is either the consumer double-counting or the
-// counter never having moved at all.
+// statPatience, and then requires it to STAY at 1 for statSettle. Exactly,
+// not "at least": this key is unique to this one pass, so anything but 1 is
+// either the consumer double-counting or the counter never having moved at
+// all. A count above 1 fails at once, in either phase.
 func (p *prober) waitForOneClick(ctx context.Context, key string) (int64, error) {
 	deadline := time.Now().Add(p.statPatience)
 	var last int64
@@ -285,9 +303,12 @@ func (p *prober) waitForOneClick(ctx context.Context, key string) (int64, error)
 		if err == nil {
 			last = count
 			if count == 1 {
-				return count, nil
+				break
 			}
 			err = fmt.Errorf("click_count is %d, want exactly 1", count)
+			if count > 1 {
+				return last, err
+			}
 		}
 
 		if time.Now().After(deadline) {
@@ -300,6 +321,27 @@ func (p *prober) waitForOneClick(ctx context.Context, key string) (int64, error)
 		case <-time.After(p.statPollPeriod):
 		}
 	}
+
+	// The hold. A failed read here is not a failure of the count, so it is
+	// tolerated; a count that is no longer 1 is.
+	hold := time.Now().Add(p.statSettle)
+	for time.Now().Before(hold) {
+		select {
+		case <-ctx.Done():
+			return last, ctx.Err()
+		case <-time.After(p.statPollPeriod):
+		}
+
+		count, err := journey.ClickCount(ctx, p.urls, key)
+		if err != nil {
+			continue
+		}
+		last = count
+		if count != 1 {
+			return last, fmt.Errorf("click_count moved to %d within %s of reading 1: the click was counted more than once (a redelivery)", count, p.statSettle)
+		}
+	}
+	return last, nil
 }
 
 // record times fn, emits the counter and the histogram, logs the outcome,

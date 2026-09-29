@@ -168,9 +168,13 @@ type (
 		Drain     Drain  `json:"drain"`
 		Interval  string `json:"interval"`
 		KeyPrefix string `json:"keyPrefix"`
-		Urls      Client `json:"urls"`
-		Redirect  Client `json:"redirect"`
-		TLS       TLS    `json:"tls"`
+		// StatSettle is how long the "stat" journey keeps watching a
+		// counter that has reached its expected value; "" means the
+		// prober's own default.
+		StatSettle string `json:"statSettle"`
+		Urls       Client `json:"urls"`
+		Redirect   Client `json:"redirect"`
+		TLS        TLS    `json:"tls"`
 	}
 )
 
