@@ -869,7 +869,8 @@ func TestTransportOffLeavesNoTrace(t *testing.T) {
 // the feature does not work at all.
 func TestTransportOnRendersWhatThePlatformNeeds(t *testing.T) {
 	out, err := render(t, defaults("--set", "images.web.tag=dev",
-		"--set", "tls.mode=strict",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
 		"--set", "tls.trustDomain=example.internal",
 		"--set", "tls.peers.redirect[0].namespace=shop",
 		"--set", "tls.peers.redirect[0].serviceAccount=web")...)
@@ -905,13 +906,17 @@ func TestTransportOnRendersWhatThePlatformNeeds(t *testing.T) {
 // A render test would not have caught it; this validates what each binary
 // would actually read.
 func TestTransportOnWithNoPeersIsStillValid(t *testing.T) {
-	for _, mode := range []string{"permissive", "strict"} {
-		t.Run(mode, func(t *testing.T) {
-			out, err := render(t, defaults(
+	// `strict` is the URL service's alone — see TestRedirectIsNeverStrict —
+	// so it is reached through the per-component override.
+	for name, mode := range map[string][]string{
+		"permissive": {"--set", "tls.mode=permissive"},
+		"strict":     {"--set", "tls.mode=permissive", "--set", "tls.components.urls.mode=strict"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, defaults(append([]string{
 				"--set", "images.web.tag=dev",
-				"--set", "tls.mode="+mode,
 				"--set", "tls.trustDomain=example.test",
-			)...)
+			}, mode...)...)...)
 			if err != nil {
 				t.Fatalf("the chart does not render: %v\n%s", err, out)
 			}
@@ -931,7 +936,7 @@ func TestTransportOnWithNoPeersIsStillValid(t *testing.T) {
 }
 
 func TestTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
-	out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "tls.mode=strict")...)
+	out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "tls.mode=permissive")...)
 	if err == nil {
 		t.Fatalf("a render with no trust domain was accepted:\n%s", out)
 	}
@@ -1050,5 +1055,225 @@ func TestTheSiteAndTheResolverAreSeparateRules(t *testing.T) {
 	}
 	if pathOf["redirect"] != "/r/" {
 		t.Errorf("the resolver rule matches %q", pathOf["redirect"])
+	}
+}
+
+// tlsOf reads the `tls` block out of one rendered configuration file, as the
+// binary that owns it would: mode, the authenticated address (permissive
+// only) and the allow-list. A file with no block returns a nil map.
+func tlsOf(t *testing.T, out, file string) map[string]any {
+	t.Helper()
+
+	var doc map[string]any
+	if err := yaml.Unmarshal(conformance.ConfigMapData(t, []byte(out), file), &doc); err != nil {
+		t.Fatalf("%s is not YAML: %v", file, err)
+	}
+	block, _ := doc["tls"].(map[string]any)
+	return block
+}
+
+// urlsAddressOf is the address a caller (`web`, `stat`) dials the URL service
+// at, which follows the URL SERVICE's effective mode and nothing else.
+func urlsAddressOf(t *testing.T, out, file string) string {
+	t.Helper()
+
+	var doc struct {
+		Urls struct{ Address string } `yaml:"urls"`
+	}
+	if err := yaml.Unmarshal(conformance.ConfigMapData(t, []byte(out), file), &doc); err != nil {
+		t.Fatalf("%s is not YAML: %v", file, err)
+	}
+	return doc.Urls.Address
+}
+
+// THE point of the per-component override: `urls` strict while `redirect`
+// stays permissive, every file still valid against its binary's schema.
+//
+// The three things that have to move together are asserted separately, since
+// each is a different way for the pair to disagree: the URL service's own
+// mode, the port its callers dial (the ordinary one, over TLS), and the
+// redirect service, which must NOT have followed it.
+func TestUrlsCanBeStrictWhileRedirectStaysPermissive(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.trustDomain=example.internal",
+		"--set", "tls.peers.urls[0].namespace=other",
+		"--set", "tls.peers.urls[0].serviceAccount=reader")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	for _, tc := range rendered() {
+		t.Run(tc.file, func(t *testing.T) {
+			conformance.ValidDocument(t, conformance.ConfigMapData(t, []byte(out), tc.file), tc.schema())
+		})
+	}
+
+	if got := tlsOf(t, out, "urls.yaml")["mode"]; got != "strict" {
+		t.Errorf("urls.yaml tls.mode = %v, want strict", got)
+	}
+	if _, ok := tlsOf(t, out, "urls.yaml")["address"]; ok {
+		t.Error("urls.yaml names a second listener under strict; there is only the ordinary one")
+	}
+	redirect := tlsOf(t, out, "redirect.yaml")
+	if redirect["mode"] != "permissive" || redirect["address"] != ":8443" {
+		t.Errorf("redirect.yaml tls = %v, want permissive on :8443", redirect)
+	}
+
+	// Callers dial the URL service's ordinary port, over TLS.
+	for _, file := range []string{"web.yaml", "stat.yaml"} {
+		if got := urlsAddressOf(t, out, file); got != "https://example-urls:8080" {
+			t.Errorf("%s dials the URL service at %q, want https://example-urls:8080", file, got)
+		}
+		if got := tlsOf(t, out, file)["mode"]; got != "strict" {
+			t.Errorf("%s tls.mode = %v, want strict", file, got)
+		}
+	}
+
+	// The Services follow the pods: only redirect grows a second port.
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if docKind(doc) != "Service" {
+			continue
+		}
+		hasHTTPS := strings.Contains(doc, "name: https")
+		switch {
+		case strings.Contains(docName(doc), "redirect") && !hasHTTPS:
+			t.Error("the redirect Service lost its authenticated port")
+		case strings.Contains(docName(doc), "urls") && hasHTTPS:
+			t.Error("the urls Service carries an authenticated second port under strict")
+		}
+	}
+}
+
+// The override defaults to tls.mode, and adding the key changes nothing a
+// release that leaves it unset can see: permissive everywhere renders the
+// same as permissive with `urls` named permissive explicitly.
+func TestUrlsOverrideDefaultsToTheReleaseWideMode(t *testing.T) {
+	base := defaults("--set", "images.web.tag=dev", "--set", "tls.mode=permissive", "--set", "tls.trustDomain=example.internal")
+
+	implicit, err := render(t, base...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, implicit)
+	}
+	explicit, err := render(t, append(base, "--set", "tls.components.urls.mode=permissive")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, explicit)
+	}
+	if implicit != explicit {
+		t.Error("naming the release-wide mode explicitly for urls changed the render")
+	}
+}
+
+// `urls` may be off or permissive beneath a permissive release, and the
+// override may also turn a component ON under an off release.
+func TestUrlsOverrideCanTurnTheTransportOnForOneComponent(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.trustDomain=example.internal")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	if tlsOf(t, out, "redirect.yaml") != nil {
+		t.Error("redirect.yaml carries a tls block although its mode is off")
+	}
+	if got := tlsOf(t, out, "urls.yaml")["mode"]; got != "strict" {
+		t.Errorf("urls.yaml tls.mode = %v, want strict", got)
+	}
+	// The callers still need an identity to call a strict URL service.
+	if !strings.Contains(out, "spiffe.csi.cert-manager.io") {
+		t.Error("no identity volume is rendered, so nothing can present a certificate")
+	}
+}
+
+// Both refusals of a strict redirect, and the two ways of spelling them.
+//
+// Written down, the SCHEMA refuses it. Inherited (a release-wide strict with
+// nothing said for redirect) only the render can, and it says why and what
+// to do instead — a bare enum error would name a value and leave the
+// operator to work out that the gateway is the reason.
+func TestRedirectIsNeverStrict(t *testing.T) {
+	cases := map[string]struct {
+		set  []string
+		want string
+	}{
+		"explicit": {
+			set:  []string{"--set", "tls.mode=permissive", "--set", "tls.components.redirect.mode=strict"},
+			want: "tls/components/redirect/mode",
+		},
+		"inherited": {
+			set:  []string{"--set", "tls.mode=strict"},
+			want: "redirect cannot be strict",
+		},
+		"inherited past an override for urls": {
+			set:  []string{"--set", "tls.mode=strict", "--set", "tls.components.urls.mode=strict"},
+			want: "redirect cannot be strict",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, defaults(append([]string{
+				"--set", "images.web.tag=dev",
+				"--set", "tls.trustDomain=example.internal",
+			}, tc.set...)...)...)
+			if err == nil {
+				t.Fatalf("a strict redirect was accepted:\n%s", out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("the refusal does not say %q: %s", tc.want, out)
+			}
+		})
+	}
+
+	// A release-wide strict IS fine once redirect is named, since nothing
+	// is then strict that must not be.
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "tls.mode=strict",
+		"--set", "tls.components.redirect.mode=permissive",
+		"--set", "tls.trustDomain=example.internal")...)
+	if err != nil {
+		t.Fatalf("a release-wide strict with redirect named permissive was refused: %v\n%s", err, out)
+	}
+	if got := tlsOf(t, out, "redirect.yaml")["mode"]; got != "permissive" {
+		t.Errorf("redirect.yaml tls.mode = %v, want permissive", got)
+	}
+}
+
+// A per-component key is only for a component that serves. `web` and `stat`
+// call out and have no mode of their own, so a key for either is a typo the
+// render must refuse rather than ignore.
+func TestOnlyServingComponentsHaveATLSMode(t *testing.T) {
+	for _, component := range []string{"web", "stat", "log", "migrate"} {
+		t.Run(component, func(t *testing.T) {
+			out, err := render(t, defaults("--set", "images.web.tag=dev",
+				"--set", "tls.mode=permissive",
+				"--set", "tls.trustDomain=example.internal",
+				"--set", "tls.components."+component+".mode=strict")...)
+			if err == nil {
+				t.Fatalf("tls.components.%s was accepted:\n%s", component, out)
+			}
+		})
+	}
+}
+
+// The empty allow-list under the override renders `[]`, never null — the
+// same trap TestTransportOnWithNoPeersIsStillValid guards, reached through
+// the new path. `urls` always carries its own release's counter, so the list
+// is never empty there; `redirect` is the one that can be, and it must still
+// be an array.
+func TestPerComponentModeStillRendersEmptyPeersAsAnArray(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.trustDomain=example.internal")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	peers, ok := tlsOf(t, out, "redirect.yaml")["peers"].([]any)
+	if !ok || len(peers) != 0 {
+		t.Errorf("redirect tls.peers = %#v, want an empty array", tlsOf(t, out, "redirect.yaml")["peers"])
 	}
 }

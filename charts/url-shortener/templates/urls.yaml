@@ -55,7 +55,7 @@ spec:
             - name: probes
               containerPort: 7070
             {{- if include "url-shortener.tlsOn" . }}
-            {{- if eq .Values.tls.mode "permissive" }}
+            {{- if eq (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) "permissive" }}
             - name: https
               containerPort: {{ .Values.tls.port }}
             {{- end }}
@@ -93,7 +93,7 @@ spec:
     - name: http
       port: 8080
       targetPort: http
-    {{- if and (include "url-shortener.tlsOn" .) (eq .Values.tls.mode "permissive") }}
+    {{- if and (include "url-shortener.tlsOn" .) (eq (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) "permissive") }}
     - name: https
       port: {{ .Values.tls.port }}
       targetPort: https

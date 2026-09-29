@@ -29,10 +29,11 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
-    {{- if include "url-shortener.tlsOn" . }}
+    {{- $mode := (include "url-shortener.tlsMode" (dict "root" . "component" "redirect")) }}
+    {{- if ne $mode "off" }}
     tls:
-      mode: {{ .Values.tls.mode }}
-      {{- if eq .Values.tls.mode "permissive" }}
+      mode: {{ $mode }}
+      {{- if eq $mode "permissive" }}
       address: ":{{ .Values.tls.port }}"
       {{- end }}
       certFile: {{ .Values.tls.mountPath }}/tls.crt
@@ -74,10 +75,11 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
-    {{- if include "url-shortener.tlsOn" . }}
+    {{- $mode := (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) }}
+    {{- if ne $mode "off" }}
     tls:
-      mode: {{ .Values.tls.mode }}
-      {{- if eq .Values.tls.mode "permissive" }}
+      mode: {{ $mode }}
+      {{- if eq $mode "permissive" }}
       address: ":{{ .Values.tls.port }}"
       {{- end }}
       certFile: {{ .Values.tls.mountPath }}/tls.crt
@@ -123,7 +125,7 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
-    {{- if include "url-shortener.tlsOn" . }}
+    {{- if include "url-shortener.urlsClientTLSOn" . }}
     tls:
       {{- /*
       `strict` whenever the transport is on at all, including while the rest
@@ -167,9 +169,10 @@ data:
       ordinary port speaking TLS, and under `permissive` it is a second one
       beside the cleartext original.
       */}}
-      {{- if eq .Values.tls.mode "strict" }}
+      {{- $urlsMode := (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) }}
+      {{- if eq $urlsMode "strict" }}
       address: https://{{ include "url-shortener.name" . }}-urls:8080
-      {{- else if eq .Values.tls.mode "permissive" }}
+      {{- else if eq $urlsMode "permissive" }}
       address: https://{{ include "url-shortener.name" . }}-urls:{{ .Values.tls.port }}
       {{- else }}
       address: http://{{ include "url-shortener.name" . }}-urls:8080
@@ -196,7 +199,7 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
-    {{- if include "url-shortener.tlsOn" . }}
+    {{- if include "url-shortener.urlsClientTLSOn" . }}
     tls:
       {{- /*
       `strict` whenever the transport is on, for the same reason the counter
@@ -215,9 +218,10 @@ data:
           serviceAccount: {{ include "url-shortener.appServiceAccountName" . }}
     {{- end }}
     urls:
-      {{- if eq .Values.tls.mode "strict" }}
+      {{- $urlsMode := (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) }}
+      {{- if eq $urlsMode "strict" }}
       address: https://{{ include "url-shortener.name" . }}-urls:8080
-      {{- else if eq .Values.tls.mode "permissive" }}
+      {{- else if eq $urlsMode "permissive" }}
       address: https://{{ include "url-shortener.name" . }}-urls:{{ .Values.tls.port }}
       {{- else }}
       address: http://{{ include "url-shortener.name" . }}-urls:8080

@@ -151,7 +151,40 @@ chart is behind this, so that the default render is byte-identical to one
 from a chart that had never heard of it — which is what a golden proves.
 */}}
 {{- define "url-shortener.tlsOn" -}}
-{{- if ne .Values.tls.mode "off" }}yes{{ end -}}
+{{- if or (ne (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) "off") (ne (include "url-shortener.tlsMode" (dict "root" . "component" "redirect")) "off") }}yes{{ end -}}
+{{- end -}}
+
+{{/*
+The transport mode ONE serving component runs in: its own
+`tls.components.<name>.mode` when set, otherwise the release-wide `tls.mode`.
+
+Only the two components that SERVE an authenticated boundary have a mode of
+their own: `urls`, called in-cluster by web, stat and the test Job, and
+`redirect`. `web` and `stat` only call out, so for them there is no third
+state and no mode to choose (see config.yaml).
+
+`redirect` is refused `strict`, whichever way it got there. It is fronted by
+a gateway, which terminates TLS at the edge and forwards cleartext, so a
+strict redirect would refuse the only caller it has. The schema refuses it
+written down; this refuses it INHERITED, which a schema cannot see — a
+release-wide `tls.mode: strict` with no override for redirect.
+*/}}
+{{- define "url-shortener.tlsMode" -}}
+{{- $components := .root.Values.tls.components | default dict -}}
+{{- $own := get (get $components .component | default dict) "mode" -}}
+{{- $mode := $own | default .root.Values.tls.mode -}}
+{{- if and (eq .component "redirect") (eq $mode "strict") -}}
+{{- fail "redirect cannot be strict: it is fronted by a gateway that terminates TLS and forwards cleartext, so a strict redirect refuses its only caller. Set tls.mode to permissive (or off) and tls.components.urls.mode to strict to make only the URL service strict" -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/*
+Whether the components that only CALL the URL service (`web`, `stat`)
+present an identity: exactly when the URL service authenticates at all.
+*/}}
+{{- define "url-shortener.urlsClientTLSOn" -}}
+{{- if ne (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) "off" }}yes{{ end -}}
 {{- end -}}
 
 {{/*

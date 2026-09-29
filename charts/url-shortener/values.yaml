@@ -241,6 +241,29 @@ tls:
   # edge migrates at a time; it is a migration state and should carry a date.
   mode: "off"
 
+  # Per-component override of `mode`, for the two components that SERVE an
+  # authenticated boundary: `urls` and `redirect`. Unset means `mode`, so a
+  # release that never heard of this renders exactly as before.
+  #
+  #   tls:
+  #     mode: permissive        # redirect (and the default for urls)
+  #     components:
+  #       urls:
+  #         mode: strict        # only the URL service refuses cleartext
+  #
+  # `redirect` can NEVER be `strict`, set here or inherited from `mode`: it
+  # is fronted by a gateway that terminates TLS at the edge and forwards
+  # cleartext, so a strict redirect refuses its only caller. The schema
+  # refuses it written down and the render refuses it inherited, so a
+  # release-wide `mode: strict` is refused too — name `urls` instead.
+  #
+  # `web` and `stat` only CALL the URL service and have no mode of their
+  # own: they present an identity (client-side `strict`) whenever the URL
+  # service authenticates at all, and dial its port for its effective mode.
+  # Everything that calls `urls` from outside this release (the e2e Job, the
+  # prober) must be granted in `peers.urls` below BEFORE it is made strict.
+  components: {}
+
   # The root of every identity this service will admit. A peer from another
   # trust domain is refused before its account is considered.
   trustDomain: ""

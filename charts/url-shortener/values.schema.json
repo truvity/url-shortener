@@ -369,7 +369,41 @@
             "off",
             "permissive",
             "strict"
-          ]
+          ],
+          "description": "The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`."
+        },
+        "components": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-component override of tls.mode, for the two components that SERVE an authenticated boundary. `web` and `stat` only call out and have no mode of their own. Unset means tls.mode.",
+          "properties": {
+            "urls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "off",
+                    "permissive",
+                    "strict"
+                  ]
+                }
+              }
+            },
+            "redirect": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Never `strict`: the redirect service is fronted by a gateway that terminates TLS and forwards cleartext.",
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "off",
+                    "permissive"
+                  ]
+                }
+              }
+            }
+          }
         },
         "trustDomain": {
           "type": "string"
