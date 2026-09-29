@@ -71,17 +71,19 @@ data:
     # See values.yaml's own comment on why this chart cannot read the
     # application release's ACTUAL mode and has to be told to agree with it.
     urls:
-      {{- if eq .Values.tls.mode "strict" }}
+      {{- $urlsMode := include "url-shortener-e2e.tlsMode" (dict "root" . "target" "urls") }}
+      {{- if eq $urlsMode "strict" }}
       address: https://{{ .Values.appRelease }}-urls:8080
-      {{- else if eq .Values.tls.mode "permissive" }}
+      {{- else if eq $urlsMode "permissive" }}
       address: https://{{ .Values.appRelease }}-urls:{{ .Values.tls.port }}
       {{- else }}
       address: http://{{ .Values.appRelease }}-urls:8080
       {{- end }}
     redirect:
-      {{- if eq .Values.tls.mode "strict" }}
+      {{- $redirectMode := include "url-shortener-e2e.tlsMode" (dict "root" . "target" "redirect") }}
+      {{- if eq $redirectMode "strict" }}
       address: https://{{ .Values.appRelease }}-redirect:8080
-      {{- else if eq .Values.tls.mode "permissive" }}
+      {{- else if eq $redirectMode "permissive" }}
       address: https://{{ .Values.appRelease }}-redirect:{{ .Values.tls.port }}
       {{- else }}
       address: http://{{ .Values.appRelease }}-redirect:8080

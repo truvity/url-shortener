@@ -151,7 +151,10 @@ chart is behind this, so that the default render is byte-identical to one
 from a chart that had never heard of it — which is what a golden proves.
 */}}
 {{- define "url-shortener.tlsOn" -}}
-{{- if or (ne (include "url-shortener.tlsMode" (dict "root" . "component" "urls")) "off") (ne (include "url-shortener.tlsMode" (dict "root" . "component" "redirect")) "off") }}yes{{ end -}}
+{{- /* Both modes are read BEFORE `or` sees either: `or` stops at the first true operand, and a strict redirect must be refused even when urls already said on. */ -}}
+{{- $urls := include "url-shortener.tlsMode" (dict "root" . "component" "urls") -}}
+{{- $redirect := include "url-shortener.tlsMode" (dict "root" . "component" "redirect") -}}
+{{- if or (ne $urls "off") (ne $redirect "off") }}yes{{ end -}}
 {{- end -}}
 
 {{/*

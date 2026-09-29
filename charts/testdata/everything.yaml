@@ -71,6 +71,11 @@ podSecurity:
 
 tls:
   mode: permissive
+  components:
+    urls:
+      mode: strict
+    redirect:
+      mode: permissive
   trustDomain: example.invalid
   csiDriver: example.csi.invalid
   mountPath: /var/run/example-identity

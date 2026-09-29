@@ -113,7 +113,7 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 		t.Fatalf("draw a trace id: %v", err)
 	}
 
-	base := serviceURL(ctx, t, componentRedirect, httpPort)
+	base := serviceURL(ctx, t, componentRedirect)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/r/"+key, http.NoBody)
 	if err != nil {
 		t.Fatalf("build the request: %v", err)
@@ -124,7 +124,7 @@ func TestRedirectTraceCrossesEveryComponent(t *testing.T) {
 	// property this asserts by using it.
 	req.Header.Set("traceparent", fmt.Sprintf("00-%s-%s-01", traceID, randomSpanID(t)))
 
-	resp, err := noRedirectClient.Do(req)
+	resp, err := noRedirectClient().Do(req)
 	if err != nil {
 		t.Fatalf("%s", errString(componentRedirect, "GET /r/"+key+" (to seed the trace)", err))
 	}

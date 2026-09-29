@@ -16,6 +16,10 @@ this image, same reason charts/url-shortener/templates/verification.yaml's
 hook Job cannot do it either) or, worse, silently skipping every test that
 needs one.
 */}}
+{{- /* Evaluated on every render, whatever is enabled: a strict redirect
+target is refused even where neither the prober nor the Job's identity would
+have looked at it. Renders nothing. */}}
+{{- $_ := include "url-shortener-e2e.tlsOn" . }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -184,10 +188,19 @@ spec:
             - name: E2E_TRACES_CA_FILE
               value: /var/run/traces-ca/{{ $.Values.traces.caConfigMapKey | default "ca-certificates.crt" }}
             {{- end }}
+            {{- if include "url-shortener-e2e.jobTLSOn" . }}
+            # The suite's own workload identity, for calls to `urls` and
+            # `redirect` — see values.yaml's own comment on job.tls, and
+            # e2e/tlsenv for what each variable means. Absent while
+            # job.tls.enabled is false, so the default Job is unchanged.
+            {{- include "url-shortener-e2e.jobTLSEnv" . | nindent 12 }}
+            {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
           {{- $tokenMount := include "url-shortener-e2e.tracesTokenMount" . }}
           {{- $caMount := include "url-shortener-e2e.tracesCAMount" . }}
-          {{- if or (trim $tokenMount) (trim $caMount) }}
+          {{- $idMount := "" }}
+          {{- if include "url-shortener-e2e.jobTLSOn" . }}{{ $idMount = include "url-shortener-e2e.identityMount" . }}{{ end }}
+          {{- if or (trim $tokenMount) (trim $caMount) (trim $idMount) }}
           volumeMounts:
             {{- with trim $tokenMount }}
             {{- . | nindent 12 }}
@@ -195,15 +208,23 @@ spec:
             {{- with trim $caMount }}
             {{- . | nindent 12 }}
             {{- end }}
+            {{- with trim $idMount }}
+            {{- . | nindent 12 }}
+            {{- end }}
           {{- end }}
       {{- $tokenVolume := include "url-shortener-e2e.tracesTokenVolume" . }}
       {{- $caVolume := include "url-shortener-e2e.tracesCAVolume" . }}
-      {{- if or (trim $tokenVolume) (trim $caVolume) }}
+      {{- $idVolume := "" }}
+      {{- if include "url-shortener-e2e.jobTLSOn" . }}{{ $idVolume = include "url-shortener-e2e.identityVolume" . }}{{ end }}
+      {{- if or (trim $tokenVolume) (trim $caVolume) (trim $idVolume) }}
       volumes:
         {{- with trim $tokenVolume }}
         {{- . | nindent 8 }}
         {{- end }}
         {{- with trim $caVolume }}
+        {{- . | nindent 8 }}
+        {{- end }}
+        {{- with trim $idVolume }}
         {{- . | nindent 8 }}
         {{- end }}
       {{- end }}

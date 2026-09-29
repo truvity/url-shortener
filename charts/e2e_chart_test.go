@@ -10,6 +10,8 @@ import (
 	"github.com/truvity/policy/conformance"
 
 	"github.com/truvity/policy/examples/url-shortener/internal/config"
+
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // e2eDefaults supplies the values the url-shortener-e2e chart refuses to
@@ -526,7 +528,8 @@ func TestProberTransportOffLeavesNoTrace(t *testing.T) {
 // true — the Role letting that account ask for a certificate.
 func TestProberTransportOnRendersIdentity(t *testing.T) {
 	out, err := renderE2E(t, proberDefaults(
-		"--set", "tls.mode=strict",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
 		"--set", "tls.trustDomain=example.invalid",
 		"--set", "tls.peers[0].namespace=example",
 		"--set", "tls.peers[0].serviceAccount=example-app")...)
@@ -569,7 +572,8 @@ func TestProberTransportOnRendersIdentity(t *testing.T) {
 // for a permission nothing here uses.
 func TestProberTransportGrantRequestIsOptional(t *testing.T) {
 	out, err := renderE2E(t, proberDefaults(
-		"--set", "tls.mode=strict",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
 		"--set", "tls.trustDomain=example.invalid",
 		"--set", "tls.grantRequest=false")...)
 	if err != nil {
@@ -599,7 +603,8 @@ func TestProberTransportGrantRequestIsOptional(t *testing.T) {
 // granted yet) looks like, so this is the DEFAULT this test proves against.
 func TestProberTLSPeersRenderAsAnEmptyArrayNotNull(t *testing.T) {
 	out, err := renderE2E(t, proberDefaults(
-		"--set", "tls.mode=strict",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
 		"--set", "tls.trustDomain=example.invalid")...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
@@ -618,11 +623,236 @@ func TestProberTLSPeersRenderAsAnEmptyArrayNotNull(t *testing.T) {
 // without it a peer from ANY trust domain would be admitted, which is a
 // caller that looks authenticated and is not.
 func TestProberTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
-	out, err := renderE2E(t, proberDefaults("--set", "tls.mode=strict")...)
+	out, err := renderE2E(t, proberDefaults("--set", "tls.mode=permissive")...)
 	if err == nil {
 		t.Fatalf("a render with no trust domain was accepted:\n%s", out)
 	}
 	if !strings.Contains(out, "tls.trustDomain is required") {
 		t.Errorf("the refusal does not say what is missing: %s", out)
+	}
+}
+
+// jobEnv returns the e2e Job container's environment as name -> value, and
+// the whole Job document.
+func jobEnv(t *testing.T, out string) (map[string]string, string) {
+	t.Helper()
+
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if docKind(doc) != "Job" {
+			continue
+		}
+		var job struct {
+			Spec struct {
+				Template struct {
+					Spec struct {
+						Containers []struct {
+							Env []struct{ Name, Value string } `yaml:"env"`
+						} `yaml:"containers"`
+					} `yaml:"spec"`
+				} `yaml:"template"`
+			} `yaml:"spec"`
+		}
+		if err := yaml.Unmarshal([]byte(doc), &job); err != nil {
+			t.Fatalf("the Job is not YAML: %v", err)
+		}
+		env := map[string]string{}
+		for _, e := range job.Spec.Template.Spec.Containers[0].Env {
+			env[e.Name] = e.Value
+		}
+		return env, doc
+	}
+	t.Fatal("no Job rendered")
+	return nil, ""
+}
+
+// With the Job's identity off — the default, and also with the prober's
+// transport on — the Job carries no trace of it: no variable, no volume, no
+// mount, no Role to ask for a certificate on ITS account.
+func TestJobTransportOffLeavesNoTrace(t *testing.T) {
+	for name, extra := range map[string][]string{
+		"defaults":                     nil,
+		"prober transport on, job off": {"--set", "prober.enabled=true", "--set", "tls.mode=permissive", "--set", "tls.trustDomain=example.invalid"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := renderE2E(t, proberDefaults(extra...)...)
+			if err != nil {
+				t.Fatalf("the chart does not render: %v\n%s", err, out)
+			}
+
+			env, job := jobEnv(t, out)
+			for k := range env {
+				if strings.Contains(k, "TLS") {
+					t.Errorf("the Job sets %s with its identity off", k)
+				}
+			}
+			for _, trace := range []string{"csi:", "identity", "certificaterequests-job", "request-identity"} {
+				if strings.Contains(job, trace) {
+					t.Errorf("the Job mentions %q with its identity off", trace)
+				}
+			}
+			for _, doc := range strings.Split(out, "\n---\n") {
+				if docKind(doc) == "Role" && strings.Contains(docName(doc), "-e2e-request-identity") {
+					t.Errorf("a Role for the Job to ask for an identity was rendered with job.tls.enabled false")
+				}
+			}
+		})
+	}
+}
+
+// Turned on, the Job gets what the prober gets — the CSI volume and its
+// mount, and a Role for ITS OWN account to ask — and its environment names
+// each target's port per mode: urls strict on the ordinary port, redirect
+// permissive on the second.
+func TestJobTransportOnRendersIdentityAndPerTargetModes(t *testing.T) {
+	out, err := renderE2E(t, e2eDefaults(
+		"--set", "job.tls.enabled=true",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.port=9443",
+		"--set", "tls.trustDomain=example.invalid",
+		"--set", "tls.peers[0].namespace=example",
+		"--set", "tls.peers[0].serviceAccount=example-app",
+		"--set", "tls.peers[1].namespace=other",
+		"--set", "tls.peers[1].serviceAccount=reader")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	env, job := jobEnv(t, out)
+	want := map[string]string{
+		"E2E_URLS_TLS":         "strict",
+		"E2E_REDIRECT_TLS":     "permissive",
+		"E2E_TLS_PORT":         "9443",
+		"E2E_TLS_DIR":          "/var/run/identity",
+		"E2E_TLS_TRUST_DOMAIN": "example.invalid",
+		"E2E_TLS_PEERS":        "example/example-app,other/reader",
+	}
+	for k, v := range want {
+		if env[k] != v {
+			t.Errorf("%s = %q, want %q", k, env[k], v)
+		}
+	}
+
+	for _, want := range []string{"spiffe.csi.cert-manager.io", "mountPath: /var/run/identity", "serviceAccountName: example-e2e-e2e"} {
+		if !strings.Contains(job, want) {
+			t.Errorf("the Job is missing %q", want)
+		}
+	}
+
+	// The Role is for the Job's OWN account — no second ServiceAccount is
+	// created for it.
+	var bound, accounts int
+	for _, doc := range strings.Split(out, "\n---\n") {
+		switch {
+		case docKind(doc) == "RoleBinding" && strings.Contains(docName(doc), "-e2e-request-identity"):
+			if !strings.Contains(doc, "name: example-e2e-e2e\n") {
+				t.Errorf("the identity RoleBinding does not bind the Job's account:\n%s", doc)
+			}
+			bound++
+		case docKind(doc) == "ServiceAccount":
+			accounts++
+		}
+	}
+	if bound != 1 {
+		t.Errorf("expected one identity RoleBinding for the Job, found %d", bound)
+	}
+	if accounts != 1 {
+		t.Errorf("expected only the Job's ServiceAccount (the prober is off), found %d", accounts)
+	}
+}
+
+// An empty allow-list is an empty STRING for the suite, which it reads as a
+// list that admits nobody — and the prober's config file, beside it, still
+// renders `[]` and never null (see TestProberTLSPeersRenderAsAnEmptyArrayNotNull).
+func TestJobTransportWithNoPeersRendersAnEmptyList(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults(
+		"--set", "prober.enabled=true",
+		"--set", "job.tls.enabled=true",
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.trustDomain=example.invalid")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	env, _ := jobEnv(t, out)
+	if v, ok := env["E2E_TLS_PEERS"]; !ok || v != "" {
+		t.Errorf("E2E_TLS_PEERS = %q (set: %v), want the empty string", v, ok)
+	}
+	if !strings.Contains(out, "peers:\n        []") {
+		t.Errorf("the prober's tls.peers with nothing set did not render as an empty array:\n%s", out)
+	}
+}
+
+// Both callers dial each target on ITS port: with urls strict and redirect
+// permissive the prober must not assume they match — a strict redirect
+// address would point at a listener the application never serves.
+func TestProberDialsEachTargetOnItsOwnPort(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults(
+		"--set", "tls.mode=permissive",
+		"--set", "tls.components.urls.mode=strict",
+		"--set", "tls.trustDomain=example.invalid")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	cfg := string(conformance.ConfigMapData(t, []byte(out), "prober.yaml"))
+	for _, want := range []string{"address: https://example-urls:8080", "address: https://example-redirect:8443"} {
+		if !strings.Contains(cfg, want) {
+			t.Errorf("the prober's configuration is missing %q:\n%s", want, cfg)
+		}
+	}
+	conformance.ValidDocument(t, []byte(cfg), config.Read("prober.json"))
+}
+
+// The refusals: the Job's identity needs the transport on; redirect is never
+// a strict target, written down or inherited; and a component key only
+// exists for the two targets.
+func TestE2ETransportRefusals(t *testing.T) {
+	cases := map[string]struct {
+		set  []string
+		want string
+	}{
+		"job identity with the transport off": {
+			set:  []string{"--set", "job.tls.enabled=true"},
+			want: "job.tls.enabled needs the transport on",
+		},
+		"redirect strict, written": {
+			set:  []string{"--set", "tls.mode=permissive", "--set", "tls.components.redirect.mode=strict", "--set", "tls.trustDomain=example.invalid"},
+			want: "tls/components/redirect/mode",
+		},
+		"redirect strict, inherited": {
+			set:  []string{"--set", "tls.mode=strict", "--set", "tls.trustDomain=example.invalid"},
+			want: "the redirect target cannot be strict",
+		},
+		"redirect strict, inherited, nothing else enabled": {
+			set:  []string{"--set", "tls.mode=strict"},
+			want: "the redirect target cannot be strict",
+		},
+		"a component that is not a target": {
+			set:  []string{"--set", "tls.components.web.mode=strict"},
+			want: "tls/components",
+		},
+		"job identity without a trust domain": {
+			set:  []string{"--set", "job.tls.enabled=true", "--set", "tls.mode=permissive"},
+			want: "tls.trustDomain is required",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defaults := proberDefaults
+			if name == "redirect strict, inherited, nothing else enabled" {
+				// No prober and no Job identity: nothing else would look
+				// at the target, and it must still be refused.
+				defaults = e2eDefaults
+			}
+			out, err := renderE2E(t, defaults(tc.set...)...)
+			if err == nil {
+				t.Fatalf("accepted:\n%s", out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("the refusal does not say %q: %s", tc.want, out)
+			}
+		})
 	}
 }

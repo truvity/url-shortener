@@ -51,6 +51,8 @@ job:
   activeDeadlineSeconds: 600
   annotations:
     example.test/replace-strategy: force
+  tls:
+    enabled: true
 resources:
   requests: { cpu: 100m, memory: 128Mi }
   limits: { cpu: 200m, memory: 256Mi }
@@ -82,6 +84,11 @@ prober:
     name: given-prober-account
 tls:
   mode: permissive
+  components:
+    urls:
+      mode: strict
+    redirect:
+      mode: permissive
   trustDomain: example.invalid
   csiDriver: example.csi.invalid
   mountPath: /var/run/example-identity

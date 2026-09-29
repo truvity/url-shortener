@@ -164,7 +164,75 @@ why this is a value this chart carries independently, not a copy of the
 application release's.
 */}}
 {{- define "url-shortener-e2e.tlsOn" -}}
-{{- if ne .Values.tls.mode "off" }}yes{{ end -}}
+{{- /* Both modes are read BEFORE `or` sees either: `or` stops at the first true operand, and a strict redirect must be refused even when urls already said on. */ -}}
+{{- $urls := include "url-shortener-e2e.tlsMode" (dict "root" . "target" "urls") -}}
+{{- $redirect := include "url-shortener-e2e.tlsMode" (dict "root" . "target" "redirect") -}}
+{{- if or (ne $urls "off") (ne $redirect "off") }}yes{{ end -}}
+{{- end -}}
+
+{{/*
+The mode the APPLICATION RELEASE runs ONE target in — `urls` or `redirect` —
+which decides the port and scheme this chart's callers dial: the target's
+own `tls.components.<name>.mode` when set, otherwise `tls.mode`. The same
+override, with the same meaning, as charts/url-shortener's own
+`tls.components`, so a platform states the two releases' modes the same way.
+
+`redirect` is refused `strict`, written down (schema) or inherited (here):
+it is fronted by a gateway that terminates TLS and forwards cleartext, so
+the application chart cannot run it strict and there is no port for a caller
+to dial. A `tls.mode: strict` with nothing said for redirect therefore
+refuses, and names what to set instead.
+*/}}
+{{- define "url-shortener-e2e.tlsMode" -}}
+{{- $components := .root.Values.tls.components | default dict -}}
+{{- $own := get (get $components .target | default dict) "mode" -}}
+{{- $mode := $own | default .root.Values.tls.mode -}}
+{{- if and (eq .target "redirect") (eq $mode "strict") -}}
+{{- fail "the redirect target cannot be strict: the application chart never runs redirect strict (it is fronted by a gateway that terminates TLS). Set tls.mode to permissive (or off) and tls.components.urls.mode to strict to call only the URL service over its strict port" -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/*
+Whether the e2e JOB presents an identity: its own switch, on top of the
+release-wide one. Separate from the prober's (which is `prober.enabled`)
+because turning the transport on for a platform already running the prober
+must not silently change what the Job asks of the application release's
+allow-lists — the Job's account is another entry to grant.
+*/}}
+{{- define "url-shortener-e2e.jobTLSOn" -}}
+{{- $job := .Values.job.tls | default dict -}}
+{{- if $job.enabled -}}
+{{- if not (include "url-shortener-e2e.tlsOn" .) -}}
+{{- fail "job.tls.enabled needs the transport on: set tls.mode (or tls.components.urls.mode) to permissive or strict, and tls.trustDomain" -}}
+{{- end -}}
+yes
+{{- end -}}
+{{- end -}}
+
+{{/*
+The suite's own environment for its identity — see
+examples/url-shortener/e2e/tlsenv for what each one means. Rendered only
+when job.tls.enabled, so a Job with it off carries none of it.
+*/}}
+{{- define "url-shortener-e2e.jobTLSEnv" -}}
+- name: E2E_URLS_TLS
+  value: {{ include "url-shortener-e2e.tlsMode" (dict "root" . "target" "urls") | quote }}
+- name: E2E_REDIRECT_TLS
+  value: {{ include "url-shortener-e2e.tlsMode" (dict "root" . "target" "redirect") | quote }}
+- name: E2E_TLS_PORT
+  value: {{ .Values.tls.port | quote }}
+- name: E2E_TLS_DIR
+  value: {{ .Values.tls.mountPath | quote }}
+- name: E2E_TLS_TRUST_DOMAIN
+  value: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain | quote }}
+{{- /*
+"namespace/serviceAccount", comma separated, and an EMPTY string for an
+empty list — which the suite reads as a list that admits nobody, never as
+no list at all.
+*/}}
+- name: E2E_TLS_PEERS
+  value: {{ $peers := list }}{{ range (.Values.tls.peers | default list) }}{{ $peers = append $peers (printf "%s/%s" .namespace .serviceAccount) }}{{ end }}{{ join "," $peers | quote }}
 {{- end -}}
 
 {{/*

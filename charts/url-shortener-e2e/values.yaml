@@ -210,12 +210,35 @@ job:
   # called or what it does, only that this chart lets a platform set it.
   annotations: {}
 
+  # Whether the SUITE presents a workload identity to the application
+  # release — the Job's counterpart of what the prober's `tls` block already
+  # does for the prober, and off by default on the same terms: byte-identical
+  # to a chart that had never heard of it.
+  #
+  # It reads the top-level `tls` block below (mode, components, trustDomain,
+  # csiDriver, mountPath, grantRequest, port, peers) — ONE description of the
+  # application release, shared with the prober — and adds only this switch,
+  # because turning the transport on for a platform already running the
+  # prober must not silently change what the Job asks of the application
+  # release's allow-lists.
+  #
+  # The identity is requested AS the Job's own account (`serviceAccount`
+  # below, `<release>-e2e` by default), a SEPARATE account from the prober's,
+  # so its name is one more entry to grant: add it to the application chart's
+  # `tls.peers.urls` (and `tls.peers.redirect`, wherever `redirect` is not
+  # `off`) BEFORE making `urls` strict. Otherwise the suite is refused at the
+  # handshake, and the error names a certificate rather than a list nobody
+  # filled in.
+  tls:
+    enabled: false
+
 resources:
   requests: { cpu: 50m, memory: 64Mi }
 
 # The account this Job runs as. Named, never generated — a platform that
-# needs to grant it something (there is nothing to grant beyond what
-# templates/rbac.yaml already scopes it to) can bind a name it chose.
+# needs to grant it something (beyond what templates/rbac.yaml already scopes
+# it to: with `job.tls.enabled`, the application chart's `tls.peers` must
+# name it) can bind a name it chose.
 serviceAccount:
   create: true
   name: ""
@@ -314,9 +337,11 @@ prober:
 # serving TLS on, which fails as a connection refusal, not as anything
 # that names a setting.
 #
-# Only the prober reads this — see `otel` below for the same rule stated in
-# full. The e2e Job's own suite is a separate question: it runs once and
-# exits, not a workload this chart keeps calling.
+# The prober reads this whenever it is not `off`; the e2e Job reads it only
+# when `job.tls.enabled` says so (see `job` above), and then mirrors the
+# prober: the Job's account is what the identity is requested as, and it is
+# another entry in the application chart's `tls.peers.urls` /
+# `tls.peers.redirect`, exactly as the prober's is.
 tls:
   # off | permissive | strict — the SAME enum charts/url-shortener's own
   # tls.mode uses, so a platform sets one value it already understands
@@ -337,6 +362,26 @@ tls:
   # below, once it is `permissive` and the ordinary port is still
   # cleartext. See templates/prober-config.yaml's own comment.
   mode: "off"
+
+  # Per-target override of `mode`: the mode the application release runs
+  # `urls` and `redirect` in, which decides which port and scheme each is
+  # dialled on. Same meaning as charts/url-shortener's own `tls.components`;
+  # unset means `mode`, so a chart that never heard of this renders as
+  # before. It exists because the application chart no longer runs the two
+  # alike: `urls` may be `strict` while `redirect`, fronted by a gateway,
+  # stays `permissive`.
+  #
+  #   tls:
+  #     mode: permissive
+  #     components:
+  #       urls:
+  #         mode: strict
+  #
+  # `redirect` can never be `strict` — the application chart refuses it — so
+  # it is refused here too, written down or inherited from a release-wide
+  # `mode: strict`. Naming only `urls` is the way to say "the URL service is
+  # strict".
+  components: {}
 
   # The root of every identity this prober will accept an ANSWER from when
   # it calls `urls` and `redirect` — see `peers` below for why that is a

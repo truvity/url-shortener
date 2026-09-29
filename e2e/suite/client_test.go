@@ -23,10 +23,6 @@ const (
 	componentLog      = "log"
 )
 
-// httpPort is the one port every RPC-serving Service in this chart carries
-// — see charts/url-shortener/templates/{urls,redirect,web}.yaml.
-const httpPort = 8080
-
 // service renders the Service name for one of this chart's components —
 // {{ include "url-shortener.name" . }}-{{ component }}, which is
 // {AppRelease}-{component} for this chart's own naming helper.
@@ -38,14 +34,45 @@ func service(component string) string {
 // port-forward to the exact Pod on the kind tier, the ClusterIP directly
 // everywhere else (harness.Cluster.ServiceURL) — and fails the test with a
 // clear name if it cannot.
-func serviceURL(ctx context.Context, t *testing.T, component string, port int) string {
+//
+// The PORT and the SCHEME come from tlsenv, not from the caller: they depend
+// on the TARGET's own mode, which differs by component (`urls` may be strict
+// while `redirect`, fronted by a gateway, never is). With the identity off —
+// the default — that is the ordinary port in cleartext, exactly as before.
+func serviceURL(ctx context.Context, t *testing.T, component string) string {
 	t.Helper()
 
+	port, _ := shared.tls.Endpoint(component)
 	url, err := shared.cluster.ServiceURL(ctx, shared.names.Namespace, service(component), port)
 	if err != nil {
 		t.Fatalf("resolve the %s Service: %v", component, err)
 	}
+
+	url, err = shared.tls.Rewrite(component, url)
+	if err != nil {
+		t.Fatalf("address the %s Service: %v", component, err)
+	}
 	return url
+}
+
+// httpClient is the client every call to the release under test goes
+// through: the plain default when no identity is loaded, and one presenting
+// the mounted certificate — verifying the ANSWERING peer's identity rather
+// than its name (transport.Identity.Client) — when the Job's is on.
+//
+// Transport is set only when an identity exists, deliberately never to a
+// typed-nil *http.Transport: an interface field holding one is not a nil
+// interface, so net/http would call RoundTrip on it instead of falling back
+// to its default.
+func httpClient(follow bool) *http.Client {
+	c := &http.Client{Timeout: 10 * time.Second}
+	if !follow {
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	}
+	if shared.identity != nil {
+		c.Transport = shared.identity
+	}
+	return c
 }
 
 // wrapThroughForward enriches err with the Pod a request travelled through,
@@ -70,8 +97,8 @@ func wrapThroughForward(component string, err error) error {
 func urlsClient(ctx context.Context, t *testing.T) urlshortenerv1connect.UrlsServiceClient {
 	t.Helper()
 
-	baseURL := serviceURL(ctx, t, componentURLs, httpPort)
-	return urlshortenerv1connect.NewUrlsServiceClient(&http.Client{Timeout: 10 * time.Second}, baseURL)
+	baseURL := serviceURL(ctx, t, componentURLs)
+	return urlshortenerv1connect.NewUrlsServiceClient(httpClient(true), baseURL)
 }
 
 // errString is a small helper so callers can name a failing RPC without

@@ -101,8 +101,7 @@ data:
     drain:
       seconds: 33
     tls:
-      mode: permissive
-      address: ":9443"
+      mode: strict
       certFile: /var/run/example-identity/tls.crt
       keyFile: /var/run/example-identity/tls.key
       caFile: /var/run/example-identity/ca.crt
@@ -134,7 +133,7 @@ data:
         - namespace: default
           serviceAccount: app-account
     urls:
-      address: https://example-urls:9443
+      address: https://example-urls:8080
     events:
       nats:
         url: nats://broker.example.svc:4222
@@ -162,7 +161,7 @@ data:
         - namespace: default
           serviceAccount: app-account
     urls:
-      address: https://example-urls:9443
+      address: https://example-urls:8080
     assets:
       directory: /app/assets
 
@@ -275,9 +274,6 @@ spec:
     - name: http
       port: 8080
       targetPort: http
-    - name: https
-      port: 9443
-      targetPort: https
 
 ---
 # Source: url-shortener/templates/web.yaml
@@ -333,7 +329,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
+        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -463,7 +459,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
+        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -589,7 +585,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
+        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -706,7 +702,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
+        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -758,8 +754,6 @@ spec:
               containerPort: 8080
             - name: probes
               containerPort: 7070
-            - name: https
-              containerPort: 9443
           livenessProbe:
             httpGet: { path: /health/live, port: probes }
             periodSeconds: 10
@@ -824,7 +818,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: e9c62b0ac0fc840e7556c6d1c4eb307c51660449d46eac4f3cfd51dfda8619af
+        checksum/config: 10fa2b421e024b2eaa0369a968ce3d1b428b00ef5b0bdf87ff0af4eaa0d2762a
     spec:
       serviceAccountName: app-account
       securityContext:

@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/truvity/gemaal/pkg/harness"
 
 	"github.com/truvity/policy/examples/url-shortener/e2e/fixture"
+	"github.com/truvity/policy/examples/url-shortener/e2e/tlsenv"
 )
 
 const (
@@ -187,6 +189,13 @@ type env struct {
 	tracesClient    string
 	tracesTokenFile string
 	tracesCAFile    string
+
+	// tls and identity are what tlsenv read from the environment: whether
+	// this process presents a workload identity to the release under test,
+	// and the transport carrying it. identity is nil unless the
+	// url-shortener-e2e chart's Job turned it on — see client_test.go.
+	tls      tlsenv.Config
+	identity *http.Transport
 }
 
 // getenv reads name, or def when unset or blank.
@@ -330,7 +339,18 @@ func resolveEnv(_ context.Context, namespace string) (env, error) {
 		RolloutTimeout: rolloutTimeoutFromEnv(),
 	}
 
+	tlsConfig, err := tlsenv.FromEnv(os.LookupEnv)
+	if err != nil {
+		return env{}, fmt.Errorf("the suite's transport identity: %w", err)
+	}
+	identity, err := tlsConfig.Transport()
+	if err != nil {
+		return env{}, err
+	}
+
 	return env{
+		tls:             tlsConfig,
+		identity:        identity,
 		cluster:         cluster,
 		names:           names,
 		appVersion:      strings.TrimSpace(os.Getenv(envAppVersion)),

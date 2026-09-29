@@ -20,7 +20,10 @@
       "minLength": 1
     },
     "mode": {
-      "enum": ["full", "tenant"]
+      "enum": [
+        "full",
+        "tenant"
+      ]
     },
     "rolloutTimeout": {
       "type": "string"
@@ -28,7 +31,12 @@
     "database": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["host", "name", "owner", "app"],
+      "required": [
+        "host",
+        "name",
+        "owner",
+        "app"
+      ],
       "properties": {
         "host": {
           "type": "string",
@@ -41,7 +49,9 @@
         "owner": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["role"],
+          "required": [
+            "role"
+          ],
           "properties": {
             "role": {
               "type": "string",
@@ -52,7 +62,10 @@
         "app": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["role", "passwordSecret"],
+          "required": [
+            "role",
+            "passwordSecret"
+          ],
           "properties": {
             "role": {
               "type": "string",
@@ -73,7 +86,13 @@
     "events": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stream", "redirectSubject", "requestSubject", "statConsumer", "logConsumer"],
+      "required": [
+        "stream",
+        "redirectSubject",
+        "requestSubject",
+        "statConsumer",
+        "logConsumer"
+      ],
       "properties": {
         "stream": {
           "type": "string",
@@ -100,7 +119,9 @@
     "archive": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bucket"],
+      "required": [
+        "bucket"
+      ],
       "properties": {
         "bucket": {
           "type": "string",
@@ -164,12 +185,17 @@
     "images": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["e2e"],
+      "required": [
+        "e2e"
+      ],
       "properties": {
         "e2e": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["registry", "repository"],
+          "required": [
+            "registry",
+            "repository"
+          ],
           "properties": {
             "registry": {
               "type": "string",
@@ -190,7 +216,10 @@
         "prober": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["registry", "repository"],
+          "required": [
+            "registry",
+            "repository"
+          ],
           "properties": {
             "registry": {
               "type": "string",
@@ -211,16 +240,26 @@
       }
     },
     "pullPolicy": {
-      "enum": ["Always", "IfNotPresent", "Never"]
+      "enum": [
+        "Always",
+        "IfNotPresent",
+        "Never"
+      ]
     },
     "job": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["backoffLimit", "activeDeadlineSeconds"],
+      "required": [
+        "backoffLimit",
+        "activeDeadlineSeconds"
+      ],
       "properties": {
         "ttlSecondsAfterFinished": {
           "description": "OPTIONAL, and UNSET by default: a GitOps controller with self-heal on recreates a Job that deleted itself, so templates/job.yaml renders this key only when it is set. Absent or null skip it; a value must still clear the floor below.",
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 120
         },
         "backoffLimit": {
@@ -232,10 +271,20 @@
           "minimum": 1
         },
         "annotations": {
-          "description": "Rendered on the Job's own metadata, never the pod template's — for a GitOps controller that must replace, not patch, an immutable Job when this chart's values change at the same version, e.g. a force/replace sync option.",
+          "description": "Rendered on the Job's own metadata, never the pod template's \u2014 for a GitOps controller that must replace, not patch, an immutable Job when this chart's values change at the same version, e.g. a force/replace sync option.",
           "type": "object",
           "additionalProperties": {
             "type": "string"
+          }
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The e2e Job's own switch for presenting a workload identity, on top of the release-wide tls block. Needs tls.mode (or a target's override) not off.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
           }
         }
       }
@@ -277,7 +326,11 @@
     "prober": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "interval", "keyPrefix"],
+      "required": [
+        "enabled",
+        "interval",
+        "keyPrefix"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -291,7 +344,11 @@
           "minLength": 1
         },
         "pullPolicy": {
-          "enum": ["Always", "IfNotPresent", "Never"]
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
         },
         "resources": {
           "type": "object",
@@ -302,7 +359,12 @@
           "additionalProperties": false,
           "properties": {
             "level": {
-              "enum": ["debug", "info", "warn", "error"]
+              "enum": [
+                "debug",
+                "info",
+                "warn",
+                "error"
+              ]
             }
           }
         },
@@ -351,10 +413,49 @@
     "tls": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mode"],
+      "required": [
+        "mode"
+      ],
       "properties": {
         "mode": {
-          "enum": ["off", "permissive", "strict"]
+          "enum": [
+            "off",
+            "permissive",
+            "strict"
+          ]
+        },
+        "components": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-target override of tls.mode: the mode the APPLICATION RELEASE runs `urls` and `redirect` in, which decides the port and scheme this chart's callers dial. Same meaning as charts/url-shortener's own tls.components. Unset means tls.mode.",
+          "properties": {
+            "urls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "off",
+                    "permissive",
+                    "strict"
+                  ]
+                }
+              }
+            },
+            "redirect": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Never `strict`: the application chart runs redirect behind a gateway that terminates TLS.",
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "off",
+                    "permissive"
+                  ]
+                }
+              }
+            }
+          }
         },
         "trustDomain": {
           "type": "string"
@@ -380,7 +481,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["namespace", "serviceAccount"],
+            "required": [
+              "namespace",
+              "serviceAccount"
+            ],
             "properties": {
               "namespace": {
                 "type": "string",
@@ -403,7 +507,10 @@
           "type": "string"
         },
         "protocol": {
-          "enum": ["http/protobuf", "grpc"]
+          "enum": [
+            "http/protobuf",
+            "grpc"
+          ]
         },
         "tracesSampler": {
           "type": "string",

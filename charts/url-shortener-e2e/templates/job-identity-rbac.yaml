@@ -1,0 +1,49 @@
+{{/*
+Permission for the e2e JOB's own account to ASK for its identity — the same
+rule templates/prober-identity-rbac.yaml states for the prober, and the same
+one charts/url-shortener/templates/identity-rbac.yaml states for the
+application's workloads: the request is made AS the account the pod runs as
+(that is what makes the identity attested rather than claimed), so that
+account needs whatever creating a CertificateRequest takes. Without it the
+POD IS NEVER CREATED, and the reason lands in an event nobody is watching
+while the Job waits.
+
+The account is the Job's own ("url-shortener-e2e.serviceAccountName"), which
+templates/rbac.yaml already creates and binds to the Kubernetes API reads the
+suite needs; nothing here creates a second one. A separate file from
+rbac.yaml on purpose, for the same reason the prober's is: two grants for two
+different things, and neither should have to change when the other does.
+
+Rendered only while the Job's identity is on AND the platform has not said it
+grants the request centrally (tls.grantRequest false): a chart with either
+left at its default carries no trace of a capability it never uses.
+*/}}
+{{- if and (include "url-shortener-e2e.jobTLSOn" .) .Values.tls.grantRequest }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "url-shortener-e2e.name" . }}-e2e-request-identity
+  labels:
+    {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+    app.kubernetes.io/component: e2e
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "url-shortener-e2e.name" . }}-e2e-request-identity
+  labels:
+    {{- include "url-shortener-e2e.labels" . | nindent 4 }}
+    app.kubernetes.io/component: e2e
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "url-shortener-e2e.name" . }}-e2e-request-identity
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "url-shortener-e2e.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

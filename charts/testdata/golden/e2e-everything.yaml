@@ -44,7 +44,7 @@ data:
     # See values.yaml's own comment on why this chart cannot read the
     # application release's ACTUAL mode and has to be told to agree with it.
     urls:
-      address: https://example-urls:9444
+      address: https://example-urls:8080
     redirect:
       address: https://example-redirect:9444
 
@@ -129,7 +129,7 @@ spec:
         # charts/url-shortener/templates/redirect.yaml states in full: without
         # this, a `helm upgrade` that only edits the ConfigMap changes
         # nothing, because the running pod keeps the file it started with.
-        checksum/config: 5afe5ab5b7d0bbf2a66bc08e75988cdbf51027e3f2056e0f911d3a57df3c2b3f
+        checksum/config: 121bfc46333467489f4c69149b7be69c8cbedd17d74981420e5e65d9f6c507e8
     spec:
       # Named only while the transport identity is on: the CSI driver
       # derives this pod's SPIFFE identity from the account it runs as, and
@@ -354,6 +354,22 @@ spec:
               value: /var/run/traces/token
             - name: E2E_TRACES_CA_FILE
               value: /var/run/traces-ca/bundle.pem
+            # The suite's own workload identity, for calls to `urls` and
+            # `redirect` — see values.yaml's own comment on job.tls, and
+            # e2e/tlsenv for what each variable means. Absent while
+            # job.tls.enabled is false, so the default Job is unchanged.
+            - name: E2E_URLS_TLS
+              value: "strict"
+            - name: E2E_REDIRECT_TLS
+              value: "permissive"
+            - name: E2E_TLS_PORT
+              value: "9444"
+            - name: E2E_TLS_DIR
+              value: "/var/run/example-identity"
+            - name: E2E_TLS_TRUST_DOMAIN
+              value: "example.invalid"
+            - name: E2E_TLS_PEERS
+              value: "other/reader"
           resources:
             limits:
               cpu: 200m
@@ -368,6 +384,9 @@ spec:
             - name: traces-ca
               mountPath: /var/run/traces-ca
               readOnly: true
+            - name: identity
+              mountPath: /var/run/example-identity
+              readOnly: true
       volumes:
         - name: traces-token
           projected:
@@ -379,3 +398,7 @@ spec:
         - name: traces-ca
           configMap:
             name: custom-traces-ca
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true

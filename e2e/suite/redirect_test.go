@@ -33,11 +33,10 @@ func TestRedirectAnswers302(t *testing.T) {
 // noRedirectClient never follows a redirect, so a 302's own status and
 // Location header are what the caller sees — following it would answer
 // "what is at the long URL", which is a different question from "did the
-// redirect service answer 302 with the right Location".
-var noRedirectClient = &http.Client{
-	Timeout:       10 * time.Second,
-	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-}
+// redirect service answer 302 with the right Location". A function, not a
+// variable: it carries the identity, which is loaded after package
+// initialisation (see httpClient).
+func noRedirectClient() *http.Client { return httpClient(false) }
 
 // followRedirect asks the redirect Service for key and returns the
 // Location header of the 302 it must answer with — the "redirect" journey,
@@ -46,8 +45,8 @@ var noRedirectClient = &http.Client{
 func followRedirect(ctx context.Context, t *testing.T, key string) string {
 	t.Helper()
 
-	base := serviceURL(ctx, t, componentRedirect, httpPort)
-	location, status, err := journey.Resolve(ctx, noRedirectClient, base, key)
+	base := serviceURL(ctx, t, componentRedirect)
+	location, status, err := journey.Resolve(ctx, noRedirectClient(), base, key)
 	if err != nil {
 		t.Fatalf("%s", errString(componentRedirect, "GET /r/"+key, err))
 	}
