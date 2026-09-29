@@ -492,3 +492,137 @@ func TestTheProberCarriesTheInstanceLabel(t *testing.T) {
 		t.Errorf("the prober's Deployment carries no app.kubernetes.io/instance label (got %q)", got)
 	}
 }
+
+// THE test for an optional capability, proved for this chart's OWN tls
+// block on the same terms as chart_test.go's TestTransportOffLeavesNoTrace
+// proves it for the application chart's: with it off (the default), the
+// render carries no trace of it at all — not the CSI volume, not the
+// certificate-request permission, not even a ServiceAccount naming the
+// prober specifically. A chart installed by someone whose platform
+// provides none of this must render byte-identical to one that had never
+// heard of it, prober enabled or not.
+func TestProberTransportOffLeavesNoTrace(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	for _, trace := range []string{
+		"csi.cert-manager.io", // the driver
+		"certificaterequests", // the permission to ask
+		"trustDomain",         // the configuration block
+		"identity",            // the volume and its mount
+		"tls:",                // the block itself
+	} {
+		if strings.Contains(out, trace) {
+			t.Errorf("the default render mentions %q; with tls.mode off it must carry no trace of it", trace)
+		}
+	}
+}
+
+// Turned on, the prober gets exactly what a platform with workload
+// identity needs: its own account (distinct from the e2e Job's), the CSI
+// volume and its mount at tls.mountPath, and — while tls.grantRequest is
+// true — the Role letting that account ask for a certificate.
+func TestProberTransportOnRendersIdentity(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults(
+		"--set", "tls.mode=strict",
+		"--set", "tls.trustDomain=example.invalid",
+		"--set", "tls.peers[0].namespace=example",
+		"--set", "tls.peers[0].serviceAccount=example-app")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	for _, want := range []string{
+		"spiffe.csi.cert-manager.io",
+		"certificaterequests",
+		"trustDomain: example.invalid",
+		"serviceAccount: example-app",
+		"mountPath: /var/run/identity",
+		"serviceAccountName: example-e2e-prober",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render is missing %q, so the platform has nothing to act on", want)
+		}
+	}
+
+	// The prober's own account is a SEPARATE ServiceAccount from the e2e
+	// Job's — see templates/_helpers.tpl's own comment on
+	// "url-shortener-e2e.proberServiceAccountName" for why the two carry
+	// different grants.
+	var accounts []string
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if docKind(doc) == "ServiceAccount" {
+			accounts = append(accounts, docName(doc))
+		}
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("expected two ServiceAccounts (the Job's and the prober's), found %v", accounts)
+	}
+}
+
+// The prober's own account needs `create certificaterequests` ONLY while
+// tls.grantRequest asks for it — see charts/url-shortener/templates/
+// identity-rbac.yaml's own comment for why a platform granting this
+// centrally sets that value false, and the render must then carry no Role
+// for a permission nothing here uses.
+func TestProberTransportGrantRequestIsOptional(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults(
+		"--set", "tls.mode=strict",
+		"--set", "tls.trustDomain=example.invalid",
+		"--set", "tls.grantRequest=false")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	if strings.Contains(out, "certificaterequests") {
+		t.Error("certificaterequests was rendered with tls.grantRequest=false")
+	}
+	// The account itself is unaffected: the CSI mount still needs one to
+	// derive an identity from, only the PERMISSION to ask is a platform's
+	// to grant centrally instead.
+	if !strings.Contains(out, "serviceAccountName: example-e2e-prober") {
+		t.Error("the prober's own account was not rendered although tls.mode is on")
+	}
+}
+
+// Transport on with NOBODY on the prober's own allow-list renders
+// configuration the prober binary accepts — the SAME claim
+// chart_test.go's TestTransportOnWithNoPeersIsStillValid proves for the
+// application chart, proved here for the prober's config file instead.
+//
+// `peers:` followed by an empty range is YAML null, not an empty array;
+// the prober would refuse it at start-up with "tls.peers: got null, want
+// array" and crash-loop while the Deployment reports Ready throughout. An
+// empty allow-list is exactly what tls.peers left at its default (nobody
+// granted yet) looks like, so this is the DEFAULT this test proves against.
+func TestProberTLSPeersRenderAsAnEmptyArrayNotNull(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults(
+		"--set", "tls.mode=strict",
+		"--set", "tls.trustDomain=example.invalid")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	doc := conformance.ConfigMapData(t, []byte(out), "prober.yaml")
+	conformance.ValidDocument(t, doc, config.Read("prober.json"))
+
+	if !strings.Contains(out, "peers:\n        []") {
+		t.Errorf("tls.peers with nothing set did not render as an empty array:\n%s", out)
+	}
+}
+
+// A trust domain is required the moment the prober's own transport is on,
+// on exactly the same terms as the application chart's tls.trustDomain:
+// without it a peer from ANY trust domain would be admitted, which is a
+// caller that looks authenticated and is not.
+func TestProberTransportOnWithoutATrustDomainIsRefused(t *testing.T) {
+	out, err := renderE2E(t, proberDefaults("--set", "tls.mode=strict")...)
+	if err == nil {
+		t.Fatalf("a render with no trust domain was accepted:\n%s", out)
+	}
+	if !strings.Contains(out, "tls.trustDomain is required") {
+		t.Errorf("the refusal does not say what is missing: %s", out)
+	}
+}

@@ -53,6 +53,9 @@
           "minLength": 1
         }
       }
+    },
+    "tls": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"
     }
   }
 }

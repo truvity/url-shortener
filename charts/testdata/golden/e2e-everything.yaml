@@ -19,15 +19,34 @@ data:
       seconds: 3
     interval: "5s"
     keyPrefix: "synthetic-"
+    tls:
+      mode: strict
+      certFile: /var/run/example-identity/tls.crt
+      keyFile: /var/run/example-identity/tls.key
+      caFile: /var/run/example-identity/ca.crt
+      trustDomain: example.invalid
+      peers:
+        - namespace: other
+          serviceAccount: reader
     # This chart has no copy of the release named by .Values.appRelease to
     # render, so these are a FORMULA over it — {appRelease}-urls and
-    # {appRelease}-redirect, port 8080 — the exact Service names and port
+    # {appRelease}-redirect — the exact Service names
     # charts/url-shortener/templates/{urls,redirect}.yaml render, never
     # guessed twice.
+    #
+    # The PORT and SCHEME instead follow this chart's OWN tls.mode, not a
+    # formula: off means the application release's cleartext port, exactly
+    # as before this existed; strict means that SAME ordinary port, but
+    # speaking TLS, because under `strict` the protocol changes and the
+    # address does not; permissive means the alternate port named by
+    # tls.port, because under `permissive` the ordinary port is still
+    # cleartext and the authenticated listener is the second one beside it.
+    # See values.yaml's own comment on why this chart cannot read the
+    # application release's ACTUAL mode and has to be told to agree with it.
     urls:
-      address: http://example-urls:8080
+      address: https://example-urls:9444
     redirect:
-      address: http://example-redirect:8080
+      address: https://example-redirect:9444
 
 ---
 # Source: url-shortener-e2e/templates/rbac.yaml
@@ -110,13 +129,24 @@ spec:
         # charts/url-shortener/templates/redirect.yaml states in full: without
         # this, a `helm upgrade` that only edits the ConfigMap changes
         # nothing, because the running pod keeps the file it started with.
-        checksum/config: be0bdb5ee113c2a096dbfd877fe09a0252db19eb066f87c98e2c549cf0698125
+        checksum/config: 5afe5ab5b7d0bbf2a66bc08e75988cdbf51027e3f2056e0f911d3a57df3c2b3f
     spec:
+      # Named only while the transport identity is on: the CSI driver
+      # derives this pod's SPIFFE identity from the account it runs as, and
+      # templates/prober-identity-rbac.yaml's Role/RoleBinding (when
+      # tls.grantRequest) binds to this exact name. Left unset while
+      # tls.mode is "off", so the default render is byte-identical to one
+      # from a chart that had never heard of any of this.
+      serviceAccountName: given-prober-account
       # No Kubernetes API access at all: this workload only ever speaks
       # HTTP to two Services, on the same terms as
       # examples/url-shortener/e2e/suite's own client calls — unlike the
       # e2e Job beside it (templates/rbac.yaml), there is nothing here for
-      # a ServiceAccount token to be for.
+      # a ServiceAccount token to be for. Still true above: the certificate
+      # named by serviceAccountName arrives through the CSI driver's own
+      # TokenRequest for this pod's account, a mechanism entirely separate
+      # from this flag, which only governs the ordinary automounted token
+      # this container never reads.
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -164,6 +194,10 @@ spec:
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
+            
+            - name: identity
+              mountPath: /var/run/example-identity
+              readOnly: true
           resources:
             limits:
               cpu: 40m
@@ -175,6 +209,11 @@ spec:
         - name: config
           configMap:
             name: example-e2e-prober
+        
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true
 
 ---
 # Source: url-shortener-e2e/templates/job.yaml

@@ -38,6 +38,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	policytelemetry "github.com/truvity/policy/telemetry"
+	"github.com/truvity/policy/transport"
 
 	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
 	"github.com/truvity/policy/examples/url-shortener/internal/config"
@@ -115,17 +116,49 @@ func run() error {
 
 	// --- what this process talks to ---
 	//
-	// Plain HTTP, no identity: this prober calls the SAME two Services the
-	// e2e suite calls, over the SAME kind of client — see
-	// examples/url-shortener/e2e/suite/client_test.go and redirect_test.go.
-	// A platform that turns on transport identity for the release turns it
-	// on for this workload too, by the same chart-wide switch; there is no
-	// second copy of that decision here to keep in step with it.
-	urlsClient := urlshortenerv1connect.NewUrlsServiceClient(&http.Client{Timeout: 10 * time.Second}, cfg.Urls.Address)
+	// The mounted identity, if the chart's OWN tls.mode asked for one. A
+	// nil identity is not an error: it is the default, and it means
+	// cleartext — the same meaning charts/url-shortener's client-only
+	// components (`stat`, `web`) already give this. It is NOT the
+	// application release's own switch: charts/url-shortener-e2e is a
+	// separate Helm release, so a platform turning `urls` strict has to
+	// turn this chart's `tls.mode` on too, or this prober keeps dialling
+	// cleartext against a listener that no longer serves it.
+	identity, err := transport.Load(cfg.TLS, log)
+	if err != nil {
+		return fmt.Errorf("transport identity: %w", err)
+	}
+
+	// Two clients, over the SAME kind of client the e2e suite uses — see
+	// examples/url-shortener/e2e/suite/client_test.go and
+	// redirect_test.go — except that with an identity loaded, both present
+	// the mounted certificate and verify the ANSWERING peer's identity
+	// instead of its name (transport.Identity.Client's own doc comment).
+	//
+	// Transport is left AT ITS ZERO VALUE with no identity — the client's
+	// own DEFAULT transport, exactly as before this existed, proxy
+	// environment variables and all. It is set only once an identity is
+	// loaded, deliberately never to a typed-nil *http.Transport: an
+	// interface field holding one is not a nil interface, so
+	// net/http.Client would call RoundTrip on it instead of falling back.
+	// Built by hand rather than through internal/runtime.RPCClient: that
+	// helper's OWN cleartext branch forces unencrypted HTTP/2, which an
+	// in-cluster gRPC caller needs (its own comment) but `redirect`'s
+	// plain REST listener does not speak — so ordinary HTTP/1.1
+	// negotiation is never disturbed, and only the TLS configuration
+	// changes when an identity is loaded.
+	urlsHTTPClient := &http.Client{Timeout: 10 * time.Second}
 	redirectClient := &http.Client{
 		Timeout:       10 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
+	if identity.Mode() != transport.Off {
+		httpTransport := &http.Transport{TLSClientConfig: identity.Client()}
+		urlsHTTPClient.Transport = httpTransport
+		redirectClient.Transport = httpTransport
+	}
+
+	urlsClient := urlshortenerv1connect.NewUrlsServiceClient(urlsHTTPClient, cfg.Urls.Address)
 
 	prober := &prober{
 		log:            log,

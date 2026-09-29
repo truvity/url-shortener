@@ -155,6 +155,57 @@ about, with its own settings rather than a share of the Job's.
 {{- printf "%s-prober" (include "url-shortener-e2e.name" .) -}}
 {{- end -}}
 
+{{/*
+Whether this chart's own client-side transport identity is on at all — the
+SAME shape charts/url-shortener's own "url-shortener.tlsOn" states, so a
+chart installed with it off renders byte-identical to one that has never
+heard of it. See values.yaml's own comment on the top-level `tls` block for
+why this is a value this chart carries independently, not a copy of the
+application release's.
+*/}}
+{{- define "url-shortener-e2e.tlsOn" -}}
+{{- if ne .Values.tls.mode "off" }}yes{{ end -}}
+{{- end -}}
+
+{{/*
+The volume the platform mounts the prober's identity into, and where it is
+mounted — the SAME ephemeral CSI volume shape charts/url-shortener's own
+"url-shortener.identityVolume" / "...identityMount" use, reused here rather
+than forked: not a Secret, so a workload that can read Secrets in its
+namespace still cannot read a neighbour's key. The driver derives the
+identity from the account the POD runs as
+("url-shortener-e2e.proberServiceAccountName" below) — nothing here names
+one, because a chart that could name one could name somebody else's.
+*/}}
+{{- define "url-shortener-e2e.identityVolume" -}}
+{{- if include "url-shortener-e2e.tlsOn" . }}
+- name: identity
+  csi:
+    driver: {{ .Values.tls.csiDriver }}
+    readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "url-shortener-e2e.identityMount" -}}
+{{- if include "url-shortener-e2e.tlsOn" . }}
+- name: identity
+  mountPath: {{ .Values.tls.mountPath }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/*
+The prober's own account name — a SEPARATE account from the e2e Job's
+("url-shortener-e2e.serviceAccountName" above), because the two carry
+different grants: the Job's account is what the Kubernetes API RBAC in
+templates/rbac.yaml binds to, and this one is what a CSI-mounted identity,
+and — once a platform grants it — the application release's own
+`tls.peers`, name. Empty means the release's own, suffixed.
+*/}}
+{{- define "url-shortener-e2e.proberServiceAccountName" -}}
+{{- .Values.prober.serviceAccount.name | default (printf "%s-prober" (include "url-shortener-e2e.name" .)) -}}
+{{- end -}}
+
 {{- define "url-shortener-e2e.proberPodSecurity" -}}
 securityContext:
   runAsNonRoot: true

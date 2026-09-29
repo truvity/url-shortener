@@ -49,11 +49,24 @@ spec:
         # nothing, because the running pod keeps the file it started with.
         checksum/config: {{ include (print $.Template.BasePath "/prober-config.yaml") . | sha256sum }}
     spec:
+      {{- if include "url-shortener-e2e.tlsOn" . }}
+      # Named only while the transport identity is on: the CSI driver
+      # derives this pod's SPIFFE identity from the account it runs as, and
+      # templates/prober-identity-rbac.yaml's Role/RoleBinding (when
+      # tls.grantRequest) binds to this exact name. Left unset while
+      # tls.mode is "off", so the default render is byte-identical to one
+      # from a chart that had never heard of any of this.
+      serviceAccountName: {{ include "url-shortener-e2e.proberServiceAccountName" . }}
+      {{- end }}
       # No Kubernetes API access at all: this workload only ever speaks
       # HTTP to two Services, on the same terms as
       # examples/url-shortener/e2e/suite's own client calls — unlike the
       # e2e Job beside it (templates/rbac.yaml), there is nothing here for
-      # a ServiceAccount token to be for.
+      # a ServiceAccount token to be for. Still true above: the certificate
+      # named by serviceAccountName arrives through the CSI driver's own
+      # TokenRequest for this pod's account, a mechanism entirely separate
+      # from this flag, which only governs the ordinary automounted token
+      # this container never reads.
       automountServiceAccountToken: false
       {{- include "url-shortener-e2e.proberPodSecurity" . | nindent 6 }}
       containers:
@@ -80,9 +93,11 @@ spec:
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
+            {{- include "url-shortener-e2e.identityMount" . | nindent 12 }}
           resources: {{- toYaml .Values.prober.resources | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "url-shortener-e2e.proberName" . }}
+        {{- include "url-shortener-e2e.identityVolume" . | nindent 8 }}
 {{- end }}

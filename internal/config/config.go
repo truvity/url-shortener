@@ -150,12 +150,18 @@ type (
 	// happening. See examples/url-shortener/e2e/journey and
 	// examples/url-shortener/e2e/cmd/prober.
 	//
-	// It carries no `tls` block, on the same terms as Migrate and the
-	// counter's own schema (stat.json): the peers it calls are the
-	// application's own release, reached in cleartext until a platform
-	// turns transport identity on for the whole release — a second copy
-	// of that decision here would be a field a deployment sets and this
-	// component ignores.
+	// It DOES carry a `tls` block, on exactly the same terms as the
+	// counter's own schema (stat.json): a client either presents an
+	// identity or it does not. It is NOT the application release's own
+	// switch reused — charts/url-shortener-e2e is a SEPARATE Helm release
+	// from charts/url-shortener, with no copy of the other's values to
+	// read `tls.mode` off, so a platform sets this chart's own `tls.mode`
+	// to match it. Absent, or `off` (the default), is cleartext, on
+	// exactly the same terms as every other component here. This used to
+	// be left out on the theory that "a platform that turns on transport
+	// identity for the release turns it on for this workload too" — true
+	// only when both are the SAME release, which this pair of charts never
+	// is.
 	Prober struct {
 		Probes    Listen `json:"probes"`
 		Log       Log    `json:"log"`
@@ -164,6 +170,7 @@ type (
 		KeyPrefix string `json:"keyPrefix"`
 		Urls      Client `json:"urls"`
 		Redirect  Client `json:"redirect"`
+		TLS       TLS    `json:"tls"`
 	}
 )
 

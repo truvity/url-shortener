@@ -115,6 +115,50 @@ func TestTheCounterCannotReachTheDatabase(t *testing.T) {
 	// renders against it. The rule outlives the language.
 }
 
+// A null tls.peers is refused by the SCHEMA, not merely avoided by a
+// chart's toYaml rendering trick.
+//
+// `peers:` followed by nothing is YAML null, not an empty array — the
+// fragment (schemas/fragments/tls.json) types `peers` as an array, and a
+// JSON Schema array property does not admit null. A chart that rendered it
+// anyway (empty `{{- range }}` over an empty list, rather than `toYaml`)
+// would crash-loop every prober against a fresh `tls.peers: []` install,
+// silently: the Deployment reports Ready throughout. This is the schema's
+// own half of that guarantee, proved directly against LoadProber rather
+// than through a chart render — see the e2e chart's own
+// TestProberTLSPeersRenderAsAnEmptyArrayNotNull for the render side.
+func TestTLSPeersNullIsRefused(t *testing.T) {
+	const path = "testdata/prober-null-peers.yaml"
+	writeFixture(t, path, `probes:
+  address: ":7070"
+log:
+  level: info
+drain:
+  seconds: 5
+interval: "10s"
+keyPrefix: "probe-"
+urls:
+  address: https://urls:8080
+redirect:
+  address: https://redirect:8080
+tls:
+  mode: strict
+  certFile: /var/run/identity/tls.crt
+  keyFile: /var/run/identity/tls.key
+  caFile: /var/run/identity/ca.crt
+  trustDomain: example.invalid
+  peers:
+`)
+
+	_, err := config.LoadProber(path)
+	if err == nil {
+		t.Fatal("a null tls.peers was accepted")
+	}
+	if !strings.Contains(err.Error(), "peers") {
+		t.Errorf("the refusal does not name tls.peers: %v", err)
+	}
+}
+
 // A password written into the file is refused, and the error does not repeat
 // it. The schemas are strict everywhere, not only at the top level, which is
 // what makes this true of a nested object.

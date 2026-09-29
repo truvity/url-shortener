@@ -275,6 +275,115 @@ prober:
     runAsGroup: 65532
     fsGroup: 65532
 
+  # The account the prober's OWN Deployment runs as — a SEPARATE account
+  # from the e2e Job's own `serviceAccount` above, because the two carry
+  # different grants: the Job's account is what the Kubernetes API RBAC in
+  # templates/rbac.yaml binds to, and this one is what a CSI-mounted
+  # identity (see the top-level `tls` block below) — and, once a platform
+  # grants it, the application release's own `tls.peers` — names. Rendered
+  # only while `tls.mode` is not `off` (templates/prober-identity-rbac.yaml):
+  # a prober installed with the transport left off keeps running as the
+  # namespace's own default account, exactly as it does today. Empty means
+  # the release's own, suffixed.
+  serviceAccount:
+    create: true
+    name: ""
+
+# Workload identity for the prober's OWN calls to `urls` and `redirect` —
+# the same fragment (schemas/fragments/tls.json) and the same fields
+# charts/url-shortener uses for a client-only component (`stat`, `web`):
+# a caller either presents an identity or it does not, so there is no
+# authenticated PORT to add here, only the switch and the certificate.
+#
+# `off` is the default, on exactly the same terms as charts/url-shortener's
+# own default: a chart installable against a platform that provides none of
+# this must render byte-identical to one that has never heard of it. That is
+# also what lets the application chart's `urls` component move from `off` to
+# `permissive` to `strict` a step at a time: this chart's own `tls.mode`
+# has to be turned on to match, or `strict` finds a prober still calling
+# cleartext, and the failure this exists to prevent is exactly the one it
+# is named for.
+#
+# THIS CHART CANNOT READ THE APPLICATION RELEASE'S OWN `tls.mode` OR
+# `tls.port` — it is a separate Helm release (see this file's own opening
+# comment on why every name below is a value, never a formula, for exactly
+# this reason) — so a platform enabling transport identity sets BOTH
+# charts' values to agree, the same way it already keeps `database.host`
+# and the `events.*` names above in step with url-shortener-infra's actual
+# render. Mismatched, the prober dials a port the application is not
+# serving TLS on, which fails as a connection refusal, not as anything
+# that names a setting.
+#
+# Only the prober reads this — see `otel` below for the same rule stated in
+# full. The e2e Job's own suite is a separate question: it runs once and
+# exits, not a workload this chart keeps calling.
+tls:
+  # off | permissive | strict — the SAME enum charts/url-shortener's own
+  # tls.mode uses, so a platform sets one value it already understands
+  # rather than learning a second vocabulary for the same switch.
+  #
+  # The prober SERVES nothing under any of these: its only listener is the
+  # cleartext probes one every component here carries. So the rendered
+  # prober configuration (templates/prober-config.yaml) always asks the
+  # transport package for `strict` once this is not `off` — the same rule
+  # charts/url-shortener/templates/config.yaml states for `stat` and `web`,
+  # and for the same reason: a client either presents an identity or it
+  # does not, and `permissive` is meaningless with no second listener to
+  # put anywhere.
+  #
+  # What THIS value still decides is which of `urls` and `redirect`'s own
+  # ports the prober dials: the ordinary one, over TLS, once the
+  # application release is `strict`; or the alternate one named by `port`
+  # below, once it is `permissive` and the ordinary port is still
+  # cleartext. See templates/prober-config.yaml's own comment.
+  mode: "off"
+
+  # The root of every identity this prober will accept an ANSWER from when
+  # it calls `urls` and `redirect` — see `peers` below for why that is a
+  # different question from who may call the prober, which is nobody: it
+  # serves no port beyond its own liveness and readiness probes.
+  trustDomain: ""
+
+  # What mounts the identity, and where. The platform owns the first; the
+  # chart only has to agree with it. Same defaults as charts/url-shortener.
+  csiDriver: spiffe.csi.cert-manager.io
+  mountPath: /var/run/identity
+
+  # The identity is requested AS the prober's own account — that is what
+  # makes it attested rather than claimed — so that account needs
+  # permission to ask. Set false where the platform grants this centrally.
+  # Same default as charts/url-shortener's own tls.grantRequest.
+  grantRequest: true
+
+  # The authenticated port `urls` and `redirect` serve BESIDE their
+  # cleartext one while the application release is `permissive` — same
+  # meaning, same default, as charts/url-shortener's own tls.port. Unused
+  # under `off` or `strict`: under `strict` the ordinary port is simply
+  # that release's own job, so nothing here has to name a second one.
+  port: 8443
+
+  # Who this prober will ACCEPT AN ANSWER FROM — an ACCOUNT, never an
+  # address, on the same terms as charts/url-shortener's own tls.peers:
+  # an address resolves to whoever holds it today. Empty admits no answer
+  # at all, which is the correct default for a caller nobody has told to
+  # trust anything yet.
+  #
+  # This is NOT granted by the application chart the way it grants its own
+  # internal callers (charts/url-shortener/templates/config.yaml's own
+  # comment on why `urls.yaml` renders its counter's account before any
+  # operator-supplied peer): that rule is for a chart wiring components IT
+  # renders. This chart renders neither `urls` nor `redirect` — it is a
+  # SEPARATE Helm release calling somebody else's — so it has no account of
+  # theirs to grant itself here, and the application chart has no account
+  # of the PROBER's to grant either. Once this chart's `tls.mode` is not
+  # `off`, a platform must add the prober's own ServiceAccount name (see
+  # templates/_helpers.tpl's "url-shortener-e2e.proberServiceAccountName",
+  # or the exact name given at prober.serviceAccount.name) to the
+  # application chart's OWN `tls.peers.urls` and `tls.peers.redirect` —
+  # otherwise `strict` refuses the prober at the handshake, and the error
+  # names a certificate rather than a list nobody filled in.
+  peers: []
+
 # Telemetry for the prober, on exactly the same terms as
 # charts/url-shortener/values.yaml's own `otel` block — see that chart's
 # `_helpers.tpl`'s "url-shortener.telemetryEnv" for the whole rule (decision

@@ -77,6 +77,19 @@ prober:
     runAsUser: 2000
     runAsGroup: 2000
     fsGroup: 2000
+  serviceAccount:
+    create: false
+    name: given-prober-account
+tls:
+  mode: permissive
+  trustDomain: example.invalid
+  csiDriver: example.csi.invalid
+  mountPath: /var/run/example-identity
+  grantRequest: false
+  port: 9444
+  peers:
+    - namespace: other
+      serviceAccount: reader
 otel:
   endpoint: https://otel.example.test
   protocol: grpc

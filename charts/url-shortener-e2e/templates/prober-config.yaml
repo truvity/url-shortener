@@ -27,13 +27,63 @@ data:
       seconds: {{ .Values.prober.drain.seconds | default 5 }}
     interval: {{ .Values.prober.interval | quote }}
     keyPrefix: {{ .Values.prober.keyPrefix | quote }}
+    {{- if include "url-shortener-e2e.tlsOn" . }}
+    tls:
+      {{- /*
+      `strict` whenever this is on at all — the SAME rule
+      charts/url-shortener/templates/config.yaml states for `stat` and
+      `web`: the prober SERVES nothing over this transport (its only
+      listener is the cleartext probes one above), so for the calls it
+      makes there is no second listener a `permissive` address could ever
+      name — a caller either presents an identity or it does not.
+      */}}
+      mode: strict
+      certFile: {{ .Values.tls.mountPath }}/tls.crt
+      keyFile: {{ .Values.tls.mountPath }}/tls.key
+      caFile: {{ .Values.tls.mountPath }}/ca.crt
+      trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
+      {{- /*
+      Who this prober will ACCEPT AN ANSWER FROM — see values.yaml's own
+      comment on `tls.peers` for why this chart cannot fill it in itself
+      the way charts/url-shortener grants its own internal callers: this
+      chart has no copy of the application release to read its account off.
+      toYaml, so an EMPTY list renders as `[]` rather than YAML null — the
+      service refuses null at start-up ("tls.peers: got null, want array")
+      and the Deployment crash-loops while still reporting progress, and an
+      empty allow-list is exactly what `tls.peers` left at its default
+      looks like.
+      */}}
+      peers:{{ toYaml (.Values.tls.peers | default list) | nindent 8 }}
+    {{- end }}
     # This chart has no copy of the release named by .Values.appRelease to
     # render, so these are a FORMULA over it — {appRelease}-urls and
-    # {appRelease}-redirect, port 8080 — the exact Service names and port
+    # {appRelease}-redirect — the exact Service names
     # charts/url-shortener/templates/{urls,redirect}.yaml render, never
     # guessed twice.
+    #
+    # The PORT and SCHEME instead follow this chart's OWN tls.mode, not a
+    # formula: off means the application release's cleartext port, exactly
+    # as before this existed; strict means that SAME ordinary port, but
+    # speaking TLS, because under `strict` the protocol changes and the
+    # address does not; permissive means the alternate port named by
+    # tls.port, because under `permissive` the ordinary port is still
+    # cleartext and the authenticated listener is the second one beside it.
+    # See values.yaml's own comment on why this chart cannot read the
+    # application release's ACTUAL mode and has to be told to agree with it.
     urls:
+      {{- if eq .Values.tls.mode "strict" }}
+      address: https://{{ .Values.appRelease }}-urls:8080
+      {{- else if eq .Values.tls.mode "permissive" }}
+      address: https://{{ .Values.appRelease }}-urls:{{ .Values.tls.port }}
+      {{- else }}
       address: http://{{ .Values.appRelease }}-urls:8080
+      {{- end }}
     redirect:
+      {{- if eq .Values.tls.mode "strict" }}
+      address: https://{{ .Values.appRelease }}-redirect:8080
+      {{- else if eq .Values.tls.mode "permissive" }}
+      address: https://{{ .Values.appRelease }}-redirect:{{ .Values.tls.port }}
+      {{- else }}
       address: http://{{ .Values.appRelease }}-redirect:8080
+      {{- end }}
 {{- end }}
