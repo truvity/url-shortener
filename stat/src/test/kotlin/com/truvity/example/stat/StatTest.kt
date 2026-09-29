@@ -79,19 +79,48 @@ private fun filteredSdk(recorder: SpanExporter): OpenTelemetrySdk =
         .build()
 
 class UrlsClientTest {
+    /**
+     * An outgoing CONNECT call -- the real Connect client, the same wiring
+     * [urlsClient] does -- carries a `traceparent` and produces a CLIENT
+     * span, recorded by an in-memory exporter. The server is plain HTTP/1.1
+     * (the client is told so below), so the RPC itself fails; what is
+     * asserted is what went OUT, which is the instrumentation's whole job.
+     */
     @Test
-    fun `the outbound client carries a span for every call`() {
-        // Built outside Spring's bean graph, so the starter's own
-        // instrumentation never sees this client (it instruments what
-        // Spring manages, and manages nothing here — server.port is -1).
-        // Without its own interceptor this is a consumer with an outbound
-        // call and no span anywhere describing it, which is exactly the
-        // gap found: a tracer provider connected and exporting nothing,
-        // because nothing created a span.
-        val client = urlsHttpClientBuilder(null, filteredSdk(RecordingSpanExporter())).build()
+    fun `an outgoing connect call carries a traceparent and produces a client span`() {
+        val recorder = RecordingSpanExporter()
+        val sdk = filteredSdk(recorder)
+        val seen = java.util.concurrent.atomic.AtomicReference<String?>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            seen.set(exchange.requestHeaders.getFirst("traceparent"))
+            exchange.sendResponseHeaders(200, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val http = urlsHttpClientBuilder(null).protocols(listOf(Protocol.HTTP_1_1)).build()
+            val client = urlsServiceClient("http://127.0.0.1:${server.address.port}", instrument(http, sdk))
+            val parent = sdk.getTracer("test").spanBuilder("consume").startSpan()
+            parent.makeCurrent().use {
+                kotlinx.coroutines.runBlocking {
+                    kotlinx.coroutines.withTimeout(15_000) { recordClick(client, "https://example.com/x") }
+                }
+            }
+            parent.end()
+            assertTrue(false, "the RPC over HTTP/1.1 was expected to fail")
+        } catch (_: IllegalStateException) {
+            // expected: see above
+        } finally {
+            server.stop(0)
+        }
+
+        val header = seen.get()
+        assertTrue(header != null, "the outgoing call carried no traceparent")
+        val client = recorder.exported.single { it.kind == SpanKind.CLIENT }
         assertTrue(
-            client.interceptors.any { it.javaClass.name.startsWith("io.opentelemetry.") },
-            "no OpenTelemetry interceptor on the client that makes the one outbound call this service makes",
+            header.startsWith("00-${client.traceId}-${client.spanId}-"),
+            "traceparent $header is not the client span's own context",
         )
     }
 
@@ -110,7 +139,7 @@ class UrlsClientTest {
      * library (the same call [urlsClient] makes), behind the SAME
      * [FilteringSpanExporter] production installs (`SpanAttributeAllowlist.kt`),
      * reached the SAME way production reaches it: as the `openTelemetry`
-     * this test passes to [urlsHttpClientBuilder], never through
+     * this test passes to [instrument], never through
      * `GlobalOpenTelemetry`. Before the fix this test cannot even be
      * written this way -- `urlsHttpClientBuilder` took no SDK to wire in,
      * only `GlobalOpenTelemetry.get()`, which is exactly the structural
@@ -128,7 +157,7 @@ class UrlsClientTest {
         }
         server.start()
         try {
-            val client = urlsHttpClientBuilder(null, sdk).protocols(listOf(Protocol.HTTP_1_1)).build()
+            val client = instrument(urlsHttpClientBuilder(null).protocols(listOf(Protocol.HTTP_1_1)).build(), sdk)
             client
                 .newCall(Request.Builder().url("http://127.0.0.1:${server.address.port}/").build())
                 .execute()
@@ -205,7 +234,7 @@ class TraceContinuityTest {
             val publisher = sdk.getTracer("test").spanBuilder("redirect").startSpan()
             val headers = Headers()
             headers.add("traceparent", "00-${publisher.spanContext.traceId}-${publisher.spanContext.spanId}-01")
-            val client = urlsHttpClientBuilder(null, sdk).protocols(listOf(Protocol.HTTP_1_1)).build()
+            val client = instrument(urlsHttpClientBuilder(null).protocols(listOf(Protocol.HTTP_1_1)).build(), sdk)
 
             // ENQUEUED, as the Connect client does: the call runs on a
             // dispatcher thread, and only the wrapped executor lets it see

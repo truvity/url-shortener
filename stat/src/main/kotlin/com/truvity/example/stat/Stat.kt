@@ -21,9 +21,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.util.concurrent.Executors
+import okhttp3.Call
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.Request
 import org.slf4j.LoggerFactory
 import urlshortener.v1.UrlsServiceClient
 import urlshortener.v1.Urls.RecordClickRequest
@@ -98,13 +100,12 @@ typealias Nats_ = com.truvity.example.stat.Nats
 // exactly those three keys, on this client's own "POST" span, in the
 // store.
 //
-// `newInterceptor()` is the deprecated half of this library's API, and it
-// is still the one this needs: the replacement, `newCallFactory`, wraps a
-// finished OkHttpClient as a bare Call.Factory, which is not the type
-// ConnectOkHttpClient's constructor takes. The interceptor is the only
-// shape that fits into a Builder that is still being configured below.
-@Suppress("DEPRECATION")
-internal fun urlsHttpClientBuilder(tls: Tls?, openTelemetry: OpenTelemetry): OkHttpClient.Builder {
+// The instrumentation is applied to the FINISHED client, by [instrument]:
+// since 2.31 the library offers only `createCallFactory`, which wraps a
+// built OkHttpClient as a bare Call.Factory (the `newInterceptor` this
+// used to add to the builder is gone). [urlsClient] adapts that back into
+// the OkHttpClient type Connect's client takes.
+internal fun urlsHttpClientBuilder(tls: Tls?): OkHttpClient.Builder {
     val builder =
         OkHttpClient.Builder()
             .callTimeout(Duration.ofSeconds(10))
@@ -122,7 +123,6 @@ internal fun urlsHttpClientBuilder(tls: Tls?, openTelemetry: OpenTelemetry): OkH
                     ),
                 ),
             )
-            .addInterceptor(OkHttpTelemetry.create(openTelemetry).newInterceptor())
     val identity = Identity.load(tls)
     if (identity == null) {
         builder.protocols(listOf(Protocol.H2_PRIOR_KNOWLEDGE))
@@ -141,16 +141,40 @@ internal fun urlsHttpClientBuilder(tls: Tls?, openTelemetry: OpenTelemetry): OkH
     return builder
 }
 
-fun urlsClient(address: String, tls: Tls?, openTelemetry: OpenTelemetry): UrlsServiceClient {
+/**
+ * Wraps [client] so every call it makes is a CLIENT span that propagates the
+ * trace context, using [openTelemetry] (see the comment above for why that
+ * is passed in).
+ *
+ * `OkHttpTelemetry.createCallFactory` returns a `Call.Factory`, and Connect's
+ * `ConnectOkHttpClient` is constructed from an `OkHttpClient` -- but it uses
+ * that client for exactly one thing, `newCall`. `OkHttpClient` is an open
+ * class whose `newCall` is the `Call.Factory` method, so a subclass that
+ * routes `newCall` through the instrumented factory is what fits, without
+ * copying Connect's HTTP layer. Everything the client is configured with
+ * (the identity socket factory and trust manager, protocols, timeouts, the
+ * dispatcher) is carried into the factory's own client by
+ * `createCallFactory` (it starts from `newBuilder()`).
+ */
+internal fun instrument(client: OkHttpClient, openTelemetry: OpenTelemetry): OkHttpClient {
+    val factory = OkHttpTelemetry.create(openTelemetry).createCallFactory(client)
+    return object : OkHttpClient() {
+        override fun newCall(request: Request): Call = factory.newCall(request)
+    }
+}
+
+fun urlsClient(address: String, tls: Tls?, openTelemetry: OpenTelemetry): UrlsServiceClient =
+    urlsServiceClient(address, instrument(urlsHttpClientBuilder(tls).build(), openTelemetry))
+
+/** The Connect client over an already-built (and already-instrumented) [http] client. */
+internal fun urlsServiceClient(address: String, http: OkHttpClient): UrlsServiceClient {
     val config =
         ProtocolClientConfig(
             host = address,
             serializationStrategy = GoogleJavaProtobufStrategy(),
             networkProtocol = NetworkProtocol.GRPC,
         )
-    return UrlsServiceClient(
-        ProtocolClient(ConnectOkHttpClient(urlsHttpClientBuilder(tls, openTelemetry).build()), config),
-    )
+    return UrlsServiceClient(ProtocolClient(ConnectOkHttpClient(http), config))
 }
 
 /**
@@ -225,7 +249,7 @@ internal object NatsHeaders : TextMapGetter<Headers> {
  * inside it become its child in turn.
  *
  * Takes [openTelemetry] rather than reading GlobalOpenTelemetry for the
- * same reason [urlsHttpClientBuilder] does: that is a different SDK, one
+ * same reason [instrument] does: that is a different SDK, one
  * the allow-list exporter never wraps. This span's own attributes are all
  * on the allow-list today, but a span built against the wrong SDK is the
  * same class of bug regardless of what it happens to set.

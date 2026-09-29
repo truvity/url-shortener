@@ -94,7 +94,7 @@ private class Server(server: Pair, client: Pair) : AutoCloseable {
 
 class IdentityHandshakeTest {
     private fun call(tls: Tls, port: Int): Int {
-        val client = urlsHttpClientBuilder(tls, OpenTelemetry.noop()).build()
+        val client = instrument(urlsHttpClientBuilder(tls).build(), OpenTelemetry.noop())
         return client.newCall(okhttp3.Request.Builder().url("https://127.0.0.1:$port/").build()).execute().use { it.code }
     }
 

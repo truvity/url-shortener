@@ -40,7 +40,7 @@ class StatApplication {
     // the same AutoConfigurationCustomizerProvider mechanism the starter
     // uses for the web layer. Depending on it here (rather than reaching
     // for GlobalOpenTelemetry, which is a different, unfiltered SDK -- see
-    // urlsHttpClientBuilder) is what makes Spring construct it first: the
+    // instrument) is what makes Spring construct it first: the
     // ordinary bean graph, not a bootstrap race.
     @Bean
     fun counter(config: Config, openTelemetry: OpenTelemetry): urlshortener.v1.UrlsServiceClient =
