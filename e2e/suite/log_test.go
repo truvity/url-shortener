@@ -95,6 +95,19 @@ func TestLogArchivesTheRecord(t *testing.T) {
 // IAM is a permission a caller should not be handed just to run this one
 // check, and the operator can opt in by setting envS3Endpoint (see
 // env_test.go).
+//
+// namesFromEnvMode's own Job never even ATTEMPTS the lookup: the same
+// reasoning as postgresHostPort's (db_test.go) — there is no reason to
+// believe a Service named objectStoreService in objectStoreNamespace exists
+// off the kind box, and this Job's Role grants it no permission to look one
+// up in a namespace that is not its own release's in any case. Skipping
+// here, before the harness ever shells out, keeps a Forbidden
+// `kubectl get services` off this Job's log entirely — the harness's own
+// runner streams a subprocess's stderr straight through (so the operator
+// sees interactive credential prompts and `kubectl`/`helm` progress), which
+// otherwise means the raw "Error from server (Forbidden)" line lands right
+// before this very skip and reads like a failure to anyone scanning a green
+// run.
 func s3ClientOrSkip(ctx context.Context, t *testing.T) *s3.Client {
 	t.Helper()
 
@@ -121,6 +134,12 @@ func s3ClientOrSkip(ctx context.Context, t *testing.T) *s3.Client {
 			BaseEndpoint: aws.String(endpoint),
 			Credentials:  cfg.Credentials,
 		})
+	}
+
+	if namesFromEnvMode() {
+		t.Skipf("%s is set and %s is not — this Job's Role grants no permission to look up "+
+			"%s/%s, and there is no reason to believe that Service exists off the kind box: "+
+			"skipping the archive check", envNamesFromEnv, envS3Endpoint, objectStoreNamespace, objectStoreService)
 	}
 
 	endpoint, err := shared.cluster.ServiceURL(ctx, objectStoreNamespace, objectStoreService, objectStorePort)
