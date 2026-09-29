@@ -19,7 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-private const val DOMAIN = "devel.example"
+private const val DOMAIN = "example.invalid"
 
 /** A self-signed EC identity whose only name is a SPIFFE URI. */
 private class Pair(val dir: Path, val name: String, val account: String) {
