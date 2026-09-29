@@ -15,6 +15,13 @@ val cfg = load("config.yaml", schema)              // validates, then returns
 val password = secret(cfg.at("/database/passwordEnv").asText())  // the NAME, never a value
 ```
 
+**Status:** built and tested in this repository's gate, against the same
+fixtures as the other loaders — and **not published**. No release ships a
+jar; a consumer builds it from a checkout of the tag it pins (Gradle's
+`includeBuild`, as
+[the example's counter](../examples/url-shortener/stat/settings.gradle.kts)
+does). Publishing it is a release-workflow change nobody has needed yet.
+
 ## Two things that are different here, and why
 
 **The shared schemas are COPIED into the jar**, not generated into a source

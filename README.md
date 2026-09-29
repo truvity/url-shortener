@@ -18,7 +18,8 @@ and says what happened; something else counts that.
 | `web/` | service, **TypeScript** | serves the page, asks `urls` what a key points at |
 | `log/` | service, **Python** | consumes request records, archives them as NDJSON |
 
-Four languages, one chart, and the chart does not know which is which.
+Four languages, one application chart, and the chart does not know which is
+which.
 
 **All three shapes are in here on purpose**, because the interesting part of
 the rule is which to reach for:
@@ -33,10 +34,10 @@ the rule is which to reach for:
   does not take it for an oversight.
 
 Three of these are not written in Go, and that is the point of them rather
-than a detail. It reads a configuration file this chart rendered, validated against
-a schema it carries itself; it serves the same probes on the same port; it
-drains on SIGTERM within the same number the chart gives the platform; and
-its deployment is [twenty lines that never mention the
+than a detail. Each reads a configuration file this chart rendered,
+validated against a schema it carries itself; each serves the same probes on
+the same port; each drains on SIGTERM within the same number the chart gives
+the platform; and each deployment is [twenty lines that never mention the
 language](charts/url-shortener/templates/log.yaml). A platform that had to
 know which language a workload was written in would be a platform every new
 language has to be added to.
@@ -98,24 +99,38 @@ configuration contract's first rule made real: a key the chart sets and the
 binary stopped reading is a test failure in the pull request, not a default
 nobody chose in a cluster.
 
-Five negative fixtures, one per refusal: an unknown key, an image with neither
-digest nor tag, a route naming no parent, an install that says it will supply
-its own database and then does not, and a log level the binary would reject.
-Each fails for its own reason, checked.
+Four negative fixtures in
+[`charts/testdata/invalid/`](charts/testdata/invalid), one per refusal: an
+unknown key, a route naming no parent, an install that supplies no address
+for its database and broker, and a log level the binary would reject. Each
+fails for its own reason, checked.
 
-The database and the streams are behind `infra.enabled`. An estate that
-provisions them separately turns it off and supplies the addresses; a local
-cluster turns it on and gets a working install from one command. That is the
-same split a two-chart "ring" model expresses, as a flag — with three
-components and one database, a second chart would be two files of ceremony
-around one resource.
+## Three charts
+
+| Chart | Installs | Who installs it |
+|---|---|---|
+| [`url-shortener`](charts/url-shortener) | the six components, their configuration, probes, rollout and route | whoever installs the example |
+| [`url-shortener-infra`](charts/url-shortener-infra) | what one install owns: its database and roles, its stream, and — at `tier: primary` — its store and the identity that reaches it | the same caller, once per install, with the same release name |
+| [`url-shortener-e2e`](charts/url-shortener-e2e) | the end-to-end suite as a Job, and an optional always-on prober | whoever wants the install proved where it runs |
+
+The database and the stream are a **second chart**, not a flag, because the
+application's migration runs as a pre-install hook: a chart that created its
+own database could never migrate it. [platform.md
+§11](../../docs/contracts/platform.md) has the whole argument and places
+every resource by scope.
 
 ## Running it
 
+From the repository root, with a container runtime:
+
 ```sh
-just cluster        # a local Kubernetes with the operators this needs
-just cluster-smoke  # prove they act
+just cluster-all   # the box, the release build, the install, and every suite
 ```
 
-The chart, and the suite that installs this into that cluster and exercises
-it, arrive with the next change.
+or one step at a time — `just cluster` stands up the box
+([`hack/kind/`](../../hack/kind/README.md): servers only, no operator),
+`just example-snapshot` builds the images and packages the charts exactly as
+a release does, `just example-fixture` provisions what the infrastructure
+chart would, `just example-install` installs the packaged application chart,
+and `just example-smoke`, `just example-e2e-chart` and `just example-prober`
+prove it works. The suite itself is Go, under [`e2e/suite`](e2e/suite).
