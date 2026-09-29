@@ -8,6 +8,7 @@ import java.security.KeyFactory
 import java.security.KeyStore
 import java.security.Principal
 import java.security.PrivateKey
+import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
@@ -16,10 +17,10 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
+import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
-import okhttp3.Interceptor
-import okhttp3.Response
 
 /**
  * The mounted workload identity, as a CLIENT presents it.
@@ -92,6 +93,13 @@ class Identity(
     // files in place, so the modification time is what says it is stale.
     private data class Loaded(val stamp: Long, val context: SSLContext, val trust: X509TrustManager)
 
+    // NOTE: the peer is admitted or refused INSIDE the handshake, by the
+    // trust manager below, and not by an interceptor on the client. An
+    // interceptor runs around the exchange: it can look at the answer only
+    // after the request has been sent (and, for an application interceptor,
+    // cannot see the connection at all), so it refused every answer while
+    // the peer had already acted on the request.
+
     @Volatile private var loaded: Loaded? = null
 
     private fun stampOf(): Long =
@@ -117,7 +125,8 @@ class Identity(
             TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
                 init(trustStore)
             }
-        val trust = trustFactory.trustManagers.filterIsInstance<X509TrustManager>().first()
+        val chainTrust = trustFactory.trustManagers.filterIsInstance<X509TrustManager>().first()
+        val trust = PeerTrustManager(chainTrust, trustDomain, peers)
 
         val context =
             SSLContext.getInstance("TLSv1.3").apply {
@@ -145,33 +154,6 @@ class Identity(
     fun sslSocketFactory(): SSLSocketFactory = ReloadingSocketFactory { current().context.socketFactory }
 
     fun trustManager(): X509TrustManager = ReloadingTrustManager { current().trust }
-
-    /**
-     * Refuses a peer whose ACCOUNT is not on the list.
-     *
-     * The chain is verified by the handshake; this is the other half — WHO
-     * the verified certificate belongs to. A client that checked only the
-     * chain would accept any workload in the trust domain that happened to
-     * answer on that address.
-     */
-    fun peerCheck(): Interceptor =
-        Interceptor { chain ->
-            val response: Response = chain.proceed(chain.request())
-            val peerCert =
-                chain.connection()?.handshake()?.peerCertificates?.firstOrNull() as? X509Certificate
-                    ?: throw java.io.IOException("the peer presented no certificate")
-            val identity =
-                identityOf(peerCert)
-                    ?: throw java.io.IOException("the peer's certificate carries no workload identity")
-            val (domain, account) = identity
-            if (domain != trustDomain) {
-                throw java.io.IOException("refused a peer: $account is from trust domain $domain, not $trustDomain")
-            }
-            if (account !in peers) {
-                throw java.io.IOException("refused a peer: $account is not one this component accepts an answer from")
-            }
-            response
-        }
 }
 
 private fun pemCertificates(pem: String): List<X509Certificate> {
@@ -259,4 +241,64 @@ private class ReloadingTrustManager(private val delegate: () -> X509TrustManager
         delegate().checkServerTrusted(chain, authType)
 
     override fun getAcceptedIssuers(): Array<X509Certificate> = delegate().acceptedIssuers
+}
+
+/**
+ * Verifies the chain, then admits the peer by the ACCOUNT in its certificate.
+ *
+ * Both halves run during the handshake, so a peer that is not admitted is
+ * refused before a single request byte is sent to it. The chain is checked
+ * by the delegate; this is the other half — WHO the verified certificate
+ * belongs to. A client that checked only the chain would accept any workload
+ * in the trust domain that happened to answer on that address.
+ */
+internal class PeerTrustManager(
+    private val delegate: X509TrustManager,
+    private val trustDomain: String,
+    private val peers: Set<String>,
+) : X509ExtendedTrustManager() {
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
+        (delegate as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, socket)
+            ?: delegate.checkServerTrusted(chain, authType)
+        admit(chain)
+    }
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
+        (delegate as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, engine)
+            ?: delegate.checkServerTrusted(chain, authType)
+        admit(chain)
+    }
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+        delegate.checkServerTrusted(chain, authType)
+        admit(chain)
+    }
+
+    // This component serves nothing, so a client certificate is never
+    // checked here; if it ever did, the account list is about who ANSWERS.
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) =
+        checkClientTrusted(chain, authType)
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) =
+        checkClientTrusted(chain, authType)
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) =
+        delegate.checkClientTrusted(chain, authType)
+
+    override fun getAcceptedIssuers(): Array<X509Certificate> = delegate.acceptedIssuers
+
+    private fun admit(chain: Array<out X509Certificate>?) {
+        val leaf =
+            chain?.firstOrNull()
+                ?: throw CertificateException("the peer presented no certificate")
+        val (domain, account) =
+            Identity.identityOf(leaf)
+                ?: throw CertificateException("the peer's certificate carries no workload identity")
+        if (domain != trustDomain) {
+            throw CertificateException("refused a peer: $account is from trust domain $domain, not $trustDomain")
+        }
+        if (account !in peers) {
+            throw CertificateException("refused a peer: $account is not one this component accepts an answer from")
+        }
+    }
 }

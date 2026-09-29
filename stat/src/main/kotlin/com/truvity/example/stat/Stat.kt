@@ -132,11 +132,10 @@ internal fun urlsHttpClientBuilder(tls: Tls?, openTelemetry: OpenTelemetry): OkH
             // A platform's workload certificate carries an identity and no
             // host name, so there is no name to check. The question that
             // matters — is the thing answering the account I was told to
-            // trust — is asked by the interceptor below, against the
+            // trust — is asked by the trust manager, during the handshake, against the
             // certificate the handshake produced.
             true
         }
-        builder.addInterceptor(identity.peerCheck())
         builder.protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
     }
     return builder
