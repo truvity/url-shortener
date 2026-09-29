@@ -73,13 +73,43 @@ class Identity(
             )
         }
 
+        // The general-name type of a URI in a subjectAlternativeNames entry.
+        private const val URI_NAME = 6
+
+        // The bit positions of keyCertSign and cRLSign in a keyUsage array.
+        private const val KEY_CERT_SIGN = 5
+        private const val CRL_SIGN = 6
+
+        /** Every URI name in the certificate, of any scheme. */
+        private fun uriNames(certificate: X509Certificate): List<String> =
+            certificate.subjectAlternativeNames
+                ?.filter { it.size == 2 && it[0] == URI_NAME }
+                ?.map { it[1].toString() }
+                ?: emptyList()
+
+        /**
+         * Why this is not the shape of a workload identity leaf, or null.
+         *
+         * Two rules of the X509-SVID specification. A leaf is not a
+         * certificate authority and may not sign certificates or revocation
+         * lists; and it carries exactly one URI name, of any scheme.
+         */
+        fun shapeRefusal(certificate: X509Certificate): String? {
+            if (certificate.basicConstraints != -1) {
+                return "the peer's certificate is a certificate authority, not a workload identity"
+            }
+            val usage = certificate.keyUsage
+            if (usage != null && ((usage.size > KEY_CERT_SIGN && usage[KEY_CERT_SIGN]) || (usage.size > CRL_SIGN && usage[CRL_SIGN]))) {
+                return "the peer's certificate may sign certificates, which a workload identity may not"
+            }
+            val count = uriNames(certificate).size
+            if (count > 1) return "the peer's certificate carries $count URI names, and an identity is exactly one"
+            return null
+        }
+
         /** `spiffe://<trust domain>/ns/<namespace>/sa/<account>`, or null. */
         fun identityOf(certificate: X509Certificate): Pair<String, String>? {
-            val uri =
-                certificate.subjectAlternativeNames
-                    ?.firstOrNull { it.size == 2 && it[0] == 6 }
-                    ?.get(1)
-                    ?.toString() ?: return null
+            val uri = uriNames(certificate).singleOrNull() ?: return null
             if (!uri.startsWith("$SCHEME://")) return null
             val rest = uri.removePrefix("$SCHEME://")
             val domain = rest.substringBefore('/')
@@ -291,6 +321,7 @@ internal class PeerTrustManager(
         val leaf =
             chain?.firstOrNull()
                 ?: throw CertificateException("the peer presented no certificate")
+        Identity.shapeRefusal(leaf)?.let { throw CertificateException(it) }
         val (domain, account) =
             Identity.identityOf(leaf)
                 ?: throw CertificateException("the peer's certificate carries no workload identity")

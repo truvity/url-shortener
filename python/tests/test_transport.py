@@ -60,6 +60,12 @@ def test_a_peer_with_no_certificate_is_refused() -> None:
         make().peer_of(None)
 
 
+def test_a_second_uri_of_another_scheme_is_refused_too() -> None:
+    mixed = peer_cert(identity_uri("a", "one"), "https://example.org/other")
+    with pytest.raises(TransportError, match="2 identities"):
+        make().peer_of(mixed)
+
+
 def test_a_certificate_with_no_workload_identity_is_refused() -> None:
     with pytest.raises(TransportError, match="no workload identity"):
         make().peer_of({"subjectAltName": (("DNS", "redirect.shortener.svc"),)})
@@ -180,12 +186,20 @@ def authority(tmp_path_factory: pytest.TempPathFactory) -> Path:
         "-out",
         str(root / "ca.crt"),
     )
-    for name, uri in [
-        ("server", identity_uri("shortener", "archive")),
-        ("admitted", identity_uri("shortener", "redirect")),
+    redirect = identity_uri("shortener", "redirect")
+    leaf_usage = "digitalSignature,keyEncipherment"
+    for name, uri, basic, usage in [
+        ("server", identity_uri("shortener", "archive"), "CA:FALSE", leaf_usage),
+        ("admitted", redirect, "CA:FALSE", leaf_usage),
         # A REAL certificate from the same authority, for an account nobody
         # granted. This is the one that matters.
-        ("stranger", identity_uri("shortener", "stat")),
+        ("stranger", identity_uri("shortener", "stat"), "CA:FALSE", leaf_usage),
+        # The admitted account's identity, but on a certificate that is itself
+        # an authority, or that may sign one. Neither is a workload leaf.
+        ("authority-leaf", redirect, "CA:TRUE", "digitalSignature,keyCertSign"),
+        ("signing-leaf", redirect, "CA:FALSE", "digitalSignature,cRLSign"),
+        # The admitted account's identity plus a second URI name.
+        ("two-uris", f"{redirect},URI:https://example.org/other", "CA:FALSE", leaf_usage),
     ]:
         extension = root / f"{name}.ext"
         # One certificate used both ways, which is what a platform mounts:
@@ -193,8 +207,8 @@ def authority(tmp_path_factory: pytest.TempPathFactory) -> Path:
         # is called.
         extension.write_text(
             f"subjectAltName=URI:{uri}\n"
-            "basicConstraints=critical,CA:FALSE\n"
-            "keyUsage=critical,digitalSignature,keyEncipherment\n"
+            f"basicConstraints=critical,{basic}\n"
+            f"keyUsage=critical,{usage}\n"
             "extendedKeyUsage=serverAuth,clientAuth\n",
             encoding="utf-8",
         )
@@ -271,7 +285,10 @@ def server(authority: Path) -> Iterator[tuple[int, list[str]]]:
                 with context.wrap_socket(raw, server_side=True) as connection:
                     # The chain is verified by now. WHO it belongs to is this.
                     try:
-                        peer = identity.verify_peer(connection.getpeercert())
+                        peer = identity.verify_peer(
+                            connection.getpeercert(),
+                            der=connection.getpeercert(binary_form=True),
+                        )
                     except TransportError as refusal:
                         decisions.append(f"refused: {refusal}")
                         connection.send(b"no")
@@ -303,7 +320,7 @@ def call(authority: Path, name: str, port: int) -> bytes:
         identity.client_context().wrap_socket(raw) as connection,
     ):
         # The client checks the SERVER's identity, for the same reason.
-        identity.verify_peer(connection.getpeercert())
+        identity.verify_peer(connection.getpeercert(), der=connection.getpeercert(binary_form=True))
         return connection.recv(16)
 
 
@@ -334,3 +351,36 @@ def test_a_real_certificate_for_an_unlisted_account_is_refused(
     port, decisions = server
     assert call(authority, "stranger", port) == b"no"
     assert decisions == ["refused: refused a peer: shortener/stat is not on this service's list"]
+
+
+def test_a_peer_certificate_that_is_an_authority_is_refused(
+    authority: Path,
+    server: tuple[int, list[str]],
+) -> None:
+    # The identity is the admitted one and the chain verifies. Only the
+    # leaf's own CA flag is wrong, and that alone must refuse it.
+    port, decisions = server
+    assert call(authority, "authority-leaf", port) == b"no"
+    assert decisions == [
+        "refused: the peer's certificate is a certificate authority, not a workload identity",
+    ]
+
+
+def test_a_peer_certificate_that_may_sign_is_refused(
+    authority: Path,
+    server: tuple[int, list[str]],
+) -> None:
+    port, decisions = server
+    assert call(authority, "signing-leaf", port) == b"no"
+    assert decisions == [
+        "refused: the peer's certificate may sign certificates, which a workload identity may not",
+    ]
+
+
+def test_a_peer_certificate_with_two_uri_names_is_refused(
+    authority: Path,
+    server: tuple[int, list[str]],
+) -> None:
+    port, decisions = server
+    assert call(authority, "two-uris", port) == b"no"
+    assert decisions == ["refused: the peer's certificate carries 2 identities"]

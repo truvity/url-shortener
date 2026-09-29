@@ -18,11 +18,19 @@ import javax.net.ssl.TrustManagerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 private const val DOMAIN = "example.invalid"
 
 /** A self-signed EC identity whose only name is a SPIFFE URI. */
-private class Pair(val dir: Path, val name: String, val account: String) {
+private class Pair(
+    val dir: Path,
+    val name: String,
+    val account: String,
+    /** Further keytool `-ext` arguments, and the SAN list, for a certificate a platform would never mint. */
+    extra: List<String> = emptyList(),
+    sans: String = "uri:spiffe://$DOMAIN/ns/shortener/sa/$account",
+) {
     val store: KeyStore
 
     init {
@@ -32,8 +40,9 @@ private class Pair(val dir: Path, val name: String, val account: String) {
             ProcessBuilder(
                 keytool, "-genkeypair", "-alias", "identity", "-keyalg", "EC", "-groupname", "secp256r1",
                 "-dname", "CN=$name", "-validity", "1",
-                "-ext", "san=uri:spiffe://$DOMAIN/ns/shortener/sa/$account",
+                "-ext", "san=$sans",
                 "-ext", "eku=serverAuth,clientAuth",
+                *extra.toTypedArray(),
                 "-keystore", file.toString(), "-storetype", "PKCS12", "-storepass", "changeit",
             ).redirectErrorStream(true).start()
         val out = process.inputStream.readBytes().decodeToString()
@@ -121,5 +130,39 @@ class IdentityHandshakeTest {
             // Refused BEFORE any request bytes: the server must have seen nothing.
             assertEquals(0, server.requests.get())
         }
+    }
+
+    private fun refused(server: Pair, me: Pair, why: String) {
+        Server(server, me).use { s ->
+            val failure = assertFailsWith<IOException> { call(me.mount(server), s.port) }
+            // The reason is ours, not a chain failure: the certificate below verifies.
+            assertTrue(generateSequence<Throwable>(failure) { it.cause }.any { it.message?.contains(why) == true }, "no '$why' in $failure")
+            assertEquals(0, s.requests.get())
+        }
+    }
+
+    @Test
+    fun `a peer whose leaf is a certificate authority is refused`() {
+        val dir = Files.createTempDirectory("stat-identity")
+        val me = Pair(dir, "me", "stat")
+        val ca = Pair(dir, "ca", "urls", extra = listOf("-ext", "bc=ca:true"))
+        refused(ca, me, "is a certificate authority")
+    }
+
+    @Test
+    fun `a peer whose leaf may sign certificates is refused`() {
+        val dir = Files.createTempDirectory("stat-identity")
+        val me = Pair(dir, "me", "stat")
+        val signer = Pair(dir, "signer", "urls", extra = listOf("-ext", "ku=digitalSignature,keyCertSign"))
+        refused(signer, me, "may sign certificates")
+    }
+
+    @Test
+    fun `a peer whose leaf carries two URI names is refused`() {
+        val dir = Files.createTempDirectory("stat-identity")
+        val me = Pair(dir, "me", "stat")
+        val two =
+            Pair(dir, "two", "urls", sans = "uri:spiffe://$DOMAIN/ns/shortener/sa/urls,uri:https://example.org/other")
+        refused(two, me, "2 URI names")
     }
 }

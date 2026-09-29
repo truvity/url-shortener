@@ -44,6 +44,19 @@ Mode = Literal["off", "permissive", "strict"]
 _SCHEME = "spiffe"
 _PATH_LENGTH = 4
 
+# What the shape check reads out of a DER certificate (X.509 / RFC 5280).
+_OID_BASIC_CONSTRAINTS = bytes.fromhex("551d13")
+_OID_KEY_USAGE = bytes.fromhex("551d0f")
+_TAG_SEQUENCE = 0x30
+_TAG_BOOLEAN = 0x01
+_TAG_OCTET_STRING = 0x04
+_TAG_BIT_STRING = 0x03
+_TAG_OID = 0x06
+_TAG_EXTENSIONS = 0xA3
+_KEY_CERT_SIGN = 0x04  # keyUsage bit 5, in the first byte
+_CRL_SIGN = 0x02  # keyUsage bit 6, in the first byte
+_LONG_LENGTH = 0x80
+
 # Stated rather than inherited, and the same floor the Go package sets.
 #
 # `create_default_context` already refuses anything below TLS 1.2, so this
@@ -53,6 +66,79 @@ _PATH_LENGTH = 4
 # connection here are workloads this platform issued identities to, so there
 # is nothing old to be compatible with.
 _MINIMUM_VERSION = ssl.TLSVersion.TLSv1_3
+
+
+def _tlv(data: bytes, offset: int) -> tuple[int, bytes, int]:
+    """Read one DER element at ``offset``: its tag, its content, and where it ends."""
+    try:
+        tag = data[offset]
+        length = data[offset + 1]
+        start = offset + 2
+        if length & _LONG_LENGTH:
+            count = length & ~_LONG_LENGTH
+            length = int.from_bytes(data[start : start + count], "big")
+            start += count
+    except IndexError:
+        raise TransportError("the peer's certificate is malformed") from None
+    end = start + length
+    if end > len(data):
+        raise TransportError("the peer's certificate is malformed")
+    return tag, data[start:end], end
+
+
+def _elements(data: bytes) -> list[tuple[int, bytes]]:
+    found: list[tuple[int, bytes]] = []
+    offset = 0
+    while offset < len(data):
+        tag, content, offset = _tlv(data, offset)
+        found.append((tag, content))
+    return found
+
+
+def _extensions(der: bytes) -> dict[bytes, bytes]:
+    """Return the certificate's extensions, by OID, each as its raw extnValue."""
+    _, certificate, _ = _tlv(der, 0)
+    _, tbs, _ = _tlv(certificate, 0)
+    found: dict[bytes, bytes] = {}
+    for tag, content in _elements(tbs):
+        if tag != _TAG_EXTENSIONS:
+            continue
+        _, listed, _ = _tlv(content, 0)
+        for _, extension in _elements(listed):
+            parts = _elements(extension)
+            if len(parts) < 2 or parts[0][0] != _TAG_OID or parts[-1][0] != _TAG_OCTET_STRING:  # noqa: PLR2004
+                raise TransportError("the peer's certificate is malformed")
+            found[parts[0][1]] = parts[-1][1]
+    return found
+
+
+def _refuse_a_signing_leaf(der: bytes) -> None:
+    """Refuse a leaf that is a certificate authority.
+
+    An X509-SVID leaf sets CA to false and may not sign certificates or
+    revocation lists. A workload certificate that could would be an
+    authority any admitted peer could use to mint further identities.
+    """
+    extensions = _extensions(der)
+
+    constraints = extensions.get(_OID_BASIC_CONSTRAINTS)
+    if constraints is not None:
+        _, body, _ = _tlv(constraints, 0)
+        parts = _elements(body)
+        if parts and parts[0][0] == _TAG_BOOLEAN and parts[0][1] != b"\x00":
+            raise TransportError(
+                "the peer's certificate is a certificate authority, not a workload identity"
+            )
+
+    usage = extensions.get(_OID_KEY_USAGE)
+    if usage is not None:
+        tag, body, _ = _tlv(usage, 0)
+        if tag != _TAG_BIT_STRING or len(body) < 2:  # noqa: PLR2004
+            raise TransportError("the peer's certificate is malformed")
+        if body[1] & (_KEY_CERT_SIGN | _CRL_SIGN):
+            raise TransportError(
+                "the peer's certificate may sign certificates, which a workload identity may not"
+            )
 
 
 class TransportError(Exception):
@@ -149,26 +235,33 @@ class Identity:
         context.load_cert_chain(self._cert_file, self._key_file)
         return context
 
-    def peer_of(self, certificate: dict[str, Any] | None) -> Peer:
+    def peer_of(self, certificate: dict[str, Any] | None, *, der: bytes | None = None) -> Peer:
         """Read the account out of a peer certificate's identity.
 
         Takes what ``SSLSocket.getpeercert()`` returns. Anything that is not
         the expected shape is refused rather than guessed at, because a
         partial match here is an identity nobody meant to grant.
+
+        A workload certificate carries exactly ONE URI name, of any scheme,
+        and is not a certificate authority. The first is read from the
+        dictionary; the second is not in it, so pass what
+        ``SSLSocket.getpeercert(binary_form=True)`` returns as ``der`` and it
+        is checked too. :meth:`verify_peer` takes the same argument.
         """
         if not certificate:
             raise TransportError("the peer presented no certificate")
 
-        uris = [
-            value
-            for kind, value in certificate.get("subjectAltName", ())
-            if kind == "URI" and value.startswith(f"{_SCHEME}://")
-        ]
+        if der is not None:
+            _refuse_a_signing_leaf(der)
+
+        uris = [value for kind, value in certificate.get("subjectAltName", ()) if kind == "URI"]
         if not uris:
             raise TransportError("the peer's certificate carries no workload identity")
         if len(uris) > 1:
             # Two identities in one certificate is not a peer to guess about.
             raise TransportError(f"the peer's certificate carries {len(uris)} identities")
+        if not uris[0].startswith(f"{_SCHEME}://"):
+            raise TransportError(f"identity {uris[0]} is not in the shape this service reads")
 
         parsed = urlsplit(uris[0])
         if self._trust_domain and parsed.netloc != self._trust_domain:
@@ -182,15 +275,16 @@ class Identity:
             raise TransportError(f"identity {uris[0]} is not in the shape this service reads")
         return Peer(namespace=parts[1], service_account=parts[3])
 
-    def verify_peer(self, certificate: dict[str, Any] | None) -> Peer:
+    def verify_peer(self, certificate: dict[str, Any] | None, *, der: bytes | None = None) -> Peer:
         """Admit the peer, or raise saying which account was refused.
 
         Call this once a connection is up and before anything is read or
         written on it. The chain is already verified by then — OpenSSL did
         that during the handshake — and this is the other half: WHO the
-        verified certificate belongs to.
+        verified certificate belongs to. Pass ``getpeercert(binary_form=True)``
+        as ``der`` so a leaf that is a certificate authority is refused too.
         """
-        peer = self.peer_of(certificate)
+        peer = self.peer_of(certificate, der=der)
         if peer not in self._peers:
             raise TransportError(f"refused a peer: {peer} is not on this service's list")
         return peer
