@@ -6,7 +6,13 @@
 # taken to its conclusion. One consequence is the one that matters: an image
 # with nothing executable in it can be assembled for any architecture without
 # emulation, so one job builds every platform.
-defaultBaseImage: cgr.dev/chainguard/static
+#
+# Pinned by digest as well as tag: `latest` alone is a different base on
+# every build. The digest is the multi-architecture INDEX, so every platform
+# resolves from one pin; renovate.json's custom manager moves it. This file
+# is what `ko build` reads here; the release builds through goreleaser's
+# `kos:` block, which does not read it and carries the same pin.
+defaultBaseImage: cgr.dev/chainguard/static:latest@sha256:41e17ed83c594a64a9396b6ab96dd26d5ddc290dacf4c177464712ff21ad534f
 builds:
   - id: migrate
     main: ./cmd/migrate

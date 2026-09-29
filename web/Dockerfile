@@ -11,11 +11,12 @@
 # a checkout, and a symlink is not a thing that can be copied into a
 # container.
 #
-# The base is by tag rather than by digest, the same choice ../.ko.yaml,
-# ../log/Dockerfile and ../stat/Dockerfile make: the registry's free tier
-# keeps only the current build, so a pinned digest stops resolving and
-# breaks every fork with a failure whose cause is invisible.
-FROM cgr.dev/chainguard/node:latest
+# The base is pinned by digest as well as tag, the same as ../.ko.yaml,
+# ../log/Dockerfile and ../stat/Dockerfile: `latest` alone is a different
+# image on every build. The registry's free tier publishes only `latest` but
+# keeps old digests resolvable (see ../log/Dockerfile); renovate moves the
+# pin.
+FROM cgr.dev/chainguard/node:latest@sha256:5d6d6287abf176121b173a0337a888900f2909f0ac06e4e096138be4898a8f92
 
 USER 65532:65532
 

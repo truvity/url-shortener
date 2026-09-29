@@ -330,15 +330,15 @@ func TestWithNoEndpointNothingIsExported(t *testing.T) {
 	}
 }
 
-// Every component says who it is, and logs stay on stdout.
+// Every component says who it is, and logs stay on stderr.
 //
 // `service.name` is a log STREAM field, so it must be stable for the life
 // of the pod and carry no request, tenant or version. And OTLP logs are
-// off deliberately: a node agent already collects stdout into the same
+// off deliberately: a node agent already collects stderr into the same
 // store under the same namespace, so an exporter buys a second copy of
 // what is there — and logs that exist only over OTLP vanish exactly when
 // the exporter is what broke.
-func TestEveryComponentNamesItselfAndLeavesLogsOnStdout(t *testing.T) {
+func TestEveryComponentNamesItselfAndLeavesLogsOnStderr(t *testing.T) {
 	out, err := render(t, defaults("--set", "otel.endpoint=http://gateway:4318")...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
@@ -362,7 +362,7 @@ func TestEveryComponentNamesItselfAndLeavesLogsOnStdout(t *testing.T) {
 		seen[name] = true
 
 		if env["OTEL_LOGS_EXPORTER"] != "none" {
-			t.Errorf("%s exports OTLP logs (%q); stdout is already collected", name, env["OTEL_LOGS_EXPORTER"])
+			t.Errorf("%s exports OTLP logs (%q); stderr is already collected", name, env["OTEL_LOGS_EXPORTER"])
 		}
 		if env["OTEL_TRACES_EXPORTER"] != "otlp" || env["OTEL_METRICS_EXPORTER"] != "otlp" {
 			t.Errorf("%s does not export traces and metrics with an endpoint set", name)

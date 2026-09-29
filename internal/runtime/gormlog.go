@@ -14,7 +14,7 @@ import (
 // GormLogger adapts GORM's logger to the log contract.
 //
 // It exists because of a rule that is easy to state and easy to forget: a
-// service emits ONE stream of JSON on stdout, at one level, and nothing it
+// service emits ONE stream of JSON on stderr, at one level, and nothing it
 // depends on gets to decide otherwise. GORM's default logger writes its own
 // format, with ANSI colour, through the standard library's log package —
 // readable in a terminal, unparseable in a log pipeline, and invisible to a

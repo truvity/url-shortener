@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-// Logger returns the one logger this service uses: JSON, on stdout, at one
+// Logger returns the one logger this service uses: JSON, on stderr, at one
 // level. Per-package levels are not a thing here — they sound useful twice a
 // year and cost a configuration surface every service, chart and operator has
 // to know about.
@@ -37,7 +37,7 @@ func Logger(level string) *slog.Logger {
 	if err := l.UnmarshalText([]byte(level)); err != nil {
 		l = slog.LevelInfo
 	}
-	handler := telemetry.NewLogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))
+	handler := telemetry.NewLogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: l}))
 	return slog.New(handler)
 }
 

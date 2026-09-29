@@ -11,8 +11,9 @@
 # `defaultBaseImage` uses for this example's own Go binaries: the test
 # binary is a `go test -c` build with CGO_ENABLED=0, statically linked the
 # same way, and needs nothing from a libc. kubectl's own published binaries
-# are static too, for the same reason `kos:` needs none here.
-FROM cgr.dev/chainguard/static:latest
+# are static too, for the same reason `kos:` needs none here. Pinned by the
+# same digest as .ko.yaml, and moved by renovate with it.
+FROM cgr.dev/chainguard/static:latest@sha256:41e17ed83c594a64a9396b6ab96dd26d5ddc290dacf4c177464712ff21ad534f
 
 ARG TARGETARCH
 # The COPY path is from the REPOSITORY ROOT, not from this directory — the

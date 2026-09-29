@@ -6,14 +6,13 @@
 # another architecture without emulation, and what is in it is a question
 # with an answer: the jar, and a JRE.
 #
-# The base is by tag rather than by digest, which is the same choice
-# ../.ko.yaml makes for the Go components and log/Dockerfile makes for the
-# Python one: the registry's free tier keeps only the current build, so a
-# pinned digest stops resolving and breaks every fork with a failure whose
-# cause is invisible. What must not move is the bytecode LEVEL, and that is
-# pinned where it can be — the Gradle toolchain targets 21, and a JRE newer
-# than that runs it.
-FROM cgr.dev/chainguard/jre:latest
+# The base is pinned by digest as well as tag, the same as ../.ko.yaml and
+# the other Dockerfiles here: `latest` alone is a different image on every
+# build. The registry's free tier publishes only `latest` but keeps old
+# digests resolvable (see ../log/Dockerfile); renovate moves the pin. What
+# must not move under a pin bump is the bytecode LEVEL, and that is pinned
+# too — the Gradle toolchain targets 21, and a JRE newer than that runs it.
+FROM cgr.dev/chainguard/jre:latest@sha256:d1ea31930e42338d67a617781f2ad3a181c10645acc8e8653853e37a91b79fa5
 
 # Already unprivileged in the base; stated here and in the chart where a
 # reader and an admission policy can both see it.

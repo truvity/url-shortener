@@ -12,14 +12,16 @@
 # architecture without emulation. And what is in it is a question with an
 # answer: the lock.
 #
-# The base is Chainguard's Python by tag rather than by digest, which is the
-# same choice ../.ko.yaml makes for the Go components. The free tier keeps
-# only the current build, so a pinned digest here would stop resolving and
-# break every fork's build with a failure whose cause is invisible. The
-# interpreter's MINOR version is what matters and it is pinned where it can
-# be: devbox.json declares the one that resolves the lock and builds the
-# wheels, and a mismatch fails the build rather than the deployment.
-FROM cgr.dev/chainguard/python:latest
+# The base is Chainguard's Python, pinned by DIGEST as well as tag, the same
+# as ../.ko.yaml and the other Dockerfiles here: `latest` alone is a
+# different image on every build, so two builds of one commit could ship two
+# interpreters. The free tier publishes only `latest`, but it keeps the old
+# digests resolvable (measured 2026-09-29: digests from 2022 still resolve),
+# so the pin holds; renovate's docker manager moves it in a pull request.
+# The interpreter's MINOR version is what matters, and devbox.json declares
+# the one that resolves the lock and builds the wheels — a mismatch fails
+# the build rather than the deployment.
+FROM cgr.dev/chainguard/python:latest@sha256:a1775c7276078865461ee5714954284f12809f333433d856d720b249c65c11b2
 
 # Installed, not built. See above.
 #

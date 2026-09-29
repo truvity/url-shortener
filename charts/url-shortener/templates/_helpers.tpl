@@ -237,8 +237,8 @@ carries no request, tenant or version in it.
 - name: OTEL_METRICS_EXPORTER
   value: "otlp"
 {{- /*
-Logs stay on stdout. A node agent already collects every container's
-stdout into the same store under the same namespace, so an OTLP log
+Logs stay on stderr. A node agent already collects every container's
+output streams into the same store under the same namespace, so an OTLP log
 exporter buys a second copy of what is already there — and a service
 whose logs exist ONLY over OTLP loses them exactly when the exporter is
 the thing that broke.
