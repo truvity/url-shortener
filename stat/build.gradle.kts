@@ -16,6 +16,14 @@ version = "0.0.0"
 
 repositories { mavenCentral() }
 
+// Two libraries here are compiled against newer releases than the Spring
+// Boot BOM manages, and the BOM wins a version conflict silently. The
+// Connect client's ABI is the coroutines (a mismatch is a NoSuchMethodError
+// only when a call is made) and OkHttp; both are pinned to what
+// connect-kotlin declares. CoroutinesAbiTest makes a real call to catch a
+// bump of one without the other.
+extra["kotlin-coroutines.version"] = "1.11.0"
+
 kotlin {
     jvmToolchain(21)
     compilerOptions {
@@ -73,6 +81,7 @@ dependencies {
     implementation("com.connectrpc:connect-kotlin-okhttp:0.9.0")
     implementation("com.connectrpc:connect-kotlin-google-java-ext:0.9.0")
     implementation("com.google.protobuf:protobuf-java:4.33.0")
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(kotlin("test"))
