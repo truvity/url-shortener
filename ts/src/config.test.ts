@@ -111,9 +111,9 @@ describe("validate", () => {
 
 describe("secret", () => {
   it("reads the variable a configuration names", () => {
-    process.env["EXAMPLE_PASSWORD"] = "value";
+    process.env.EXAMPLE_PASSWORD = "value";
     expect(secret("EXAMPLE_PASSWORD")).toBe("value");
-    delete process.env["EXAMPLE_PASSWORD"];
+    delete process.env.EXAMPLE_PASSWORD;
   });
 
   it("names the variable when it is unset", () => {
@@ -122,9 +122,9 @@ describe("secret", () => {
 
   it("treats an empty variable as unset", () => {
     // An empty password is a misconfiguration, not a password.
-    process.env["EXAMPLE_EMPTY"] = "";
+    process.env.EXAMPLE_EMPTY = "";
     expect(() => secret("EXAMPLE_EMPTY")).toThrow(/is empty/);
-    delete process.env["EXAMPLE_EMPTY"];
+    delete process.env.EXAMPLE_EMPTY;
   });
 
   it("refuses a secret with no variable named", () => {

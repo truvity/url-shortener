@@ -1,0 +1,9 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "extends": ["../../../lint/biome.base.jsonc"],
+  "files": {
+    // The RPC client generated from proto/ — see the `protos` recipe.
+    // Generated code is reviewed by diff against the schema, not by style.
+    "includes": ["**", "!src/gen"]
+  }
+}

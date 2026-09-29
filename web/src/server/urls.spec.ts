@@ -22,7 +22,7 @@ function call(header: Headers, fail?: Error) {
     header,
   };
   const next = () => (fail ? Promise.reject(fail) : Promise.resolve({}));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: a fake request/next pair for the interceptor, not the real Connect shape.
   return tracing(next as any)(req as any);
 }
 
@@ -35,6 +35,7 @@ describe("the outbound call", () => {
     await context.with(trace.setSpan(context.active(), server), () => call(header));
     server.end();
 
+    // biome-ignore lint/style/noNonNullAssertion: absent means the test itself failed to produce a client span, which the next assertion already reports.
     const client = exporter.getFinishedSpans().find((s) => s.kind === 2)!;
     expect(client.name).toBe("urlshortener.v1.UrlsService/GetURL");
     expect(client.parentSpanContext?.spanId).toBe(server.spanContext().spanId);
@@ -48,6 +49,7 @@ describe("the outbound call", () => {
   it("marks the span failed and lets the error through", async () => {
     await expect(call(new Headers(), new Error("refused"))).rejects.toThrow("refused");
 
+    // biome-ignore lint/style/noNonNullAssertion: absent means the test itself failed to produce a span, which the next assertion already reports.
     const client = exporter.getFinishedSpans()[0]!;
     expect(client.status.code).toBe(2);
     expect(client.events.map((e) => e.name)).toContain("exception");

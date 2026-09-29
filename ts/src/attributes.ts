@@ -59,9 +59,7 @@ export const DEFAULT_ALLOWED_ATTRIBUTES: ReadonlySet<string> = new Set([
  * spread copies only OWN enumerable properties — it silently drops them.
  */
 function withFilteredAttributes(span: ReadableSpan, allowed: ReadonlySet<string>): ReadableSpan {
-  const attributes = Object.fromEntries(
-    Object.entries(span.attributes).filter(([key]) => allowed.has(key)),
-  );
+  const attributes = Object.fromEntries(Object.entries(span.attributes).filter(([key]) => allowed.has(key)));
 
   return new Proxy(span, {
     get(target, prop, _receiver) {
@@ -89,7 +87,10 @@ export function filteringSpanExporter(exporter: SpanExporter, allowed: ReadonlyS
   };
 
   if (exporter.forceFlush) {
-    wrapped.forceFlush = () => exporter.forceFlush!();
+    // Narrowed to a local: a closure over `exporter.forceFlush` itself does
+    // not keep the narrowing, so TypeScript sees `undefined` again inside it.
+    const forceFlush = exporter.forceFlush;
+    wrapped.forceFlush = () => forceFlush();
   }
 
   return wrapped;

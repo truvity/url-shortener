@@ -1,0 +1,11 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "extends": ["../lint/biome.base.jsonc"],
+  "files": {
+    // Generated from schemas/, not hand-written — see hack/generate-schemas.mjs
+    // and the `drift` recipe that proves it stays regenerated. Linting a
+    // generated file for style is linting the generator's output, and
+    // formatting it would fight the next regeneration.
+    "includes": ["**", "!src/schemas.generated.ts"]
+  }
+}

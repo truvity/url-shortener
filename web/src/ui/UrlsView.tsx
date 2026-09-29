@@ -36,6 +36,7 @@ export function UrlsView(): React.JSX.Element {
   const [filter, setFilter] = useState("");
   const refresh = (): void => setReload((r) => r + 1);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload is a trigger refresh() bumps to force a re-run; the effect body never reads it.
   useEffect(() => {
     // Aborted on unmount, so a slow answer to a question nobody is asking
     // any more does not set state on a component that is gone.

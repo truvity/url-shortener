@@ -22,10 +22,7 @@ import { UrlsService } from "../gen/urlshortener/v1/urls_pb.ts";
  * The address carries that decision because the chart renders the address.
  */
 export function urlsClient(address: string): Client<typeof UrlsService> {
-  return createClient(
-    UrlsService,
-    createGrpcTransport({ baseUrl: address, interceptors: [tracing] }),
-  );
+  return createClient(UrlsService, createGrpcTransport({ baseUrl: address, interceptors: [tracing] }));
 }
 
 /**

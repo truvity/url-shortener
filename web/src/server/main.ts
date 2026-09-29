@@ -18,7 +18,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { read } from "./config.ts";
+import { read, type Web } from "./config.ts";
 import { urlsClient } from "./urls.ts";
 
 const LIVE = "/health/live";
@@ -62,13 +62,13 @@ function logLine(level: string, message: string, rest: Record<string, unknown> =
 }
 
 async function main(): Promise<void> {
-  const path = argument() ?? process.env["CONFIG_FILE"];
+  const path = argument() ?? process.env.CONFIG_FILE;
   if (!path) {
     process.stderr.write("no configuration file: pass -config or set CONFIG_FILE\n");
     process.exit(1);
   }
 
-  let cfg;
+  let cfg: Web;
   try {
     cfg = read(path);
   } catch (error) {
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  logLine("info", "starting", { component: "web", version: process.env["VERSION"] ?? "unknown" });
+  logLine("info", "starting", { component: "web", version: process.env.VERSION ?? "unknown" });
 
   // Telemetry, from OpenTelemetry's own environment (decision 0006).
   // With no endpoint configured the chart sets the exporters to `none`
@@ -120,7 +120,9 @@ async function main(): Promise<void> {
   });
 
   app.listen(port(cfg.listen.address), () => logLine("info", "listening", { address: cfg.listen.address }));
-  probes.listen(port(cfg.probes.address), () => logLine("info", "serving probes", { address: cfg.probes.address }));
+  probes.listen(port(cfg.probes.address), () =>
+    logLine("info", "serving probes", { address: cfg.probes.address }),
+  );
 
   const drain = (cfg.drain?.seconds ?? 20) * 1000;
   for (const signal of ["SIGTERM", "SIGINT"] as const) {
@@ -160,9 +162,17 @@ function port(address: string): number {
 // because JSON has no Timestamp and JavaScript has no int64 — handing the
 // wire type straight to the page gives it a BigInt that JSON.stringify
 // refuses, which fails at the boundary rather than where it was decided.
-function present(url:
-  | { key?: string; longUrl?: string; clickCount?: bigint; createdAt?: { seconds?: bigint }; deletedAt?: { seconds?: bigint } }
-  | undefined): { key: string; longUrl: string; clicks: number; createdAt: string | null; deleted: boolean } {
+function present(
+  url:
+    | {
+        key?: string;
+        longUrl?: string;
+        clickCount?: bigint;
+        createdAt?: { seconds?: bigint };
+        deletedAt?: { seconds?: bigint };
+      }
+    | undefined,
+): { key: string; longUrl: string; clicks: number; createdAt: string | null; deleted: boolean } {
   const stamp = (t?: { seconds?: bigint }): string | null =>
     t?.seconds === undefined ? null : new Date(Number(t.seconds) * 1000).toISOString();
   return {
@@ -202,11 +212,7 @@ async function readBody(req: IncomingMessage): Promise<string> {
 // The incoming context is extracted BEFORE the span starts, so a request
 // that arrives with a traceparent continues that trace instead of
 // beginning an orphan one.
-async function traced(
-  req: IncomingMessage,
-  res: ServerResponse,
-  run: () => Promise<void>,
-): Promise<void> {
+async function traced(req: IncomingMessage, res: ServerResponse, run: () => Promise<void>): Promise<void> {
   const tracer = trace.getTracer("url-shortener-web");
   const incoming = propagation.extract(context.active(), req.headers);
   // Named for the ROUTE, never the path: `/api/urls/abc12345` as a span
@@ -259,7 +265,13 @@ async function serve(
     try {
       const answer = await urls.get({ key });
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ key: answer.url?.key, longUrl: answer.url?.longUrl, clicks: Number(answer.url?.clickCount ?? 0) }));
+      res.end(
+        JSON.stringify({
+          key: answer.url?.key,
+          longUrl: answer.url?.longUrl,
+          clicks: Number(answer.url?.clickCount ?? 0),
+        }),
+      );
     } catch (error) {
       logLine("error", "the URL service refused", { detail: (error as Error).message });
       res.writeHead(502, { "content-type": "application/json" });
