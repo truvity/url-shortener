@@ -72,12 +72,18 @@ spec:
               mountPath: /etc/url-shortener
               readOnly: true
             {{- include "url-shortener.identityMount" . | nindent 12 }}
+            {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
+            {{- include "url-shortener.dbCAMount" . | nindent 12 }}
+            {{- end }}
           resources: {{- toYaml .Values.resources.urls | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-config
         {{- include "url-shortener.identityVolume" . | nindent 8 }}
+        {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
+        {{- include "url-shortener.dbCAVolume" . | nindent 8 }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

@@ -90,6 +90,71 @@ migration and the services cannot accidentally be handed the same credential.
 {{- end -}}
 
 {{/*
+dbTLSMode: require | verify-full, refused otherwise. `require` encrypts and
+verifies nobody; `verify-full` also proves who answered, against a root the
+platform hands in.
+*/}}
+{{- define "url-shortener.dbTLSMode" -}}
+{{- $mode := .Values.database.tls.mode | default "require" -}}
+{{- if not (has $mode (list "require" "verify-full")) -}}
+{{- fail (printf "database.tls.mode %q must be require or verify-full" $mode) -}}
+{{- end -}}
+{{- if and (eq $mode "verify-full") (not .Values.database.tls.rootCA.configMapName) -}}
+{{- fail "database.tls.rootCA.configMapName is required for verify-full: the ConfigMap holding the root the server certificate chains to" -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/*
+dbHost: `require` keeps the host as given. Under verify-full the name must be
+one the serving certificate carries, and it carries the fully-qualified form
+only, so a short name becomes `<host>.<namespace>.svc.<clusterDomain>`. A host
+that already has a dot is taken to be qualified and left alone.
+*/}}
+{{- define "url-shortener.dbHost" -}}
+{{- if and (eq (include "url-shortener.dbTLSMode" .) "verify-full") (not (contains "." .Values.database.host)) -}}
+{{- printf "%s.%s.svc.%s" .Values.database.host .Release.Namespace (.Values.database.clusterDomain | default "cluster.local") -}}
+{{- else -}}
+{{- .Values.database.host -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+dbCAMountPath: where the root is mounted, as a DIRECTORY (never a subPath,
+which a rotation of the ConfigMap would not reach).
+*/}}
+{{- define "url-shortener.dbCAMountPath" -}}
+/etc/url-shortener-pg-ca
+{{- end -}}
+
+{{/*
+dbQuery: the sslmode (and root) parameters of the connection URL.
+*/}}
+{{- define "url-shortener.dbQuery" -}}
+{{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" -}}
+sslmode=verify-full&sslrootcert={{ include "url-shortener.dbCAMountPath" . }}/{{ .Values.database.tls.rootCA.key | default "ca-certificates.crt" }}
+{{- else -}}
+sslmode=require
+{{- end -}}
+{{- end -}}
+
+{{- define "url-shortener.dbCAVolume" -}}
+{{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" -}}
+- name: database-ca
+  configMap:
+    name: {{ .Values.database.tls.rootCA.configMapName }}
+{{- end }}
+{{- end -}}
+
+{{- define "url-shortener.dbCAMount" -}}
+{{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" -}}
+- name: database-ca
+  mountPath: {{ include "url-shortener.dbCAMountPath" . }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/*
 The account ONE component runs as. EVERY component has its own, always:
 `redirect`, `urls`, `web`, `stat` and `log` never share an account, because a
 workload identity is namespace plus account, and a shared account makes two

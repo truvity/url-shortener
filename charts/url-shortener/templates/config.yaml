@@ -52,7 +52,7 @@ data:
       peers:{{ toYaml (.Values.tls.peers.redirect | default list) | nindent 8 }}
     {{- end }}
     database:
-      url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
+      url: postgres://{{ .Values.database.app.role }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?{{ include "url-shortener.dbQuery" . }}
       passwordEnv: DATABASE_PASSWORD
       maxConnections: 10
     events:
@@ -132,7 +132,7 @@ data:
         {{- end }}
     {{- end }}
     database:
-      url: postgres://{{ .Values.database.app.role }}@{{ .Values.database.host }}:5432/{{ .Values.database.name }}?sslmode=require
+      url: postgres://{{ .Values.database.app.role }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?{{ include "url-shortener.dbQuery" . }}
       passwordEnv: DATABASE_PASSWORD
       maxConnections: 20
 

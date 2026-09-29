@@ -34,11 +34,17 @@ spec:
             {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "migrate") | nindent 12 }}
             {{- include "url-shortener.passwordEnv" .Values.database.owner | nindent 12 }}
           volumeMounts:
+            {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
+            {{- include "url-shortener.dbCAMount" . | nindent 12 }}
+            {{- end }}
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
           resources: {{- toYaml .Values.resources.migrate | nindent 12 }}
       volumes:
+        {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
+        {{- include "url-shortener.dbCAVolume" . | nindent 8 }}
+        {{- end }}
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-migrate-config

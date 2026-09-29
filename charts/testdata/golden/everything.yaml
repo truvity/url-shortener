@@ -135,7 +135,7 @@ data:
         - namespace: other
           serviceAccount: caller
     database:
-      url: postgres://app_role@pg.example.svc:5432/shortener?sslmode=require
+      url: postgres://app_role@pg-rw.default.svc.cluster.example:5432/shortener?sslmode=verify-full&sslrootcert=/etc/url-shortener-pg-ca/root.pem
       passwordEnv: DATABASE_PASSWORD
       maxConnections: 10
     events:
@@ -167,7 +167,7 @@ data:
         - namespace: other
           serviceAccount: reader
     database:
-      url: postgres://app_role@pg.example.svc:5432/shortener?sslmode=require
+      url: postgres://app_role@pg-rw.default.svc.cluster.example:5432/shortener?sslmode=verify-full&sslrootcert=/etc/url-shortener-pg-ca/root.pem
       passwordEnv: DATABASE_PASSWORD
       maxConnections: 20
 
@@ -396,7 +396,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
+        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -526,7 +526,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
+        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
     spec:
       serviceAccountName: example-redirect
       securityContext:
@@ -595,6 +595,9 @@ spec:
                 seconds: 7
           volumeMounts:
             
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -608,6 +611,9 @@ spec:
               memory: 111Mi
       volumes:
         
+        - name: database-ca
+          configMap:
+            name: example-root-ca
         - name: config
           configMap:
             name: example-config
@@ -652,7 +658,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
+        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
     spec:
       serviceAccountName: example-stat
       securityContext:
@@ -694,11 +700,6 @@ spec:
               value: "0.25"
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secret
-                  key: app-key
           ports:
             - name: probes
               containerPort: 7070
@@ -769,7 +770,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
+        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
     spec:
       serviceAccountName: example-urls
       securityContext:
@@ -839,6 +840,9 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
           resources:
             requests:
               cpu: 44m
@@ -852,6 +856,9 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        - name: database-ca
+          configMap:
+            name: example-root-ca
 
 ---
 # Source: url-shortener/templates/web.yaml
@@ -885,7 +892,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: c6d2d09f80796282affb36189578725a03cb26e68acafb43ee2a12d4388d76d9
+        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
     spec:
       serviceAccountName: example-web
       securityContext:
@@ -1044,7 +1051,7 @@ data:
     log:
       level: debug
     database:
-      url: postgres://owner_role@pg.example.svc:5432/shortener?sslmode=require
+      url: postgres://owner_role@pg-rw.default.svc.cluster.example:5432/shortener?sslmode=verify-full&sslrootcert=/etc/url-shortener-pg-ca/root.pem
       passwordEnv: DATABASE_PASSWORD
     ownerRole: owner_role
     appRole: app_role
@@ -1111,6 +1118,9 @@ spec:
                   name: owner-secret
                   key: owner-key
           volumeMounts:
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -1119,6 +1129,9 @@ spec:
               cpu: 66m
               memory: 666Mi
       volumes:
+        - name: database-ca
+          configMap:
+            name: example-root-ca
         - name: config
           configMap:
             name: example-migrate-config

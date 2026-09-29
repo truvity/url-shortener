@@ -81,6 +81,9 @@ spec:
             {{- else }}
             {{- include "url-shortener.eventsTokenMount" . | nindent 12 }}
             {{- end }}
+            {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
+            {{- include "url-shortener.dbCAMount" . | nindent 12 }}
+            {{- end }}
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -91,6 +94,9 @@ spec:
         {{- include "url-shortener.eventsCAVolume" . | nindent 8 }}
         {{- else }}
         {{- include "url-shortener.eventsTokenVolume" . | nindent 8 }}
+        {{- end }}
+        {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
+        {{- include "url-shortener.dbCAVolume" . | nindent 8 }}
         {{- end }}
         - name: config
           configMap:

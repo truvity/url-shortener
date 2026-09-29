@@ -533,11 +533,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app
-                  key: password
           ports:
             - name: probes
               containerPort: 7070

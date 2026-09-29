@@ -37,6 +37,36 @@
           "type": "string",
           "minLength": 1
         },
+        "clusterDomain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "require",
+                "verify-full"
+              ]
+            },
+            "rootCA": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "configMapName": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
         "owner": {
           "type": "object",
           "additionalProperties": false,

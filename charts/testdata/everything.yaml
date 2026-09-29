@@ -9,8 +9,14 @@
 installName: example-install
 
 database:
-  host: pg.example.svc
+  host: pg-rw
   name: shortener
+  clusterDomain: cluster.example
+  tls:
+    mode: verify-full
+    rootCA:
+      configMapName: example-root-ca
+      key: root.pem
   owner:
     role: owner_role
     passwordSecret: owner-secret

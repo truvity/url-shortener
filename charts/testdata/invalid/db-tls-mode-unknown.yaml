@@ -1,0 +1,12 @@
+# A mode the chart does not have. `disable` and `prefer` are absent on
+# purpose: the connection is encrypted, or the chart does not render.
+database:
+  host: pg-rw
+  tls:
+    mode: prefer
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222

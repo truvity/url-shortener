@@ -1556,3 +1556,86 @@ func TestEventsIdentityIsRefusedWhereItCannotWork(t *testing.T) {
 		})
 	}
 }
+
+// Under `require`, the default, the database URL is what it always was: the
+// host as written, no root file, no mounted trust bundle.
+func TestDatabaseTLSRequireIsTheDefault(t *testing.T) {
+	out, err := render(t, defaults()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "@example-pg-rw:5432/url_shortener?sslmode=require") {
+		t.Errorf("the default is not sslmode=require against the host as written:\n%s", out)
+	}
+	for _, unwanted := range []string{"sslrootcert", "database-ca", "verify-full"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("%q rendered under the default", unwanted)
+		}
+	}
+}
+
+// Under `verify-full` the host is the fully-qualified name (the only form a
+// server certificate carries), every URL names the mounted root, and the
+// root is mounted as a directory into exactly the three workloads that dial
+// the database.
+func TestDatabaseTLSVerifyFull(t *testing.T) {
+	out, err := render(t, defaults(
+		"--namespace", "shop",
+		"--set", "database.tls.mode=verify-full",
+		"--set", "database.tls.rootCA.configMapName=example-root-ca",
+		"--set", "database.clusterDomain=cluster.example",
+		"--set", "images.web.tag=dev",
+	)...)
+	if err != nil {
+		t.Fatalf("does not render: %v\n%s", err, out)
+	}
+	const dsnTail = "@example-pg-rw.shop.svc.cluster.example:5432/url_shortener?sslmode=verify-full&sslrootcert=/etc/url-shortener-pg-ca/ca-certificates.crt"
+	for _, file := range []string{"urls.yaml", "redirect.yaml", "migrate.yaml"} {
+		doc := conformance.ConfigMapData(t, []byte(out), file)
+		if !strings.Contains(string(doc), dsnTail) {
+			t.Errorf("%s does not carry the verify-full URL:\n%s", file, doc)
+		}
+	}
+	if strings.Contains(out, "sslmode=require") {
+		t.Error("a URL is still on require")
+	}
+
+	// urls, redirect, migrate: each mounts it; nothing else does.
+	if n := strings.Count(out, "mountPath: /etc/url-shortener-pg-ca"); n != 3 {
+		t.Errorf("the root is mounted %d times, want 3 (urls, redirect, migrate)", n)
+	}
+	if strings.Contains(out, "subPath") {
+		t.Error("a subPath mount does not follow a rotation of the ConfigMap")
+	}
+}
+
+// stat has no database, so it must not be handed a credential for one.
+func TestStatHasNoDatabasePassword(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if strings.Contains(doc, "app.kubernetes.io/component: stat") &&
+			strings.Contains(doc, "kind: Deployment") &&
+			strings.Contains(doc, "DATABASE_PASSWORD") {
+			t.Error("stat carries DATABASE_PASSWORD")
+		}
+	}
+}
+
+// The cluster's DNS suffix defaults to the one every cluster has unless told
+// otherwise.
+func TestDatabaseClusterDomainDefault(t *testing.T) {
+	out, err := render(t, defaults(
+		"--namespace", "shop",
+		"--set", "database.tls.mode=verify-full",
+		"--set", "database.tls.rootCA.configMapName=example-root-ca",
+	)...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "@example-pg-rw.shop.svc." + "cluster." + "local:5432/"; !strings.Contains(out, want) {
+		t.Errorf("the default suffix is not applied; want %q", want)
+	}
+}

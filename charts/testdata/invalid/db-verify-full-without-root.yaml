@@ -1,0 +1,13 @@
+# verify-full with no trust root to verify against. The chart refuses it
+# rather than rendering a URL whose root file does not exist, which the
+# driver would only report as a failed connection at start-up.
+database:
+  host: pg-rw
+  tls:
+    mode: verify-full
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222
