@@ -229,7 +229,7 @@ class TraceContinuityTest {
             val header = seen.get()
             assertTrue(header != null, "no trace context reached the callee")
             assertTrue(
-                header!!.startsWith("00-${publisher.spanContext.traceId}-"),
+                header.startsWith("00-${publisher.spanContext.traceId}-"),
                 "the callee joined a different trace: $header",
             )
         } finally {

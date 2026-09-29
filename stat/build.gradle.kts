@@ -24,6 +24,15 @@ repositories { mavenCentral() }
 // bump of one without the other.
 extra["kotlin-coroutines.version"] = "1.11.0"
 
+// The same trap, again, for what else the libraries below are compiled
+// against: the BOM manages Jackson, SnakeYAML and kotlinx-serialization at
+// older releases than the newest one any dependency asks for, and a lower
+// resolved version is the NoSuchMethodError waiting for a call. Each is
+// raised to the highest version on the classpath.
+extra["jackson-bom.version"] = "2.22.3"
+extra["snakeyaml.version"] = "2.5"
+extra["kotlin-serialization.version"] = "1.11.0"
+
 kotlin {
     jvmToolchain(21)
     compilerOptions {
@@ -49,7 +58,7 @@ dependencies {
     // OTEL_TRACES_EXPORTER=none, which is what a deployment with no
     // endpoint sets -- so nothing here tests an enable flag, and the
     // instrumentation for the web layer comes with it.
-    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.31.1")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.11.0")
 
     // The OUTBOUND call to urls, and the reason for a library rather than
     // asking the starter above for it: that starter instruments what
