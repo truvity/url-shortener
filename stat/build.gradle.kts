@@ -4,9 +4,9 @@
 // owns the table to count it. It holds no database credential: the table is
 // somebody else's property, and this component has an address.
 plugins {
-    kotlin("jvm") version "2.2.20"
-    kotlin("plugin.spring") version "2.2.20"
-    id("org.springframework.boot") version "3.5.6"
+    kotlin("jvm") version "2.4.20"
+    kotlin("plugin.spring") version "2.4.20"
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.google.protobuf") version "0.10.0"
 }
@@ -49,7 +49,7 @@ dependencies {
     // OTEL_TRACES_EXPORTER=none, which is what a deployment with no
     // endpoint sets -- so nothing here tests an enable flag, and the
     // instrumentation for the web layer comes with it.
-    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.11.0")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.31.1")
 
     // The OUTBOUND call to urls, and the reason for a library rather than
     // asking the starter above for it: that starter instruments what
@@ -72,7 +72,7 @@ dependencies {
     testImplementation("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.11.0-alpha")
 
     // The broker's own client.
-    implementation("io.nats:jnats:2.23.0")
+    implementation("io.nats:jnats:2.26.3")
 
     // Connect, as a CLIENT. The Kotlin library generates no servers, which
     // is a real constraint on where a JVM service sits in a topology and is
@@ -80,7 +80,7 @@ dependencies {
     implementation("com.connectrpc:connect-kotlin:0.9.0")
     implementation("com.connectrpc:connect-kotlin-okhttp:0.9.0")
     implementation("com.connectrpc:connect-kotlin-google-java-ext:0.9.0")
-    implementation("com.google.protobuf:protobuf-java:4.33.0")
+    implementation("com.google.protobuf:protobuf-java:4.36.2")
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -135,7 +135,7 @@ val writeConnectGenerator by tasks.registering {
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.33.0" }
+    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
     plugins {
         create("connectkt") {
             path = connectGeneratorScript.get().asFile.absolutePath
