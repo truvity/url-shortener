@@ -165,9 +165,14 @@ fi
 # fall back to — so if the client did not present its certificate, or the
 # server did not admit it, the count simply stops moving. That failure is
 # silent from every angle except this one.
-echo "==> the whole release on strict, and the counter still counting"
+#
+# `strict` is the URL service's alone: the redirect service is fronted by a
+# gateway and is never strict, so it stays on the release-wide `permissive`
+# and only `urls` is named.
+echo "==> the URL service on strict (redirect stays permissive), and the counter still counting"
 helm upgrade "$APP" "$CHARTS/url-shortener" -n "$NS" --reuse-values \
-    --set tls.mode=strict \
+    --set tls.mode=permissive \
+    --set tls.components.urls.mode=strict \
     --set "tls.trustDomain=$TRUST_DOMAIN" \
     --wait --timeout 5m >/dev/null
 
@@ -180,10 +185,10 @@ kubectl -n "$NS" exec "${INFRA:-infra}-pg-1" -c postgres -- \
     "INSERT INTO urls.urls (id, url_key, long_url, created_at)
      VALUES ('$ID', '$KEY', '$LONG', now()) ON CONFLICT (id) DO NOTHING;" >/dev/null
 
-# Published straight to the stream rather than driven through the redirect
-# service. Under `strict` that service REQUIRES a client certificate, so
-# nothing outside the mesh of identities can call it — which is the rule
-# working, and also why this step cannot use curl.
+# Published straight to the stream rather than driven through a service.
+# The URL service under `strict` REQUIRES a client certificate, so nothing
+# outside the mesh of identities can call it — which is the rule working, and
+# why this step cannot use curl.
 kubectl -n nats exec deploy/nats-box -- nats --server nats://nats:4222 \
     pub "$NS-$INSTALL_NAME.redirect" \
     "{\"url_key\":\"$KEY\",\"long_url\":\"$LONG\",\"timestamp\":\"2026-01-01T00:00:00Z\"}" \
@@ -207,11 +212,12 @@ if [ "${count:-0}" -lt 1 ]; then
 fi
 echo "    the counter reached it and the count moved to $count"
 
-# The box is left as it was found. `strict` takes the cleartext port away,
-# so anything that port-forwards — the other smoke test, a person having a
+# The box is left as it was found. `strict` takes the URL service's cleartext
+# port away, so anything that port-forwards — the other smoke test, a person having a
 # look — would find a service that refuses them and no obvious reason why.
 echo "==> putting the transport back"
 helm upgrade "$APP" "$CHARTS/url-shortener" -n "$NS" --reuse-values \
-    --set tls.mode=off --wait --timeout 5m >/dev/null
+    --set tls.mode=off --set tls.components.urls.mode=off \
+    --wait --timeout 5m >/dev/null
 
 echo "identity smoke passed: the platform attested it, the service checked it, the stranger was closed, and a client presented its own"
