@@ -99,7 +99,7 @@ dependencies {
     implementation("com.connectrpc:connect-kotlin-okhttp:0.9.0")
     implementation("com.connectrpc:connect-kotlin-google-java-ext:0.9.0")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
-    implementation("com.squareup.okhttp3:okhttp:5.4.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(kotlin("test"))
