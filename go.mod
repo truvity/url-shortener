@@ -22,7 +22,7 @@ require (
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
 	github.com/truvity/gemaal v0.24.3
-	github.com/truvity/policy v0.8.1
+	github.com/truvity/policy v0.9.2
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/metric v1.46.0
 	go.opentelemetry.io/otel/sdk v1.46.0
