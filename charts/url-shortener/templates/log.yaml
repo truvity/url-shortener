@@ -42,6 +42,7 @@ spec:
         - name: log
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "log") }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          {{- include "url-shortener.containerSecurity" . | nindent 10 }}
           args: ["-config", "/etc/url-shortener/log.yaml"]
           env:
             {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "log") | nindent 12 }}

@@ -334,6 +334,21 @@ securityContext:
   runAsUser: {{ .Values.podSecurity.runAsUser }}
   runAsGroup: {{ .Values.podSecurity.runAsGroup }}
   fsGroup: {{ .Values.podSecurity.fsGroup }}
+  seccompProfile:
+    type: RuntimeDefault
+{{- end -}}
+
+{{/*
+The container half of the Pod Security `restricted` profile: no privilege
+escalation and no capabilities. Every container of this chart carries it,
+the migration's included.
+*/}}
+{{- define "url-shortener.containerSecurity" -}}
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
 {{- end -}}
 
 {{/*

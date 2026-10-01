@@ -87,6 +87,20 @@ securityContext:
   runAsUser: {{ .Values.podSecurity.runAsUser }}
   runAsGroup: {{ .Values.podSecurity.runAsGroup }}
   fsGroup: {{ .Values.podSecurity.fsGroup }}
+  seccompProfile:
+    type: RuntimeDefault
+{{- end -}}
+
+{{/*
+The container half of the Pod Security `restricted` profile: no privilege
+escalation and no capabilities.
+*/}}
+{{- define "url-shortener-e2e.containerSecurity" -}}
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
 {{- end -}}
 
 {{/*
@@ -280,6 +294,8 @@ securityContext:
   runAsUser: {{ .Values.prober.podSecurity.runAsUser }}
   runAsGroup: {{ .Values.prober.podSecurity.runAsGroup }}
   fsGroup: {{ .Values.prober.podSecurity.fsGroup }}
+  seccompProfile:
+    type: RuntimeDefault
 {{- end -}}
 
 {{/*

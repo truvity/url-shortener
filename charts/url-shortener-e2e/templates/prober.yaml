@@ -73,6 +73,7 @@ spec:
         - name: prober
           image: {{ include "url-shortener-e2e.proberImage" . }}
           imagePullPolicy: {{ .Values.prober.pullPolicy | default "IfNotPresent" }}
+          {{- include "url-shortener-e2e.containerSecurity" . | nindent 10 }}
           args: ["-config", "/etc/url-shortener/prober.yaml"]
           env:
             {{- include "url-shortener-e2e.telemetryEnv" . | nindent 12 }}

@@ -45,6 +45,7 @@ spec:
         - name: urls
           image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "urls") }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          {{- include "url-shortener.containerSecurity" . | nindent 10 }}
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
             {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "urls") | nindent 12 }}

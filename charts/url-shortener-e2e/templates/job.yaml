@@ -61,6 +61,7 @@ spec:
         - name: e2e
           image: {{ include "url-shortener-e2e.image" . }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          {{- include "url-shortener-e2e.containerSecurity" . | nindent 10 }}
           args:
             - "-test.v"
             {{- if eq .Values.mode "tenant" }}

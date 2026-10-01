@@ -404,6 +404,8 @@ spec:
         runAsUser: 1234
         runAsGroup: 5678
         fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 45
       topologySpreadConstraints:
         - maxSkew: 1
@@ -418,6 +420,11 @@ spec:
         - name: log
           image: example.io/shortener/log@sha256:5555555555555555555555555555555555555555555555555555555555555555
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/log.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -534,6 +541,8 @@ spec:
         runAsUser: 1234
         runAsGroup: 5678
         fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 45
       topologySpreadConstraints:
         - maxSkew: 1
@@ -548,6 +557,11 @@ spec:
         - name: redirect
           image: example.io/shortener/redirect@sha256:2222222222222222222222222222222222222222222222222222222222222222
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -666,6 +680,8 @@ spec:
         runAsUser: 1234
         runAsGroup: 5678
         fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 45
       topologySpreadConstraints:
         - maxSkew: 1
@@ -680,6 +696,11 @@ spec:
         - name: stat
           image: example.io/shortener/stat@sha256:4444444444444444444444444444444444444444444444444444444444444444
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/stat.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -778,6 +799,8 @@ spec:
         runAsUser: 1234
         runAsGroup: 5678
         fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 45
       topologySpreadConstraints:
         - maxSkew: 1
@@ -792,6 +815,11 @@ spec:
         - name: urls
           image: example.io/shortener/urls@sha256:3333333333333333333333333333333333333333333333333333333333333333
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -900,6 +928,8 @@ spec:
         runAsUser: 1234
         runAsGroup: 5678
         fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 45
       topologySpreadConstraints:
         - maxSkew: 1
@@ -914,6 +944,11 @@ spec:
         - name: web
           image: example.io/shortener/web@sha256:6666666666666666666666666666666666666666666666666666666666666666
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/web.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -1088,10 +1123,17 @@ spec:
         runAsUser: 1234
         runAsGroup: 5678
         fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: example.io/shortener/migrate@sha256:1111111111111111111111111111111111111111111111111111111111111111
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
             - name: OTEL_SERVICE_NAME

@@ -154,10 +154,17 @@ spec:
         runAsUser: 2000
         runAsGroup: 2000
         fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: prober
           image: registry.example.test/url-shortener/prober:4.5.6
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/prober.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -248,10 +255,17 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: e2e
           image: registry.example.test/url-shortener/e2e:1.2.3
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args:
             - "-test.v"
             # See values.yaml's own comment on `mode` for why exactly this

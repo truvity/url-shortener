@@ -303,6 +303,8 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
@@ -317,6 +319,11 @@ spec:
         - name: log
           image: ghcr.io/truvity/policy/url-shortener/log:0.0.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/log.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -403,6 +410,8 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
@@ -417,6 +426,11 @@ spec:
         - name: redirect
           image: ghcr.io/truvity/policy/url-shortener/redirect:0.0.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -509,6 +523,8 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
@@ -523,6 +539,11 @@ spec:
         - name: stat
           image: ghcr.io/truvity/policy/url-shortener/stat:0.0.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/stat.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -604,6 +625,8 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
@@ -618,6 +641,11 @@ spec:
         - name: urls
           image: ghcr.io/truvity/policy/url-shortener/urls:0.0.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/urls.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -703,6 +731,8 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
@@ -717,6 +747,11 @@ spec:
         - name: web
           image: ghcr.io/truvity/policy/url-shortener/web:0.0.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/web.yaml"]
           env:
             - name: OTEL_SERVICE_NAME
@@ -830,10 +865,17 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: ghcr.io/truvity/policy/url-shortener/migrate:0.0.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
             - name: OTEL_SERVICE_NAME

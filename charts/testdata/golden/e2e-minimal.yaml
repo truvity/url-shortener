@@ -78,10 +78,17 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: e2e
           image: ghcr.io/truvity/policy/url-shortener/e2e@sha256:1111111111111111111111111111111111111111111111111111111111111111
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args:
             - "-test.v"
           env:
