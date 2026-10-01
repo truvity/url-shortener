@@ -11,6 +11,17 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ .Release.Name }}-pg
+  {{- /*
+  Passed through as given. What they say is the platform's business (a
+  GitOps controller's per-object options, a cost-allocation key); this chart
+  only declines to stand between a platform and its own object. The chart
+  sets no annotation of its own on the database, so nothing here can win
+  against the platform's.
+  */}}
+  {{- with .Values.postgres.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- /*
     MERGED, with the chart's winning — not written one after the other. A

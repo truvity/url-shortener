@@ -118,6 +118,12 @@
             "type": "string"
           }
         },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "scheduling": {
           "type": "object",
           "additionalProperties": false,

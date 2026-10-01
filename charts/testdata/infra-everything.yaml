@@ -29,6 +29,8 @@ postgres:
   labels:
     example.io/project: url-shortener
     example.io/tier: primary
+  annotations:
+    example.io/retain: "true"
   scheduling:
     nodeSelector:
       example.io/nodepool: durable

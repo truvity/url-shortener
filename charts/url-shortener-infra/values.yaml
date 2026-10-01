@@ -158,6 +158,14 @@ postgres:
   # its own selectors look for.
   labels: {}
 
+  # Stamped on the database resource as annotations, for whatever reads them
+  # on a platform: a controller's per-object options, a policy, an
+  # attribution key. The chart adds none of its own. The one use that
+  # matters for a database is telling the controller that installs this
+  # chart not to prune or delete the resource when it stops being rendered
+  # here, which is what lets a platform take it over without recreating it.
+  annotations: {}
+
   # Where the instances are allowed to run.
   #
   # Not a preference. A database sharing a pool with everything else is one

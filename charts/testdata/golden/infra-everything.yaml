@@ -92,6 +92,8 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: example-pg
+  annotations:
+    example.io/retain: "true"
   labels:
     app.kubernetes.io/instance: example
     app.kubernetes.io/name: url-shortener-infra
