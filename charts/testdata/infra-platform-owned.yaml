@@ -1,0 +1,10 @@
+# The platform owns the database: no Cluster is rendered, the runtime role
+# is a role object of its own, and the password is still generated here.
+installName: example-install
+postgres:
+  platformOwned: true
+  runtimePasswordSecret: example-pg-runtime
+  runtimePassword:
+    generate: true
+  labels:
+    example.io/project: url-shortener

@@ -118,6 +118,9 @@
             "type": "string"
           }
         },
+        "platformOwned": {
+          "type": "boolean"
+        },
         "annotations": {
           "type": "object",
           "additionalProperties": {

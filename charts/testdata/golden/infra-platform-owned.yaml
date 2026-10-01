@@ -1,0 +1,81 @@
+---
+# Source: url-shortener-infra/templates/infra.yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: example-pg-role-url-shortener-app
+  labels:
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/name: url-shortener-infra
+    example.io/project: url-shortener
+spec:
+  cluster:
+    name: example-pg
+  name: url_shortener_app
+  ensure: present
+  login: true
+  connectionLimit: -1
+  inherit: true
+  passwordSecret:
+    name: example-pg-runtime
+  databaseRoleReclaimPolicy: retain
+
+---
+# Source: url-shortener-infra/templates/credential.yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: example-pg-runtime
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  refreshInterval: "0"
+  target:
+    name: example-pg-runtime
+    template:
+      type: kubernetes.io/basic-auth
+      data:
+        username: "url_shortener_app"
+        password: "{{ .password }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: example-pg-runtime
+
+---
+# Source: url-shortener-infra/templates/credential.yaml
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: example-pg-runtime
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  length: 32
+  digits: 5
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+
+---
+# Source: url-shortener-infra/templates/infra.yaml
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: example-events
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  name: default-example-install-events
+  subjects:
+    - "default-example-install.redirect"
+    - "default-example-install.log"
+  storage: memory
+  replicas: 1
+  servers:
+    - nats://nats.nats.svc:4222

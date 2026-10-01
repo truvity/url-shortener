@@ -39,7 +39,7 @@ func renderInfra(t *testing.T, args ...string) (string, error) {
 //
 // Regenerate with `just golden` after reading the diff, never before.
 func TestWhatTheInfraChartRenders(t *testing.T) {
-	for _, name := range []string{"infra-minimal", "infra-everything"} {
+	for _, name := range []string{"infra-minimal", "infra-everything", "infra-platform-owned"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := renderInfra(t, "-f", filepath.Join("testdata", name+".yaml"))
 			if err != nil {
@@ -538,5 +538,28 @@ func TestGenerateWithNoNameStillRefuses(t *testing.T) {
 	}
 	if !strings.Contains(out, "runtimePasswordSecret") {
 		t.Errorf("the refusal does not name the missing value:\n%s", out)
+	}
+}
+
+// In platform-owned mode the chart renders no Cluster, and the role the
+// services log in as is a DatabaseRole against the platform's database.
+func TestThePlatformOwnedInfraChartRendersNoCluster(t *testing.T) {
+	out, err := renderInfra(t, infraDefaults("--set", "postgres.platformOwned=true")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	if strings.Contains(out, "kind: Cluster") {
+		t.Errorf("a Cluster was rendered although the platform owns the database:\n%s", out)
+	}
+
+	for _, want := range []string{"kind: DatabaseRole", "name: example-pg\n", "name: url_shortener_app", "name: example-pg-runtime"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q:\n%s", want, out)
+		}
+	}
+
+	if strings.Contains(out, "kind: Database\n") {
+		t.Errorf("a Database was rendered; the platform's chart declares the bootstrap database and a second object would be refused:\n%s", out)
 	}
 }

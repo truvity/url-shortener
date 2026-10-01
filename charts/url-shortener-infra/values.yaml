@@ -152,6 +152,18 @@ postgres:
   # not say `profile: prod`, which is one estate's vocabulary wearing a
   # chart's clothes.
 
+  # The database is the platform's, not this chart's. True renders NO
+  # Cluster: the chart renders a role object for the runtime role (and
+  # keeps the password generator below, if asked) against a database whose
+  # name is still `<release>-pg`, which the platform's own cluster chart
+  # creates. instances, storage, scheduling, backup and serverTLS describe
+  # the Cluster and have no effect in this mode. The bootstrap database and
+  # owner are declared by the platform's chart with the cluster; this chart
+  # renders no second object for them.
+  #
+  # Off by default, so every existing consumer renders exactly what it did.
+  platformOwned: false
+
   # Stamped on the database resource, for whatever reads labels here — cost
   # attribution, a policy, a dashboard's grouping. The chart's own labels
   # are added beside these and win, so a platform cannot rename the thing

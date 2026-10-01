@@ -7,6 +7,45 @@ set of containers. A resource nothing reconciles is accepted, stored, and
 never becomes anything — which looks exactly like success from a chart's
 side, and like an empty database from the application's.
 */}}
+{{- if .Values.postgres.platformOwned }}
+{{- /*
+The database is the PLATFORM's here, rendered by whatever installs the
+database operator's cluster chart, so this chart renders no Cluster. What
+stays this chart's is the one thing it was always the only party to know:
+the runtime role the services log in as, and the Secret holding its
+password. It is a role object of its own (not an entry in the Cluster's
+managed roles, which would need the Cluster), reconciled by the operator
+against the platform's database.
+
+The bootstrap database and its owner are NOT rendered here either: the
+platform's cluster chart declares them with the cluster itself, and a
+second object for the same database would be refused as a duplicate.
+instances, storage, scheduling, backup and serverTLS describe the Cluster
+and are ignored in this mode.
+*/}}
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: {{ .Release.Name }}-pg-role-{{ include "url-shortener-infra.resolvedAppRole" . | replace "_" "-" }}
+  labels:
+    {{- toYaml (merge (dict
+        "app.kubernetes.io/name" "url-shortener-infra"
+        "app.kubernetes.io/instance" .Release.Name)
+        (.Values.postgres.labels | default dict)) | nindent 4 }}
+spec:
+  cluster:
+    name: {{ .Release.Name }}-pg
+  name: {{ include "url-shortener-infra.resolvedAppRole" . }}
+  ensure: present
+  login: true
+  connectionLimit: -1
+  inherit: true
+  passwordSecret:
+    name: {{ required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent one, though it can be asked to fill it -- see postgres.runtimePassword.generate" .Values.postgres.runtimePasswordSecret }}
+  {{- /* Never dropped from the database by deleting this object: the role
+  owns grants the migration made. */}}
+  databaseRoleReclaimPolicy: retain
+{{- else }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -126,6 +165,7 @@ spec:
         inherit: true
         passwordSecret:
           name: {{ required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent one, though it can be asked to fill it -- see postgres.runtimePassword.generate" .Values.postgres.runtimePasswordSecret }}
+{{- end }}
 ---
 {{/*
 One stream, several subjects. The redirect service publishes to two of them
