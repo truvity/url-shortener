@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"golang.org/x/sync/errgroup"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	policyconfig "github.com/truvity/policy/config"
@@ -93,11 +93,44 @@ func run() error {
 
 	// --- what this process talks to ---
 
-	db, closeDB, err := openDatabase(log, cfg.Database)
+	// The probe listener comes up FIRST, before the database is dialled.
+	// While the database is away the process is alive and not ready:
+	// liveness answers, readiness says why not, and nothing restarts a
+	// process that is doing exactly what it should. Exiting here instead is
+	// what turned a one-minute database reload into a crash loop.
+	var (
+		pool   atomic.Pointer[gorm.DB]
+		stream atomic.Pointer[nats.Conn]
+	)
+	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
+		db := pool.Load()
+		if db == nil {
+			return errors.New("database: not connected yet")
+		}
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		if err := sqlDB.PingContext(ctx); err != nil {
+			return fmt.Errorf("database: %w", err)
+		}
+		if nc := stream.Load(); nc == nil || !nc.IsConnected() {
+			return errors.New("not connected to the event stream")
+		}
+		return nil
+	})
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.Go(func() error { return runtime.Serve(groupCtx, log, "probes", probes, 5*time.Second) })
+
+	db, closeDB, err := openDatabase(groupCtx, log, cfg.Database)
 	if err != nil {
-		return err
+		stop()
+		_ = group.Wait()
+		return startupError(ctx, err)
 	}
 	defer closeDB()
+	pool.Store(db)
 
 	// The mounted identity, if the platform provides one. A nil identity is
 	// not an error: it is the default, and it means cleartext. Loaded before
@@ -115,6 +148,7 @@ func run() error {
 	// Drain rather than Close: it finishes what is in flight, which for a
 	// publisher is the events of requests already answered.
 	defer func() { _ = nc.Drain() }()
+	stream.Store(nc)
 
 	js, err := jetstream.New(nc)
 	if err != nil {
@@ -147,22 +181,6 @@ func run() error {
 
 	// --- serving ---
 
-	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return err
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			return fmt.Errorf("database: %w", err)
-		}
-		if !nc.IsConnected() {
-			return errors.New("not connected to the event stream")
-		}
-		return nil
-	})
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.Go(func() error { return runtime.Serve(groupCtx, log, "probes", probes, 5*time.Second) })
 	group.Go(func() error {
 		<-groupCtx.Done()
 		// The same drain the probe server gets, for the same reason: an
@@ -231,32 +249,27 @@ func (s subjectPublisher) PublishEvents(ctx context.Context, batch []events.Even
 	return s.publisher.PublishEvents(ctx, out)
 }
 
-func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
+// openDatabase waits for the database per the retry settings in the
+// environment (see runtime.RetryFromEnv) and returns its pool.
+func openDatabase(ctx context.Context, log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
 	dsn, err := dsn(pg)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		// The library logs through the service's logger, not its own.
-		// See runtime.GormLogger.
-		Logger: runtime.GormLogger(log, time.Second),
-	})
+	retry, err := runtime.RetryFromEnv(os.LookupEnv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("connect to the database: %w", err)
-	}
-	if err := runtime.TraceDatabase(db); err != nil {
 		return nil, nil, err
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("reach the connection pool: %w", err)
+	return runtime.OpenDatabase(ctx, log, dsn, pg.MaxConnections, retry)
+}
+
+// startupError is what run returns when start-up did not finish. A signal
+// that arrived during the wait is a request to stop, not a failure.
+func startupError(ctx context.Context, err error) error {
+	if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+		return nil
 	}
-	if pg.MaxConnections > 0 {
-		// Sized against the server's limit divided by the number of
-		// instances, not guessed: every replica opens this many.
-		sqlDB.SetMaxOpenConns(pg.MaxConnections)
-	}
-	return db, func() { _ = sqlDB.Close() }, nil
+	return err
 }
 
 func connect(cfg config.NATS, identity *transport.Identity) (*nats.Conn, error) {

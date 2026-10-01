@@ -22,13 +22,13 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"golang.org/x/sync/errgroup"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	policyconfig "github.com/truvity/policy/config"
@@ -97,11 +97,38 @@ func run() error {
 	log.InfoContext(ctx, "starting", slog.String("component", component),
 		slog.String("version", version), slog.String("commit", commit))
 
-	db, closeDB, err := openDatabase(log, cfg.Database)
+	// The probe listener comes up FIRST, before the database is dialled.
+	// While the database is away the process is alive and not ready:
+	// liveness answers, readiness says why not, and nothing restarts a
+	// process that is doing exactly what it should. Exiting here instead is
+	// what turned a one-minute database reload into a crash loop.
+	var pool atomic.Pointer[gorm.DB]
+	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
+		db := pool.Load()
+		if db == nil {
+			return errors.New("database: not connected yet")
+		}
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		if err := sqlDB.PingContext(ctx); err != nil {
+			return fmt.Errorf("database: %w", err)
+		}
+		return nil
+	})
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.Go(func() error { return runtime.Serve(groupCtx, log, "probes", probes, 5*time.Second) })
+
+	db, closeDB, err := openDatabase(groupCtx, log, cfg.Database)
 	if err != nil {
-		return err
+		stop()
+		_ = group.Wait()
+		return startupError(ctx, err)
 	}
 	defer closeDB()
+	pool.Store(db)
 
 	storeClient, err := store.NewClient(ctx, log, db)
 	if err != nil {
@@ -149,19 +176,6 @@ func run() error {
 		api.Protocols = nil
 	}
 
-	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return err
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			return fmt.Errorf("database: %w", err)
-		}
-		return nil
-	})
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.Go(func() error { return runtime.Serve(groupCtx, log, "probes", probes, 5*time.Second) })
 	group.Go(func() error {
 		log.InfoContext(ctx, "listening",
 			slog.String("address", cfg.Listen.Address),
@@ -282,28 +296,27 @@ func procedureLogger(log *slog.Logger) connect.UnaryInterceptorFunc {
 	}
 }
 
-func openDatabase(log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
+// openDatabase waits for the database per the retry settings in the
+// environment (see runtime.RetryFromEnv) and returns its pool.
+func openDatabase(ctx context.Context, log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
 	dsn, err := dsn(pg)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: runtime.GormLogger(log, time.Second),
-	})
+	retry, err := runtime.RetryFromEnv(os.LookupEnv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("connect to the database: %w", err)
-	}
-	if err := runtime.TraceDatabase(db); err != nil {
 		return nil, nil, err
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("reach the connection pool: %w", err)
+	return runtime.OpenDatabase(ctx, log, dsn, pg.MaxConnections, retry)
+}
+
+// startupError is what run returns when start-up did not finish. A signal
+// that arrived during the wait is a request to stop, not a failure.
+func startupError(ctx context.Context, err error) error {
+	if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+		return nil
 	}
-	if pg.MaxConnections > 0 {
-		sqlDB.SetMaxOpenConns(pg.MaxConnections)
-	}
-	return db, func() { _ = sqlDB.Close() }, nil
+	return err
 }
 
 func dsn(pg config.Postgres) (string, error) {
