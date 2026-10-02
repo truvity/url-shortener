@@ -142,3 +142,10 @@ web:
     mode: enforce
     connectSrc: ["https://collector.example"]
     reportUri: /csp-report
+  faro:
+    enabled: true
+    collectorUrl: https://collector.example/collect
+    apiKey: public-app-key
+    appName: example-web
+    environment: example
+    sampleRate: 0.25

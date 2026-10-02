@@ -223,6 +223,21 @@ data:
       reportUri: {{ . | quote }}
       {{- end }}
     {{- end }}
+    {{- with .Values.web.faro }}
+    {{- if .enabled }}
+    faro:
+      enabled: true
+      collectorUrl: {{ .collectorUrl | default "/faro/collect" | quote }}
+      {{- with .apiKey }}
+      apiKey: {{ . | quote }}
+      {{- end }}
+      appName: {{ .appName | default "url-shortener-web" | quote }}
+      {{- with .environment }}
+      environment: {{ . | quote }}
+      {{- end }}
+      sampleRate: {{ .sampleRate | default 1 }}
+    {{- end }}
+    {{- end }}
     {{- if include "url-shortener.urlsClientTLSOn" . }}
     tls:
       {{- /*

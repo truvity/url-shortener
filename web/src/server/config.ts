@@ -15,6 +15,16 @@ import { load } from "@truvity/policy";
 
 import type { Csp } from "./csp.ts";
 
+/** Browser telemetry. Everything here is shipped to every visitor: no secrets. */
+export interface Faro {
+  enabled: boolean;
+  collectorUrl?: string;
+  apiKey?: string;
+  appName?: string;
+  environment?: string;
+  sampleRate?: number;
+}
+
 export interface Web {
   listen: { address: string };
   probes: { address: string };
@@ -23,6 +33,7 @@ export interface Web {
   urls: { address: string };
   assets: { directory: string };
   csp?: Csp;
+  faro?: Faro;
 }
 
 // Carried beside the code, so the binary validates against the schema it

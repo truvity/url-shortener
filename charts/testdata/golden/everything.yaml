@@ -210,6 +210,13 @@ data:
       mode: enforce
       connectSrc: ["https://collector.example"]
       reportUri: "/csp-report"
+    faro:
+      enabled: true
+      collectorUrl: "https://collector.example/collect"
+      apiKey: "public-app-key"
+      appName: "example-web"
+      environment: "example"
+      sampleRate: 0.25
     tls:
       mode: strict
       certFile: /var/run/example-identity/tls.crt
@@ -400,7 +407,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
+        checksum/config: e01ce9a9b77e11babd7a8a3c9458d8de417365788a99ea777c5862a510bb57de
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -537,7 +544,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
+        checksum/config: e01ce9a9b77e11babd7a8a3c9458d8de417365788a99ea777c5862a510bb57de
     spec:
       serviceAccountName: example-redirect
       securityContext:
@@ -676,7 +683,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
+        checksum/config: e01ce9a9b77e11babd7a8a3c9458d8de417365788a99ea777c5862a510bb57de
     spec:
       serviceAccountName: example-stat
       securityContext:
@@ -795,7 +802,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
+        checksum/config: e01ce9a9b77e11babd7a8a3c9458d8de417365788a99ea777c5862a510bb57de
     spec:
       serviceAccountName: example-urls
       securityContext:
@@ -924,7 +931,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
+        checksum/config: e01ce9a9b77e11babd7a8a3c9458d8de417365788a99ea777c5862a510bb57de
     spec:
       serviceAccountName: example-web
       securityContext:

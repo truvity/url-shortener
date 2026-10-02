@@ -326,6 +326,26 @@
           "type": "string",
           "minLength": 1
         },
+        "faro": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "An optional PUBLIC rule that routes the page's telemetry path to a collector Service. Off by default.",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "ruleName": { "type": "string", "minLength": 1 },
+            "path": { "type": "string", "pattern": "^/[^\\s'\"<>;,?#]*$" },
+            "rewritePath": { "type": "string", "pattern": "^(/[^\\s'\"<>;,?#]*)?$" },
+            "backend": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": { "type": "string" },
+                "namespace": { "type": "string" },
+                "port": { "type": "integer", "minimum": 0, "maximum": 65535 }
+              }
+            }
+          }
+        },
         "redirectRuleName": {
           "type": "string",
           "minLength": 1,
@@ -479,6 +499,19 @@
               "items": { "type": "string", "pattern": "^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$" }
             },
             "reportUri": { "type": "string", "pattern": "^[^\\s;,'\"]*$" }
+          }
+        },
+        "faro": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Browser telemetry. Public by design: every value is shipped to every visitor, so no secret belongs here.",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "collectorUrl": { "type": "string", "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$" },
+            "apiKey": { "type": "string", "pattern": "^[A-Za-z0-9._~-]*$" },
+            "appName": { "type": "string" },
+            "environment": { "type": "string" },
+            "sampleRate": { "type": "number", "minimum": 0, "maximum": 1 }
           }
         }
       }

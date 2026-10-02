@@ -82,6 +82,40 @@ spec:
           name: {{ include "url-shortener.name" . }}-redirect
           port: 8080
           weight: 1
+    {{- with .Values.route.faro }}
+    {{- if .enabled }}
+    {{- /*
+    The page's telemetry, PUBLIC like the resolver and for the same reason:
+    a browser whose session has ended still has to be able to say so. It is
+    its own rule so that the site's sign-in policy, which attaches by name,
+    never covers it and never has to be loosened for it. Exact path, POST
+    only: nothing else of the collector is reachable through here.
+    */}}
+    - name: {{ .ruleName }}
+      matches:
+        - path:
+            type: Exact
+            value: {{ .path }}
+          method: POST
+      {{- with .rewritePath }}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: {{ . }}
+      {{- end }}
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ required "route.faro.backend.name is required when route.faro.enabled is true" .backend.name }}
+          {{- with .backend.namespace }}
+          namespace: {{ . }}
+          {{- end }}
+          port: {{ required "route.faro.backend.port is required when route.faro.enabled is true" .backend.port }}
+          weight: 1
+    {{- end }}
+    {{- end }}
     {{- /*
     The site, and it is the rule a policy attaches to.
 

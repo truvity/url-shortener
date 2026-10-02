@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 
 import { read, type Web } from "./config.ts";
 import { header as cspHeader } from "./csp.ts";
+import { collectorOrigin, withTelemetryConfig } from "./page.ts";
 import { urlsClient } from "./urls.ts";
 
 const LIVE = "/health/live";
@@ -92,13 +93,16 @@ async function main(): Promise<void> {
     // The probe listener below is deliberately NOT traced: a readiness
     // check every few seconds is not a request anybody is debugging, and
     // it would be most of what the store holds.
-    const csp = cspHeader(cfg.csp);
+    // The collector is the one cross-origin connection the page makes, so it
+    // is allowed here from the same configuration that tells the page to use it.
+    const collector = collectorOrigin(cfg.faro);
+    const csp = cspHeader(cfg.csp, collector ? [collector] : []);
     if (csp) {
       // On EVERY response, not only the page: the header is cheap and a
       // route that forgot it would be the one without a policy.
       res.setHeader(csp.name, csp.value);
     }
-    void traced(req, res, () => serve(req, res, cfg.assets.directory, urls));
+    void traced(req, res, () => serve(req, res, cfg.assets.directory, urls, cfg.faro));
   });
 
   // Probes on their OWN listener. The port that serves the page is the port
@@ -219,7 +223,11 @@ async function readBody(req: IncomingMessage): Promise<string> {
 // The incoming context is extracted BEFORE the span starts, so a request
 // that arrives with a traceparent continues that trace instead of
 // beginning an orphan one.
-async function traced(req: IncomingMessage, res: ServerResponse, run: () => Promise<void>): Promise<void> {
+export async function traced(
+  req: IncomingMessage,
+  res: ServerResponse,
+  run: () => Promise<void>,
+): Promise<void> {
   const tracer = trace.getTracer("url-shortener-web");
   const incoming = propagation.extract(context.active(), req.headers);
   // Named for the ROUTE, never the path: `/api/urls/abc12345` as a span
@@ -261,6 +269,7 @@ async function serve(
   res: ServerResponse,
   assets: string,
   urls: ReturnType<typeof urlsClient>,
+  faro?: Web["faro"],
 ): Promise<void> {
   const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -343,7 +352,8 @@ async function serve(
   const file = join(assets, normalize(wanted).replace(/^(\.\.[/\\])+/, ""));
   if (existsSync(file)) {
     res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" });
-    res.end(readFileSync(file));
+    const body = readFileSync(file);
+    res.end(extname(file) === ".html" ? withTelemetryConfig(body.toString("utf8"), faro) : body);
     return;
   }
   res.writeHead(404, { "content-type": "text/plain" }).end("not found");

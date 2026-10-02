@@ -42,6 +42,35 @@
         }
       }
     },
+    "faro": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Browser telemetry (Grafana Faro). Absent, or `enabled: false`, means the page sends nothing and the Faro libraries are never downloaded. Every field here is written into the page for every visitor to read: `apiKey` is a PUBLIC identifier of this app at the collector (one key per app, rotatable, paired with the collector's origin allow-list), not a secret, and no credential may be put in this block.",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "collectorUrl": {
+          "type": "string",
+          "default": "/faro/collect",
+          "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$",
+          "description": "Where the page POSTs telemetry: a path on its own origin (the default, `/faro/collect`, which the gateway routes to the collector, so connect-src 'self' is enough) or an absolute HTTPS URL, whose origin is then added to connect-src."
+        },
+        "apiKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._~-]*$",
+          "description": "The app's public key at the collector, sent as `x-api-key`. A public identifier, not a secret."
+        },
+        "appName": { "type": "string", "minLength": 1, "default": "url-shortener-web", "description": "The app name the collector sees." },
+        "environment": { "type": "string", "description": "A label for where this install runs, for example `devel`." },
+        "sampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "description": "The fraction of browser SESSIONS that report anything, 0 to 1."
+        }
+      }
+    },
     "assets": {
       "type": "object",
       "additionalProperties": false,

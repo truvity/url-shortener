@@ -105,6 +105,50 @@ unknown key, a route naming no parent, an install that supplies no address
 for its database and broker, and a log level the binary would reject. Each
 fails for its own reason, checked.
 
+## Browser telemetry
+
+The page can report errors, web vitals and traces to a Grafana Faro collector
+(for example Grafana Alloy's `faro.receiver`). It is **off by default**: with no
+`faro` block in `web.yaml`, nothing is sent and the Faro libraries are never
+downloaded (they sit behind a dynamic import).
+
+The settings are runtime, not build time, because one build is promoted
+unchanged from environment to environment. In the chart they are `web.faro`:
+
+```yaml
+web:
+  faro:
+    enabled: true
+    collectorUrl: /faro/collect                       # the default: a path on this page's own origin
+    apiKey: public-app-key                            # a PUBLIC identifier, not a secret
+    appName: url-shortener-web
+    environment: devel
+    sampleRate: 1                                     # fraction of SESSIONS that report
+```
+
+By default the page reports to `/faro/collect` **on its own origin**: the
+gateway routes that path to the collector (`route.faro` renders the optional,
+off-by-default rule: exact path, POST only, its own rule so the site's sign-in
+policy never covers it), which makes the CSP's `connect-src 'self'` enough and
+CORS irrelevant. The Node server serves no such path and has no catch-all
+page, so nothing here swallows it. An absolute HTTPS `collectorUrl` is also
+accepted, and its origin is then added to `connect-src`.
+
+The server writes this block into the page as a JSON data element, so every
+value is readable by every visitor: `apiKey` identifies the app to the
+collector (pair it with the collector's origin allow-list and rate limit) and
+must never be a credential. What leaves the browser: errors, `console.error`
+(no other console levels), web vitals, page views, CSP violations, and traces
+whose `traceparent` is sent to this page's own origin only, where the server
+continues the trace. An anonymous random session id is kept in memory, never
+in a cookie or storage. No user is ever set; `meta.user` and identity-named
+attributes are dropped; and the query string and fragment are cut from every
+URL, with URLs of other origins replaced inside error and log text (a refused
+create echoes what the visitor typed). The app version reported is the git
+commit the bundle was built from, baked in at build time (`BUILD_ID` overrides
+it where there is no checkout), which is also the release a source map is
+looked up by.
+
 ## Three charts
 
 | Chart | Installs | Who installs it |

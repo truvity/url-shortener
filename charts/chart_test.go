@@ -1664,3 +1664,75 @@ func TestAnOriginThatIsNotAnOriginIsRefusedForTheContentSecurityPolicy(t *testin
 		t.Fatalf("a directive smuggled through connectSrc rendered:\n%s", out)
 	}
 }
+
+// Browser telemetry is off unless asked for: a default render has no `faro`
+// block at all, so nothing changes for anyone who does not set it.
+func TestBrowserTelemetryIsOffByDefaultAndRendersWhenEnabled(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "faro:") {
+		t.Errorf("a default render carries a faro block")
+	}
+
+	out, err = render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "web.faro.enabled=true",
+		"--set", "web.faro.collectorUrl=https://collector.example/collect",
+		"--set-json", "web.faro.sampleRate=0.5")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	for _, want := range []string{"faro:", "enabled: true", `collectorUrl: "https://collector.example/collect"`, "sampleRate: 0.5"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q", want)
+		}
+	}
+}
+
+func TestBrowserTelemetryDefaultsToTheSameOriginPathAndRefusesPlainHTTP(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "web.faro.enabled=true")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, `collectorUrl: "/faro/collect"`) {
+		t.Errorf("the collector is not the same-origin default:\n%s", out)
+	}
+	if out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "web.faro.enabled=true",
+		"--set", "web.faro.collectorUrl=http://plain.example")...); err == nil {
+		t.Fatalf("a plain-HTTP collector was accepted:\n%s", out)
+	}
+}
+
+// The telemetry rule is optional and PUBLIC: its own rule, exact path, POST
+// only, so the site's sign-in policy (which attaches to a rule by name) never
+// covers it and nothing else of the collector is exposed through it.
+func TestTheTelemetryRouteRuleIsOptionalAndNarrow(t *testing.T) {
+	routed := []string{"--set", "images.web.tag=dev", "--set", "route.enabled=true", "--set", "route.parentRef.name=gw"}
+	out, err := render(t, defaults(routed...)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "/faro/collect") {
+		t.Errorf("a default route carries the telemetry rule")
+	}
+
+	out, err = render(t, defaults(append(routed,
+		"--set", "route.faro.enabled=true",
+		"--set", "route.faro.backend.name=collector",
+		"--set", "route.faro.backend.port=12347",
+		"--set", "route.faro.rewritePath=/collect")...)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	for _, want := range []string{"name: faro", "type: Exact", "value: /faro/collect", "method: POST",
+		"replaceFullPath: /collect", "name: collector"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q", want)
+		}
+	}
+
+	if out, err := render(t, defaults(append(routed, "--set", "route.faro.enabled=true")...)...); err == nil {
+		t.Fatalf("a telemetry rule with no backend rendered:\n%s", out)
+	}
+}

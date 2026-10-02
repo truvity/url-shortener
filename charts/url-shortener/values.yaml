@@ -375,6 +375,31 @@ web:
     # Where browsers POST violation reports. Empty adds no report-uri.
     reportUri: ""
 
+  # Browser telemetry (Grafana Faro), OFF by default: with it off the page
+  # sends nothing and the Faro libraries are never downloaded.
+  #
+  # This is runtime configuration, because one build is promoted unchanged
+  # from environment to environment and so cannot carry a collector address.
+  # Everything here is written into the page for every visitor to read.
+  # `apiKey` is a PUBLIC identifier of this app at the collector, paired with
+  # the collector's origin allow-list; it is not a secret, and no credential
+  # may be put in this block.
+  #
+  # The collector is reached on THIS page's own origin by default, at
+  # `/faro/collect`, which the gateway routes to the collector (see
+  # `route.faro`): same-origin, so `connect-src 'self'` already allows it and
+  # no CORS is involved. An absolute https URL is allowed instead, and its
+  # origin is then added to connect-src.
+  faro:
+    enabled: false
+    collectorUrl: /faro/collect
+    apiKey: ""
+    appName: url-shortener-web
+    # A label for where this install runs, for example `devel`.
+    environment: ""
+    # The fraction of browser sessions that report anything, 0 to 1.
+    sampleRate: 1
+
 replicas:
   # Two, because one instance cannot be replaced without a gap whatever the
   # strategy says. Both components run more than one safely: the redirect
@@ -445,3 +470,22 @@ route:
     namespace: ""
     sectionName: ""
   hostname: ""
+  # Optional rule that sends the page's telemetry (`/faro/collect`) to a
+  # collector Service, so the page can report on its OWN origin. Off by
+  # default. The rule is separate from the site's and carries its own name
+  # because it is PUBLIC by design: a browser that has not signed in (or
+  # whose session just ended) still needs to report that. What bounds it is
+  # the collector's per-app key, origin check, payload cap and rate limit,
+  # never a sign-in. Do not attach the site's sign-in policy to it; do not
+  # point it at anything but the collector. Only POST on the exact path is
+  # matched. A backend in another namespace needs a ReferenceGrant there.
+  faro:
+    enabled: false
+    ruleName: faro
+    path: /faro/collect
+    # The path the collector expects; empty sends the request unchanged.
+    rewritePath: ""
+    backend:
+      name: ""
+      namespace: ""
+      port: 0

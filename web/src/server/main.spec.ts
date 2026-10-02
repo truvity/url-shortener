@@ -6,7 +6,7 @@ import {
 } from "@opentelemetry/sdk-trace-node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { spanCorrelation } from "./main.ts";
+import { spanCorrelation, traced } from "./main.ts";
 
 const exporter = new InMemorySpanExporter();
 const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
@@ -42,5 +42,24 @@ describe("spanCorrelation", () => {
     // Outside the context.with callback: no span is active here, even
     // though one was current a moment ago in this same test.
     expect(spanCorrelation()).toEqual({});
+  });
+});
+
+describe("traced", () => {
+  it("continues the trace a browser started", async () => {
+    const traceId = "0af7651916cd43dd8448eb211c80319c";
+    const parentId = "b7ad6b7169203331";
+    const req = {
+      method: "POST",
+      url: "/api/urls",
+      headers: { traceparent: `00-${traceId}-${parentId}-01` },
+    } as unknown as Parameters<typeof traced>[0];
+    const res = { statusCode: 201 } as Parameters<typeof traced>[1];
+
+    await traced(req, res, async () => undefined);
+
+    const [span] = exporter.getFinishedSpans();
+    expect(span?.spanContext().traceId).toBe(traceId);
+    expect(span?.parentSpanContext?.spanId).toBe(parentId);
   });
 });
