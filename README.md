@@ -144,10 +144,12 @@ continues the trace. An anonymous random session id is kept in memory, never
 in a cookie or storage. No user is ever set; `meta.user` and identity-named
 attributes are dropped; and the query string and fragment are cut from every
 URL, with URLs of other origins replaced inside error and log text (a refused
-create echoes what the visitor typed). The app version reported is the git
-commit the bundle was built from, baked in at build time (`BUILD_ID` overrides
-it where there is no checkout), which is also the release a source map is
-looked up by.
+create echoes what the visitor typed). The app version and release reported are the
+release version the bundle was built for, baked in at build time
+(`VITE_APP_VERSION`, set by the release; `dev` for any other build), which is
+also the tag its source maps are pushed under. The maps are built hidden, kept
+out of the image and pushed as an OCI artifact when the release is configured
+to; see [docs/guides/source-maps.md](../../docs/guides/source-maps.md).
 
 ## Three charts, and the library they render with
 

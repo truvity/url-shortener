@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "build": "vite build && node scripts/bundle.ts",
+    "build": "vite build && node scripts/bundle.ts && node scripts/sourcemaps.ts",
     "test": "vitest run",
     "start": "node dist/server/main.js"
   },

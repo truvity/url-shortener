@@ -25,10 +25,10 @@ export interface FaroConfig {
   sampleRate?: number;
 }
 
-declare const __BUILD_ID__: string;
+declare const __APP_VERSION__: string;
 
-/** The build this bundle came from, also the key the source maps are stored under. */
-export const buildId: string = typeof __BUILD_ID__ === "undefined" ? "dev" : __BUILD_ID__;
+/** The release this bundle was built for: Faro's app.release, and the tag its source maps are pushed under. */
+export const appVersion: string = typeof __APP_VERSION__ === "undefined" ? "dev" : __APP_VERSION__;
 
 /** Parses the text of the config element. Anything unusable is "off", never an exception. */
 export function parseConfig(text: string | null | undefined): FaroConfig | undefined {
@@ -83,7 +83,7 @@ export async function initTelemetry(
   sdk.initializeFaro({
     url: collector,
     apiKey: cfg.apiKey,
-    app: { name: cfg.appName, version: buildId, environment: cfg.environment },
+    app: { name: cfg.appName, version: appVersion, release: appVersion, environment: cfg.environment },
     // An anonymous, random, per-tab session id, kept in memory only: no cookie
     // and no storage, so a closed tab is a finished session. samplingRate
     // keeps or drops whole sessions.

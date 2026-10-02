@@ -1,28 +1,19 @@
-import { execSync } from "node:child_process";
 import { copyFileSync } from "node:fs";
 
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vite";
 
-// The build id: the commit this bundle was built from, or BUILD_ID when the
-// build runs somewhere with no checkout. It is baked in, never read at run
-// time, because it must be the SAME string the source maps are stored under.
-function buildId(): string {
-  if (process.env.BUILD_ID) return process.env.BUILD_ID;
-  try {
-    return execSync("git rev-parse --short=12 HEAD", { stdio: ["ignore", "pipe", "ignore"] })
-      .toString()
-      .trim();
-  } catch {
-    return "unknown";
-  }
-}
+// The release version, baked in at build time and never read at run time:
+// the browser reports it as Faro's app.release, and it must be the SAME string
+// the source maps are pushed under. The release passes it as VITE_APP_VERSION
+// (GoReleaser's {{ .Version }}); a build without it reports "dev".
+const appVersion = process.env.VITE_APP_VERSION || "dev";
 
 // SWC emits, and the type checker is a separate command — see
 // docs/canon/toolchain.md. Emit was never the compiler's job, which is also
 // why it was never the slow part.
 export default defineConfig({
-  define: { __BUILD_ID__: JSON.stringify(buildId()) },
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [
     react(),
     {
@@ -36,5 +27,12 @@ export default defineConfig({
       },
     },
   ],
-  build: { outDir: "dist/assets", emptyOutDir: true },
+  build: {
+    outDir: "dist/assets",
+    emptyOutDir: true,
+    // "hidden": maps are written but the bundles carry no sourceMappingURL
+    // comment (Alloy asks the map server by the script's own path).
+    // scripts/sourcemaps.ts moves them out of dist/ before the image is built.
+    sourcemap: "hidden",
+  },
 });
