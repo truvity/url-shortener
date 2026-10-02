@@ -9,3 +9,8 @@ type: application
 # moves by hand is a version two people can disagree about.
 version: 0.0.0
 appVersion: "0.0.0"
+# The highest delivery interface this chart reads, one number for the three
+# charts of the product (docs/contracts/delivery-interface.md). A platform
+# renders the keys of every step up to it and compares no version.
+annotations:
+  delivery.truvity.io/interface: "10"
