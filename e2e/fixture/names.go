@@ -28,6 +28,7 @@ import (
 
 	yaml "go.yaml.in/yaml/v3"
 
+	policycharts "github.com/truvity/policy/charts"
 	"github.com/truvity/policy/examples/url-shortener/charts"
 )
 
@@ -115,17 +116,20 @@ type Names struct {
 
 // Resolve renders both charts and reads back the names they use. It needs
 // `helm` on PATH and nothing else — no cluster, no network beyond what helm
-// itself needs to run locally, which is none: both charts have no
-// dependencies to fetch.
+// itself needs to run locally, which is none: the one dependency is a
+// local path, resolved by `helm dependency build --skip-refresh`.
 func Resolve(o Options) (Names, error) {
 	o = o.withDefaults()
 
-	root, err := os.MkdirTemp("", "url-shortener-fixture-charts-")
+	top, err := os.MkdirTemp("", "url-shortener-fixture-charts-")
 	if err != nil {
 		return Names{}, err
 	}
-	defer func() { _ = os.RemoveAll(root) }()
-	if err := writeCharts(root); err != nil {
+	defer func() { _ = os.RemoveAll(top) }()
+	// At the repository's own relative paths, because the application chart
+	// depends on the library through a `file://` path relative to itself.
+	root := filepath.Join(top, "examples", "url-shortener", "charts")
+	if err := writeCharts(top, root); err != nil {
 		return Names{}, err
 	}
 
@@ -269,54 +273,30 @@ func helmTemplate(release, chartDir, namespace string, extra ...string) (string,
 	return string(out), nil
 }
 
-// writeCharts extracts the embedded charts to dir, exactly as the chart
-// tests do (charts_test.go's chartDir) — duplicated rather than shared,
-// because that helper takes a *testing.T and this package has callers
-// (apply.sh, by way of cmd/resolve) that are not tests.
-func writeCharts(dir string) error {
-	var write func(sub string) error
-	write = func(sub string) error {
-		entries, err := charts.Files.ReadDir(sub)
-		if err != nil {
-			return err
-		}
-		for _, e := range entries {
-			p := filepath.Join(sub, e.Name())
-			out := filepath.Join(dir, p)
-			if e.IsDir() {
-				if err := os.MkdirAll(out, 0o755); err != nil {
-					return err
-				}
-				if err := write(p); err != nil {
-					return err
-				}
-				continue
-			}
-			b, err := charts.Files.ReadFile(p)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(out, b, 0o644); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	top, err := charts.Files.ReadDir(".")
-	if err != nil {
+// writeCharts extracts the embedded charts to root and the library chart to
+// top/charts/service-lib, exactly as the chart tests do (charts_test.go's
+// chartDir) — duplicated rather than shared, because that helper takes a
+// *testing.T and this package has callers (apply.sh, by way of cmd/resolve)
+// that are not tests. It then resolves the application chart's dependency
+// from its committed Chart.lock, as `helmctl package` does for a release.
+func writeCharts(top, root string) error {
+	if err := os.CopyFS(root, charts.Files); err != nil {
 		return err
 	}
-	for _, e := range top {
-		if !e.IsDir() {
-			continue
-		}
-		if err := os.MkdirAll(filepath.Join(dir, e.Name()), 0o755); err != nil {
-			return err
-		}
-		if err := write(e.Name()); err != nil {
-			return err
-		}
+	if err := os.CopyFS(filepath.Join(top, "charts"), policycharts.Library); err != nil {
+		return err
 	}
+	app := filepath.Join(root, "url-shortener")
+	// An archive resolved on this machine is ignored by git, so the embed
+	// may carry a stale one; the lock decides what is resolved.
+	if err := os.RemoveAll(filepath.Join(app, "charts")); err != nil {
+		return err
+	}
+	out, err := exec.Command("helm", "dependency", "build", "--skip-refresh", app).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("helm dependency build: %w\n%s", err, out)
+	}
+
 	return nil
 }
 

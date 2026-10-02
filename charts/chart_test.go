@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	policycharts "github.com/truvity/policy/charts"
 	"github.com/truvity/policy/conformance"
 
 	"github.com/truvity/policy/examples/url-shortener/charts"
@@ -21,58 +22,67 @@ import (
 // chartDir writes the embedded charts out so `helm` can read them, and
 // returns the path to the one named.
 //
-// The embed is what makes this test honest: Go's cache keys on the files the
+// They are laid out at the repository's OWN relative paths
+// (`examples/url-shortener/charts/<chart>`, with the library at
+// `charts/service-lib`), because a chart depends on the library through a
+// `file://` path relative to itself; then `helm dependency build` resolves it
+// from the committed Chart.lock, exactly as `helmctl package` does for a
+// release. What renders is therefore the library as it stands in the tree.
+//
+// The embeds are what make this test honest: Go's cache keys on the files the
 // TEST package reads, not on what helm reads, so a template edit would
 // otherwise leave a cached PASS behind and the contract would go unchecked.
 func chartDir(t *testing.T, chart string) string {
 	t.Helper()
-	root := t.TempDir()
-	entries, err := charts.Files.ReadDir(".")
+	top := t.TempDir()
+	if err := os.CopyFS(top, os.DirFS(resolvedTree)); err != nil {
+		t.Fatal(err)
+	}
+	if chart == "service-lib" {
+		return filepath.Join(top, "charts", "service-lib")
+	}
+
+	return filepath.Join(top, "examples", "url-shortener", "charts", chart)
+}
+
+// resolvedTree is the charts laid out and their dependencies resolved, once
+// per test run: `helm dependency build` costs far more than a render, and
+// every one of the hundreds of renders here would pay it.
+var resolvedTree string
+
+func TestMain(m *testing.M) {
+	top, err := os.MkdirTemp("", "url-shortener-charts-")
 	if err != nil {
-		t.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	var write func(dir string)
-	write = func(dir string) {
-		items, err := charts.Files.ReadDir(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, item := range items {
-			p := filepath.Join(dir, item.Name())
-			out := filepath.Join(root, p)
-			if item.IsDir() {
-				if err := os.MkdirAll(out, 0o755); err != nil {
-					t.Fatal(err)
-				}
-				write(p)
-				continue
-			}
-			b, err := charts.Files.ReadFile(p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(out, b, 0o644); err != nil {
-				t.Fatal(err)
-			}
-		}
+	resolvedTree = top
+	code := 1
+	defer func() { _ = os.RemoveAll(top); os.Exit(code) }()
+
+	root := filepath.Join(top, "examples", "url-shortener", "charts")
+	if err := os.CopyFS(root, charts.Files); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
 	}
-	for _, e := range entries {
-		if e.IsDir() {
-			if err := os.MkdirAll(filepath.Join(root, e.Name()), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			write(e.Name())
+	if err := os.CopyFS(filepath.Join(top, "charts"), policycharts.Library); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	for _, chart := range []string{"url-shortener", "testdata/service-example"} {
+		dir := filepath.Join(root, chart)
+		// An archive resolved on this machine is ignored by git and so absent
+		// in CI; whatever the embed picked up is replaced by what the lock says.
+		if err := os.RemoveAll(filepath.Join(dir, "charts")); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		if out, err := exec.Command("helm", "dependency", "build", "--skip-refresh", dir).CombinedOutput(); err != nil {
+			fmt.Fprintf(os.Stderr, "helm dependency build %s: %v\n%s", chart, err, out)
+			return
 		}
 	}
-	// The example chart that follows the library convention is NOT vendored
-	// (it is a few lines on purpose): the library is copied in beside it, as
-	// `helm dependency update` would have, so that what renders is the library
-	// as it stands rather than a copy that could be stale.
-	if err := os.CopyFS(filepath.Join(root, "testdata", "service-example", "charts", "service-lib"),
-		os.DirFS(filepath.Join(root, "service-lib"))); err != nil {
-		t.Fatal(err)
-	}
-	return filepath.Join(root, chart)
+	code = m.Run()
 }
 
 // defaults supplies the addresses every render needs. They are REQUIRED —

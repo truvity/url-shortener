@@ -8,10 +8,9 @@ description: >-
 type: application
 version: 0.0.0
 appVersion: "0.0.0"
-# Not vendored here, unlike the published charts: the tests copy the library
-# in beside it (charts_test.go's chartDir), so this directory stays a few
-# lines. A chart that is published vendors it (`just vendor-charts`).
+# Resolved like any chart's: the tests lay the library out beside it at the
+# repository's own relative path and run `helm dependency build`.
 dependencies:
   - name: service-lib
     version: 0.0.0
-    repository: ""
+    repository: file://../../../../../charts/service-lib

@@ -32,8 +32,9 @@ import (
 func TestFixtureProvidesWhatTheInfraChartWouldCreate(t *testing.T) {
 	o := DefaultOptions()
 
-	root := t.TempDir()
-	if err := writeCharts(root); err != nil {
+	top := t.TempDir()
+	root := filepath.Join(top, "examples", "url-shortener", "charts")
+	if err := writeCharts(top, root); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,8 +233,9 @@ func TestPostgresNamesStayWithinThePostgresLimitWhenTheScopeIsLong(t *testing.T)
 // duplicated from the chart tests: it must produce a directory `helm` can
 // read at all, independent of anything Resolve does with it.
 func TestWriteChartsRoundTrips(t *testing.T) {
-	dir := t.TempDir()
-	if err := writeCharts(dir); err != nil {
+	top := t.TempDir()
+	dir := filepath.Join(top, "examples", "url-shortener", "charts")
+	if err := writeCharts(top, dir); err != nil {
 		t.Fatal(err)
 	}
 	for _, chart := range []string{"url-shortener", "url-shortener-infra"} {

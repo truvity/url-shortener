@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	policycharts "github.com/truvity/policy/charts"
 	"github.com/truvity/policy/conformance"
 	"github.com/truvity/policy/examples/url-shortener/charts"
 )
@@ -105,7 +106,7 @@ func effectiveConfig(t *testing.T, values ...string) map[string]any {
 // is not installable, and the one the application chart packages is the one
 // that is released.
 func TestTheLibraryIsALibrary(t *testing.T) {
-	raw, err := charts.Files.ReadFile("service-lib/Chart.yaml")
+	raw, err := policycharts.Library.ReadFile("service-lib/Chart.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,52 +127,33 @@ func TestTheLibraryIsALibrary(t *testing.T) {
 	}
 }
 
-// vendoredFiles reads every file under dir in the embedded charts, by its path below dir.
-func vendoredFiles(t *testing.T, dir string) map[string]string {
-	t.Helper()
-
-	got := map[string]string{}
-	err := fs.WalkDir(charts.Files, dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+// A chart that depends on the library resolves it, it does not carry it: the
+// dependency is a `file://` path to charts/service-lib, Chart.lock is
+// committed, and what is resolved under charts/ is ignored by git.
+// `helmctl package` runs `helm dependency build` itself when the declared
+// dependency is missing, and refuses a lock that disagrees with Chart.Yaml,
+// so a library that only arrived at package time is a library that arrives.
+func TestTheApplicationChartResolvesTheLibraryFromItsLock(t *testing.T) {
+	for _, chart := range []string{"url-shortener"} {
+		var meta struct {
+			Dependencies []struct{ Name, Version, Repository string } `yaml:"dependencies"`
 		}
-		b, err := charts.Files.ReadFile(p)
-		got[strings.TrimPrefix(p, dir+"/")] = string(b)
-
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return got
-}
-
-// The application chart carries a COPY of the library under charts/, because
-// `helmctl package` does not run `helm dependency update`: a library that only
-// arrived at package time would be published without it. A copy is a second
-// version of the truth, so a test holds it to the first.
-//
-// `just vendor-charts` refreshes the copy.
-func TestTheVendoredLibraryIsTheLibrary(t *testing.T) {
-	source := vendoredFiles(t, "service-lib")
-	vendored := vendoredFiles(t, "url-shortener/charts/service-lib")
-
-	if len(source) == 0 {
-		t.Fatal("service-lib is empty")
-	}
-	for name, want := range source {
-		got, ok := vendored[name]
-		switch {
-		case !ok:
-			t.Errorf("url-shortener/charts/service-lib lacks %s: run `just vendor-charts`", name)
-		case got != want:
-			t.Errorf("url-shortener/charts/service-lib/%s differs from service-lib/%s: run `just vendor-charts`", name, name)
+		raw, err := charts.Files.ReadFile(chart + "/Chart.yaml")
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	for name := range vendored {
-		if _, ok := source[name]; !ok {
-			t.Errorf("url-shortener/charts/service-lib has %s, which service-lib does not: run `just vendor-charts`", name)
+		unmarshalYAML(t, raw, &meta)
+		if len(meta.Dependencies) != 1 || meta.Dependencies[0].Name != "service-lib" ||
+			meta.Dependencies[0].Repository != "file://../../../../charts/service-lib" {
+			t.Errorf("%s depends on %+v, want service-lib at file://../../../../charts/service-lib", chart, meta.Dependencies)
+		}
+
+		lock, err := charts.Files.ReadFile(chart + "/Chart.lock")
+		if err != nil {
+			t.Fatalf("%s has no committed Chart.lock: run `helm dependency update` in it", chart)
+		}
+		if !strings.Contains(string(lock), "file://../../../../charts/service-lib") {
+			t.Errorf("%s's Chart.lock does not name the library", chart)
 		}
 	}
 }
