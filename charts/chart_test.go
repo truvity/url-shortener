@@ -1639,3 +1639,28 @@ func TestDatabaseClusterDomainDefault(t *testing.T) {
 		t.Errorf("the default suffix is not applied; want %q", want)
 	}
 }
+
+// The front end's CSP is configured from the chart and rendered into the
+// file the binary validates. A value that stopped reaching it would leave a
+// page on the default policy with nothing to say so.
+func TestTheContentSecurityPolicyReachesTheFrontEndConfiguration(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "web.csp.mode=enforce",
+		"--set", "web.csp.connectSrc[0]=https://collector.example")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	for _, want := range []string{"csp:", "mode: enforce", `connectSrc: ["https://collector.example"]`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q", want)
+		}
+	}
+}
+
+func TestAnOriginThatIsNotAnOriginIsRefusedForTheContentSecurityPolicy(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev",
+		"--set", "web.csp.connectSrc[0]=https://collector.example; script-src *")...)
+	if err == nil {
+		t.Fatalf("a directive smuggled through connectSrc rendered:\n%s", out)
+	}
+}

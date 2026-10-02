@@ -215,6 +215,14 @@ data:
       level: {{ .Values.log.level }}
     drain:
       seconds: {{ .Values.drain.seconds }}
+    {{- with .Values.web.csp }}
+    csp:
+      mode: {{ .mode | default "report-only" }}
+      connectSrc: {{ toJson (.connectSrc | default list) }}
+      {{- with .reportUri }}
+      reportUri: {{ . | quote }}
+      {{- end }}
+    {{- end }}
     {{- if include "url-shortener.urlsClientTLSOn" . }}
     tls:
       {{- /*

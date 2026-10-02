@@ -19,6 +19,7 @@ import { extname, join, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { read, type Web } from "./config.ts";
+import { header as cspHeader } from "./csp.ts";
 import { urlsClient } from "./urls.ts";
 
 const LIVE = "/health/live";
@@ -91,6 +92,12 @@ async function main(): Promise<void> {
     // The probe listener below is deliberately NOT traced: a readiness
     // check every few seconds is not a request anybody is debugging, and
     // it would be most of what the store holds.
+    const csp = cspHeader(cfg.csp);
+    if (csp) {
+      // On EVERY response, not only the page: the header is cheap and a
+      // route that forgot it would be the one without a policy.
+      res.setHeader(csp.name, csp.value);
+    }
     void traced(req, res, () => serve(req, res, cfg.assets.directory, urls));
   });
 

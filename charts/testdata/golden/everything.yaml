@@ -206,6 +206,10 @@ data:
       level: debug
     drain:
       seconds: 33
+    csp:
+      mode: enforce
+      connectSrc: ["https://collector.example"]
+      reportUri: "/csp-report"
     tls:
       mode: strict
       certFile: /var/run/example-identity/tls.crt
@@ -396,7 +400,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
+        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -533,7 +537,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
+        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
     spec:
       serviceAccountName: example-redirect
       securityContext:
@@ -672,7 +676,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
+        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
     spec:
       serviceAccountName: example-stat
       securityContext:
@@ -791,7 +795,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
+        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
     spec:
       serviceAccountName: example-urls
       securityContext:
@@ -920,7 +924,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: 00f3c894d0743d9c468c26cbc0838eb7e80b8e2e3c85236f77d0f3987f3893e6
+        checksum/config: b6131c07599edfc6cbcc3c7def39c80f9c45265b07e401b764c93dd5a4fe7b27
     spec:
       serviceAccountName: example-web
       securityContext:

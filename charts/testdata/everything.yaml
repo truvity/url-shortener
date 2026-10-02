@@ -136,3 +136,9 @@ otel:
   sampleRatio: "0.25"
   resourceAttributes:
     deployment.example.tier: primary
+
+web:
+  csp:
+    mode: enforce
+    connectSrc: ["https://collector.example"]
+    reportUri: /csp-report

@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url";
 
 import { load } from "@truvity/policy";
 
+import type { Csp } from "./csp.ts";
+
 export interface Web {
   listen: { address: string };
   probes: { address: string };
@@ -20,6 +22,7 @@ export interface Web {
   drain?: { seconds: number };
   urls: { address: string };
   assets: { directory: string };
+  csp?: Csp;
 }
 
 // Carried beside the code, so the binary validates against the schema it

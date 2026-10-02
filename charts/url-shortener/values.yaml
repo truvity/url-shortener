@@ -361,6 +361,20 @@ tls:
     # naming a certificate rather than a list nobody filled in.
     urls: []
 
+# The front end's own settings, rendered into its configuration file.
+web:
+  # The Content-Security-Policy the front end sends. REPORT-ONLY by default: a
+  # browser reports what the policy would have blocked and blocks nothing, so
+  # it cannot break a page. Set `enforce` once the reports are quiet, or `off`
+  # to send no header at all.
+  csp:
+    mode: report-only
+    # Origins the page may connect to besides its own (`connect-src 'self'`
+    # plus these): bare origins such as `https://collector.example`.
+    connectSrc: []
+    # Where browsers POST violation reports. Empty adds no report-uri.
+    reportUri: ""
+
 replicas:
   # Two, because one instance cannot be replaced without a gap whatever the
   # strategy says. Both components run more than one safely: the redirect

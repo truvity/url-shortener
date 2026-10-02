@@ -19,6 +19,29 @@
         "address": { "type": "string", "minLength": 1 }
       }
     },
+    "csp": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The Content-Security-Policy this server sends with every response. Absent means report-only with no extra origins: the header is sent, nothing is blocked, so turning it on cannot break a page.",
+      "properties": {
+        "mode": {
+          "enum": ["off", "report-only", "enforce"],
+          "default": "report-only",
+          "description": "`report-only` sends Content-Security-Policy-Report-Only: a browser reports a violation to its console (and to reportUri) and blocks nothing. `enforce` sends Content-Security-Policy. `off` sends neither."
+        },
+        "connectSrc": {
+          "type": "array",
+          "default": [],
+          "description": "Origins the page may connect to besides its own, added to `connect-src 'self'`. Each is a bare origin, scheme and host and optional port, never a path and never a keyword.",
+          "items": { "type": "string", "pattern": "^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$" }
+        },
+        "reportUri": {
+          "type": "string",
+          "description": "Where a browser POSTs violation reports. A path on this origin or an absolute URL; empty or absent adds no report-uri directive.",
+          "pattern": "^[^\\s;,'\"]*$"
+        }
+      }
+    },
     "assets": {
       "type": "object",
       "additionalProperties": false,

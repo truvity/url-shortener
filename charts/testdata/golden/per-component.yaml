@@ -207,6 +207,9 @@ data:
       level: info
     drain:
       seconds: 20
+    csp:
+      mode: report-only
+      connectSrc: []
     tls:
       mode: strict
       certFile: /var/run/identity/tls.crt
@@ -390,7 +393,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: 93c64ee1acea2f3c65fd8daee37b42ed216c37c5d1bc812a2e4d7742f066d862
+        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
     spec:
       serviceAccountName: archiver
       securityContext:
@@ -504,7 +507,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: 93c64ee1acea2f3c65fd8daee37b42ed216c37c5d1bc812a2e4d7742f066d862
+        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
     spec:
       serviceAccountName: example-redirect
       securityContext:
@@ -627,7 +630,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: 93c64ee1acea2f3c65fd8daee37b42ed216c37c5d1bc812a2e4d7742f066d862
+        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
     spec:
       serviceAccountName: counter
       securityContext:
@@ -736,7 +739,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: 93c64ee1acea2f3c65fd8daee37b42ed216c37c5d1bc812a2e4d7742f066d862
+        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
     spec:
       serviceAccountName: example-urls
       securityContext:
@@ -849,7 +852,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: 93c64ee1acea2f3c65fd8daee37b42ed216c37c5d1bc812a2e4d7742f066d862
+        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
     spec:
       serviceAccountName: example-web
       securityContext:
