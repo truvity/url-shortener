@@ -5,6 +5,10 @@
 # than a surprise in a cluster.
 database:
   host: pg
+  clusterDomain: cluster.example
+  tls:
+    rootCA:
+      configMapName: pg-ca
   owner:
     passwordSecret: owner
   app:

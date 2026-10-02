@@ -1,0 +1,15 @@
+# `require` encrypts and verifies nobody, and the database client refuses to
+# connect that way, so the chart refuses to render a Deployment that could not
+# start rather than letting it fail after rollout.
+database:
+  host: pg-rw
+  tls:
+    mode: require
+    rootCA:
+      configMapName: pg-ca
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222

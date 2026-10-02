@@ -33,19 +33,22 @@ spec:
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
             {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "migrate") | nindent 12 }}
-            {{- include "url-shortener.passwordEnv" .Values.database.owner | nindent 12 }}
+            {{- include "url-shortener.dbEnv" (dict "root" $ "role" .Values.database.owner "component" "migrate") | nindent 12 }}
+            {{- /* DDL can outlast the services' 30 s default, and a
+            migration that is cut off half way is worse than one that is
+            slow. */}}
+            - name: CNPG_CLIENT_STATEMENT_TIMEOUT
+              value: "10m"
           volumeMounts:
-            {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
             {{- include "url-shortener.dbCAMount" . | nindent 12 }}
-            {{- end }}
+            {{- include "url-shortener.dbPasswordMount" . | nindent 12 }}
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
           resources: {{- toYaml .Values.resources.migrate | nindent 12 }}
       volumes:
-        {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
         {{- include "url-shortener.dbCAVolume" . | nindent 8 }}
-        {{- end }}
+        {{- include "url-shortener.dbPasswordVolume" .Values.database.owner | nindent 8 }}
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-migrate-config

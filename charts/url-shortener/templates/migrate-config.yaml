@@ -25,9 +25,6 @@ data:
   migrate.yaml: |
     log:
       level: {{ .Values.log.level }}
-    database:
-      url: postgres://{{ .Values.database.owner.role }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?{{ include "url-shortener.dbQuery" . }}
-      passwordEnv: DATABASE_PASSWORD
     ownerRole: {{ .Values.database.owner.role }}
     {{- with .Values.database.app.role }}
     appRole: {{ . }}

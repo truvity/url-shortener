@@ -1,0 +1,11 @@
+# No root to verify the server against. verify-full is the only mode, so a
+# release that names none is refused rather than rendered into pods that exit
+# at start-up with a configuration error.
+database:
+  host: pg-rw
+  owner:
+    passwordSecret: pg-owner
+  app:
+    passwordSecret: pg-app
+events:
+  url: nats://nats:4222

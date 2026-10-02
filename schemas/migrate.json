@@ -5,10 +5,9 @@
   "description": "The migration job. It does NOT reference the service envelope: a job that runs once and exits is not a service, and probes it never serves would be configuration a deployment can set and watch do nothing.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["database", "ownerRole"],
+  "required": ["ownerRole"],
   "properties": {
     "log": { "$ref": "https://github.com/truvity/policy/schemas/fragments/log.json" },
-    "database": { "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json" },
     "ownerRole": {
       "type": "string",
       "minLength": 1,

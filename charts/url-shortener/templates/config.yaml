@@ -11,8 +11,9 @@ render and validates them with the binary's schema.
 The migration's file is NOT here — it is in migrate.yaml, as part of the
 hook. See that file for why.
 
-No secret appears in any of them. The database password is NAMED — the
-component reads the variable the file points at.
+No secret appears in any of them, and neither does the database: the
+connection is the libpq environment the Deployment sets (see dbEnv in
+_helpers.tpl), and the password is a mounted file the client re-reads.
 */}}
 apiVersion: v1
 kind: ConfigMap
@@ -51,10 +52,6 @@ data:
       */}}
       peers:{{ toYaml (.Values.tls.peers.redirect | default list) | nindent 8 }}
     {{- end }}
-    database:
-      url: postgres://{{ .Values.database.app.role }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?{{ include "url-shortener.dbQuery" . }}
-      passwordEnv: DATABASE_PASSWORD
-      maxConnections: 10
     events:
       nats:
         url: {{ .Values.events.url }}
@@ -131,10 +128,6 @@ data:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     {{- end }}
-    database:
-      url: postgres://{{ .Values.database.app.role }}@{{ include "url-shortener.dbHost" . }}:5432/{{ .Values.database.name }}?{{ include "url-shortener.dbQuery" . }}
-      passwordEnv: DATABASE_PASSWORD
-      maxConnections: 20
 
   stat.yaml: |
     probes:

@@ -12,15 +12,11 @@
   "unevaluatedProperties": false,
   "required": [
     "listen",
-    "database",
     "events"
   ],
   "properties": {
     "listen": {
       "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
-    },
-    "database": {
-      "$ref": "https://github.com/truvity/policy/schemas/fragments/postgres.json"
     },
     "tls": {
       "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"

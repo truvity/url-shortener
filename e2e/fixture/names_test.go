@@ -85,6 +85,7 @@ func TestFixtureProvidesWhatTheInfraChartWouldCreate(t *testing.T) {
 
 	app, err := helmTemplate(o.AppRelease, filepath.Join(root, "url-shortener"), o.Namespace,
 		"--set", "database.host=placeholder",
+		"--set", "database.tls.rootCA.configMapName=placeholder",
 		"--set", "database.owner.passwordSecret=placeholder",
 		"--set", "database.app.passwordSecret=placeholder",
 		"--set", "events.url=nats://placeholder:4222",

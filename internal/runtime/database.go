@@ -2,62 +2,107 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/truvity/cnpg/v2/clients/go/pgclient"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// OpenDatabase opens the connection pool and waits for the server to answer,
-// retrying per retry while it does not.
+// The start-up patience this service has always had: 0.5 s doubling to 10 s,
+// for up to 3 minutes. The client's own default (5 tries, 30 s) is a good
+// ceiling for a call in flight and too short for a process that starts while
+// the database is reloading, which is routine and must not become a restart
+// loop with a back-off of its own.
 //
-// The automatic ping gorm does at Open is switched off and replaced by one
-// that takes the retry's context, because Open cannot be cancelled: a
-// SIGTERM during the wait would otherwise have to outlast a hung dial.
+// Applied only when the environment says nothing: CNPG_CLIENT_RETRY_ATTEMPTS
+// and CNPG_CLIENT_RETRY_BUDGET still win, and so does _RETRY_MAX_DELAY.
+var startupRetry = pgclient.RetryPolicy{
+	Attempts:     1000,
+	InitialDelay: 500 * time.Millisecond,
+	MaxDelay:     10 * time.Second,
+	Budget:       3 * time.Minute,
+}
+
+// DatabaseConfig reads the connection from the libpq environment the
+// platform's client library defines (PGHOST, PGDATABASE, PGUSER,
+// PGSSLROOTCERT, CNPG_CLIENT_PASSWORD_FILE and the CNPG_CLIENT_* tuning),
+// with this service's start-up patience under any retry the environment did
+// not set.
 //
-// What comes back is a *pool*, and that is what makes the later case work
-// without code of its own: database/sql discards a connection that broke and
-// dials a fresh one on the next query, so a server restarted mid-run costs the
-// queries issued while it was down and nothing after. Readiness (a ping per
-// probe) is what keeps traffic away meanwhile.
-func OpenDatabase(ctx context.Context, log *slog.Logger, dsn string, maxConnections int, retry Retry) (*gorm.DB, func(), error) {
-	var db *gorm.DB
-	err := retry.Do(ctx, log, "database", func(ctx context.Context) error {
-		opened, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-			// The library logs through the service's logger, not its own.
-			// See GormLogger.
-			Logger:               GormLogger(log, time.Second),
-			DisableAutomaticPing: true,
-		})
-		if err != nil {
-			return fmt.Errorf("open the database: %w", err)
-		}
-		sqlDB, err := opened.DB()
-		if err != nil {
-			return fmt.Errorf("reach the connection pool: %w", err)
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			_ = sqlDB.Close()
-			return fmt.Errorf("connect to the database: %w", err)
-		}
-		db = opened
-		return nil
+// There is no connection URL anywhere in this service. A URL is a string a
+// parameter can be dropped from on its way to the driver, and a dropped
+// `sslrootcert` turns verify-full into a connection that does not verify;
+// the client takes parts, and refuses anything weaker than verify-full.
+func DatabaseConfig(getenv func(string) string) (pgclient.Config, error) {
+	cfg, err := pgclient.FromEnv(getenv)
+	if err != nil {
+		return pgclient.Config{}, err
+	}
+	if getenv("CNPG_CLIENT_RETRY_ATTEMPTS") == "" && getenv("CNPG_CLIENT_RETRY_BUDGET") == "" && getenv("CNPG_CLIENT_RETRY_MAX_DELAY") == "" {
+		cfg.Retry = startupRetry
+	}
+	return cfg, cfg.Validate()
+}
+
+// OpenDatabase connects, waiting for the server per cfg.Retry, and returns a
+// gorm handle over the client's pool, with the function that closes both.
+//
+// gorm is handed the pool the client built (pgx's own pool, through
+// database/sql), not a connection string of its own. That is what keeps the
+// rules in ONE place: the TLS settings, the files re-read for every new
+// connection, the statement timeout. A second pool opened by gorm from a
+// string would have none of them.
+//
+// What comes back is a *pool*, which is what makes a server restarted
+// mid-run cost the queries issued while it was down and nothing after:
+// the pool discards a connection that broke and dials a fresh one. Readiness
+// (a ping per probe) keeps traffic away meanwhile.
+//
+// Tracing stays this package's gorm plugin (TraceDatabase), so pgclient's
+// own pgx tracer (otelpg) is deliberately NOT set: both would record every
+// statement, and a trace with each query twice is worse than one without.
+func OpenDatabase(ctx context.Context, log *slog.Logger, cfg pgclient.Config) (*gorm.DB, func(), error) {
+	pool, err := pgclient.New(ctx, cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("connect to the database: %w", err)
+	}
+	sqlDB := stdlib.OpenDBFromPool(pool.Pool)
+	boundSQL(sqlDB, cfg)
+
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		// The library logs through the service's logger, not its own.
+		// See GormLogger.
+		Logger: GormLogger(log, time.Second),
+		// pgclient.New already proved the connection.
+		DisableAutomaticPing: true,
 	})
 	if err != nil {
-		return nil, nil, err
+		_ = sqlDB.Close()
+		pool.Close()
+		return nil, nil, fmt.Errorf("open the database: %w", err)
 	}
-
 	if err := TraceDatabase(db); err != nil {
+		_ = sqlDB.Close()
+		pool.Close()
 		return nil, nil, err
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("reach the connection pool: %w", err)
-	}
-	if maxConnections > 0 {
-		sqlDB.SetMaxOpenConns(maxConnections)
-	}
-	return db, func() { _ = sqlDB.Close() }, nil
+	log.InfoContext(ctx, "database connected",
+		slog.String("host", cfg.Host), slog.String("database", cfg.Database), slog.String("user", cfg.User))
+	return db, func() {
+		_ = sqlDB.Close()
+		pool.Close()
+	}, nil
+}
+
+// boundSQL gives database/sql the pool's own ceiling, so a burst waits in one
+// place. OpenDBFromPool already keeps no idle connections in database/sql: the
+// pool owns idleness and lifetime, which is what lets a renewed certificate or
+// password reach every connection within one lifetime.
+func boundSQL(db *sql.DB, cfg pgclient.Config) {
+	db.SetMaxOpenConns(int(cfg.MaxConns))
 }

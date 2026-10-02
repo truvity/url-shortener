@@ -111,6 +111,7 @@ echo "==> the application ($CHART_TGZ)"
 helm upgrade --install "$APP" "$CHART_TGZ" -n "$NS" \
     $LOCAL_STORE_ARGS $EXTRA \
     --set "database.host=${DATABASE_HOST}" \
+    --set "database.tls.rootCA.configMapName=${DATABASE_CA}" \
     --set "database.name=${DATABASE}" \
     --set "database.owner.role=${OWNER_ROLE}" \
     --set "database.owner.passwordSecret=${OWNER_SECRET}" \

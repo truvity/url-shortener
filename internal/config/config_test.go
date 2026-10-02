@@ -69,9 +69,6 @@ func TestTheExampleConfigurationsLoad(t *testing.T) {
 		if cfg.Listen.Address == "" {
 			t.Error("listen.address did not decode")
 		}
-		if cfg.Database.URL == "" {
-			t.Error("the database URL did not decode")
-		}
 	})
 
 	t.Run("prober", func(t *testing.T) {
@@ -168,12 +165,10 @@ func TestAPasswordInTheFileIsRefused(t *testing.T) {
   address: ":8080"
 probes:
   address: ":7070"
-database:
-  url: postgres://redirect@db:5432/url_shortener
-  password: hunter2-never-in-a-file
 events:
   nats:
     url: nats://nats:4222
+    password: hunter2-never-in-a-file
   redirectSubject: a
   requestSubject: b
 `)
@@ -187,5 +182,29 @@ events:
 	}
 	if !strings.Contains(err.Error(), "password") {
 		t.Errorf("the error does not name the offending key:\n%v", err)
+	}
+}
+
+// The connection is not in the file at all. It comes from the libpq
+// environment the platform's client reads, so a file that still carries the
+// old `database` block (a URL, a password variable) is refused by name rather
+// than half-obeyed: nothing reads it any more, and a setting nothing reads
+// is a setting a deployment believes it has.
+func TestADatabaseBlockInTheFileIsRefused(t *testing.T) {
+	const stale = "testdata/urls-with-database.yaml"
+	writeFixture(t, stale, `listen:
+  address: ":8080"
+probes:
+  address: ":7070"
+database:
+  url: postgres://urls@db:5432/url_shortener?sslmode=require
+`)
+
+	_, err := config.LoadUrls(stale)
+	if err == nil {
+		t.Fatal("a database block was accepted: the connection is read from the environment")
+	}
+	if !strings.Contains(err.Error(), "database") {
+		t.Errorf("the refusal does not name the database block: %v", err)
 	}
 }

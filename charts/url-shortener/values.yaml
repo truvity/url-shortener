@@ -24,27 +24,29 @@ database:
   host: ""
   name: url_shortener
 
-  # How the connection is secured.
+  # How the connection is secured: ALWAYS verify-full. The database client
+  # (the platform's PostgreSQL client library, which reads libpq's PGHOST,
+  # PGSSLROOTCERT and friends from this chart's environment) proves who
+  # answered: the server certificate must chain to the root below AND name the
+  # host dialled. It refuses `require`, and refuses to start without a root,
+  # so there is no weaker setting to choose; `mode` is kept for a platform
+  # that already sets it, and accepts only `verify-full`.
   #
-  # `require` encrypts the connection and verifies nobody: the server may be
-  # anyone. `verify-full` also proves who answered: the server certificate
-  # must chain to the root below AND name the host dialled. Turn it on when
-  # the platform serves a certificate from a private chain.
-  #
-  # Under `verify-full` the host is dialled by its fully-qualified name,
+  # The host is dialled by its fully-qualified name,
   # `<host>.<release namespace>.svc.<clusterDomain>` (a host that already has
   # a dot is left as given), because that is the form a server certificate
-  # carries. Under `require` the host is dialled exactly as written.
+  # carries.
   tls:
-    mode: require
+    mode: verify-full
     # The ConfigMap holding the root the server certificate chains to. The
-    # platform provides it; required when `mode` is `verify-full`. It is
-    # mounted as a DIRECTORY into `redirect`, `urls` and the migration, so a
-    # rotation of the root reaches a running pod without a restart.
+    # platform provides it; REQUIRED. It is mounted as a DIRECTORY into
+    # `redirect`, `urls` and the migration, so a rotation of the root reaches
+    # a running pod without a restart (the client re-reads the file for every
+    # new connection).
     rootCA:
       configMapName: ""
       key: ca-certificates.crt
-  # The cluster's DNS suffix; only read under `verify-full`.
+  # The cluster's DNS suffix, for the fully-qualified host above.
   clusterDomain: cluster.local
 
   # TWO roles, with two credentials, because they are trusted with different
@@ -54,7 +56,9 @@ database:
   # say.
   #
   # Each role names the SECRET holding its password, and the key inside it.
-  # No value appears in this file or in anything it renders.
+  # No value appears in this file or in anything it renders. The password
+  # reaches the process as a mounted FILE the client re-reads for every new
+  # connection, so a rotated Secret is picked up without a restart.
   owner:
     role: url_shortener_owner
     passwordSecret: ""

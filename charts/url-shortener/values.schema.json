@@ -47,8 +47,8 @@
           "properties": {
             "mode": {
               "type": "string",
+              "description": "Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused.",
               "enum": [
-                "require",
                 "verify-full"
               ]
             },
@@ -57,7 +57,8 @@
               "additionalProperties": false,
               "properties": {
                 "configMapName": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "The ConfigMap holding the root the database server certificate chains to. Required."
                 },
                 "key": {
                   "type": "string",

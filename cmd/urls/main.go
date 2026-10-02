@@ -31,7 +31,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
-	policyconfig "github.com/truvity/policy/config"
 	policytelemetry "github.com/truvity/policy/telemetry"
 	"github.com/truvity/policy/transport"
 
@@ -97,6 +96,15 @@ func run() error {
 	log.InfoContext(ctx, "starting", slog.String("component", component),
 		slog.String("version", version), slog.String("commit", commit))
 
+	// The connection is read from the environment, and a missing or weaker
+	// setting (no CA file, a sslmode below verify-full) is refused HERE, before
+	// anything listens: that is a deployment mistake, not a database that is
+	// briefly away, and retrying it would only hide it.
+	dbConfig, err := runtime.DatabaseConfig(os.Getenv)
+	if err != nil {
+		return err
+	}
+
 	// The probe listener comes up FIRST, before the database is dialled.
 	// While the database is away the process is alive and not ready:
 	// liveness answers, readiness says why not, and nothing restarts a
@@ -121,7 +129,7 @@ func run() error {
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return runtime.Serve(groupCtx, log, "probes", probes, 5*time.Second) })
 
-	db, closeDB, err := openDatabase(groupCtx, log, cfg.Database)
+	db, closeDB, err := runtime.OpenDatabase(groupCtx, log, dbConfig)
 	if err != nil {
 		stop()
 		_ = group.Wait()
@@ -296,20 +304,6 @@ func procedureLogger(log *slog.Logger) connect.UnaryInterceptorFunc {
 	}
 }
 
-// openDatabase waits for the database per the retry settings in the
-// environment (see runtime.RetryFromEnv) and returns its pool.
-func openDatabase(ctx context.Context, log *slog.Logger, pg config.Postgres) (*gorm.DB, func(), error) {
-	dsn, err := dsn(pg)
-	if err != nil {
-		return nil, nil, err
-	}
-	retry, err := runtime.RetryFromEnv(os.LookupEnv)
-	if err != nil {
-		return nil, nil, err
-	}
-	return runtime.OpenDatabase(ctx, log, dsn, pg.MaxConnections, retry)
-}
-
 // startupError is what run returns when start-up did not finish. A signal
 // that arrived during the wait is a request to stop, not a failure.
 func startupError(ctx context.Context, err error) error {
@@ -317,15 +311,4 @@ func startupError(ctx context.Context, err error) error {
 		return nil
 	}
 	return err
-}
-
-func dsn(pg config.Postgres) (string, error) {
-	if pg.PasswordEnv == "" {
-		return pg.URL, nil
-	}
-	password, err := policyconfig.Secret(pg.PasswordEnv)
-	if err != nil {
-		return "", err
-	}
-	return injectPassword(pg.URL, password)
 }

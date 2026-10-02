@@ -49,7 +49,12 @@ spec:
           args: ["-config", "/etc/url-shortener/redirect.yaml"]
           env:
             {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "redirect") | nindent 12 }}
-            {{- include "url-shortener.passwordEnv" .Values.database.app | nindent 12 }}
+            {{- include "url-shortener.dbEnv" (dict "root" $ "role" .Values.database.app "component" "redirect") | nindent 12 }}
+            {{- /* What `database.maxConnections` was before the connection
+            moved to the client's environment: this component's share of the
+            server's limit. */}}
+            - name: CNPG_CLIENT_POOL_MAX
+              value: "10"
           ports:
             - name: http
               containerPort: 8080
@@ -82,9 +87,8 @@ spec:
             {{- else }}
             {{- include "url-shortener.eventsTokenMount" . | nindent 12 }}
             {{- end }}
-            {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
             {{- include "url-shortener.dbCAMount" . | nindent 12 }}
-            {{- end }}
+            {{- include "url-shortener.dbPasswordMount" . | nindent 12 }}
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -96,9 +100,8 @@ spec:
         {{- else }}
         {{- include "url-shortener.eventsTokenVolume" . | nindent 8 }}
         {{- end }}
-        {{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" }}
         {{- include "url-shortener.dbCAVolume" . | nindent 8 }}
-        {{- end }}
+        {{- include "url-shortener.dbPasswordVolume" .Values.database.app | nindent 8 }}
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-config

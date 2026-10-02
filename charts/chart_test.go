@@ -73,6 +73,7 @@ func chartDir(t *testing.T, chart string) string {
 func defaults(extra ...string) []string {
 	return append([]string{
 		"--set", "database.host=example-pg-rw",
+		"--set", "database.tls.rootCA.configMapName=example-root-ca",
 		"--set", "database.owner.passwordSecret=example-pg-app",
 		"--set", "database.app.passwordSecret=example-pg-runtime",
 		"--set", "events.url=nats://nats.nats.svc:4222",
@@ -455,9 +456,13 @@ func TestNoSecretIsRendered(t *testing.T) {
 			t.Errorf("%s carries a password field; the file names the variable, it does not hold the value:\n%s", tc.file, body)
 		}
 	}
-	// And the deployments read it from a Secret rather than a literal.
-	if !strings.Contains(out, "secretKeyRef") {
-		t.Error("nothing reads the password from a Secret, so something else must be supplying it")
+	// And the workloads read it from a Secret, mounted as a file, rather than
+	// from a literal.
+	if !strings.Contains(out, "secretName: example-pg-runtime") {
+		t.Error("nothing mounts the password from a Secret, so something else must be supplying it")
+	}
+	if strings.Contains(out, "PGPASSWORD") {
+		t.Error("the password is rendered as a variable; it is a mounted file the client re-reads")
 	}
 }
 
@@ -511,35 +516,22 @@ func TestTheMigrationAndTheServicesUseDifferentCredentials(t *testing.T) {
 	var migrate, services []string
 
 	for _, doc := range strings.Split(out, "\n---\n") {
-		name := ""
-		for _, line := range strings.Split(doc, "\n") {
-			if strings.HasPrefix(line, "  name: ") {
-				name = strings.TrimSpace(strings.TrimPrefix(line, "  name: "))
-
-				break
-			}
+		name := docName(doc)
+		if kind := docKind(doc); kind != "Deployment" && kind != "Job" {
+			continue
 		}
 
-		for i, line := range strings.Split(doc, "\n") {
-			if !strings.Contains(line, "DATABASE_PASSWORD") {
+		// The password is a Secret volume: `secret:` is followed by its name.
+		for _, line := range strings.Split(doc, "\n") {
+			secret, ok := strings.CutPrefix(strings.TrimSpace(line), "secretName: ")
+			if !ok {
 				continue
 			}
 
-			lines := strings.Split(doc, "\n")
-			for _, l := range lines[i:min(i+5, len(lines))] {
-				l = strings.TrimSpace(l)
-				if !strings.HasPrefix(l, "name: ") {
-					continue
-				}
-
-				secret := strings.TrimPrefix(l, "name: ")
-				if strings.Contains(name, "migrate") {
-					migrate = append(migrate, secret)
-				} else {
-					services = append(services, secret)
-				}
-
-				break
+			if strings.Contains(name, "migrate") {
+				migrate = append(migrate, secret)
+			} else {
+				services = append(services, secret)
 			}
 		}
 	}
@@ -818,6 +810,11 @@ func TestWhatTheMigrationHookNeedsIsAlsoAHook(t *testing.T) {
 	if len(needs) < 2 {
 		t.Fatalf("expected the migration to need an account and a configuration, found %v", needs)
 	}
+
+	// The root the database server is verified against is the PLATFORM's
+	// ConfigMap: it exists in the namespace before any release, so it is not an
+	// ordinary resource of this one that a hook could not wait for.
+	delete(needs, ref{"ConfigMap", "example-root-ca"})
 
 	for n := range needs {
 		if !hooks[n] {
@@ -1557,55 +1554,148 @@ func TestEventsIdentityIsRefusedWhereItCannotWork(t *testing.T) {
 	}
 }
 
-// Under `require`, the default, the database URL is what it always was: the
-// host as written, no root file, no mounted trust bundle.
-func TestDatabaseTLSRequireIsTheDefault(t *testing.T) {
-	out, err := render(t, defaults()...)
+// What a workload that dials the database is handed: the libpq environment the
+// platform's PostgreSQL client reads, as parts. No connection URL appears
+// anywhere in the render, because a URL is a string a parameter can be dropped
+// from on its way to the driver.
+func TestTheDatabaseIsParts(t *testing.T) {
+	out, err := render(t, defaults("--namespace", "shop", "--set", "images.web.tag=dev")...)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("does not render: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "@example-pg-rw:5432/url_shortener?sslmode=require") {
-		t.Errorf("the default is not sslmode=require against the host as written:\n%s", out)
-	}
-	for _, unwanted := range []string{"sslrootcert", "database-ca", "verify-full"} {
+	for _, unwanted := range []string{"postgres://", "postgresql://", "sslmode=require", "DATABASE_PASSWORD", "passwordEnv"} {
 		if strings.Contains(out, unwanted) {
-			t.Errorf("%q rendered under the default", unwanted)
+			t.Errorf("%q rendered: the connection is parts, and the password is a file", unwanted)
+		}
+	}
+	for _, doc := range strings.Split(out, "\n---\n") {
+		if !strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job") {
+			continue
+		}
+		dials := strings.Contains(doc, "app.kubernetes.io/component: urls") ||
+			strings.Contains(doc, "app.kubernetes.io/component: redirect") ||
+			strings.Contains(doc, "name: example-migrate")
+		if !dials {
+			continue
+		}
+		for _, want := range []string{
+			"- name: PGHOST\n              value: \"example-pg-rw.shop.svc." + "cluster." + "local\"",
+			"- name: PGDATABASE\n              value: \"url_shortener\"",
+			"- name: PGSSLMODE\n              value: verify-full",
+			"- name: PGSSLROOTCERT\n              value: /etc/url-shortener-pg-ca/ca-certificates.crt",
+			"- name: CNPG_CLIENT_PASSWORD_FILE\n              value: /etc/url-shortener-pg-password/password",
+		} {
+			if !strings.Contains(doc, want) {
+				t.Errorf("a workload that dials the database lacks %q:\n%s", want, doc)
+			}
 		}
 	}
 }
 
-// Under `verify-full` the host is the fully-qualified name (the only form a
-// server certificate carries), every URL names the mounted root, and the
+// Each workload logs in as ITS role, with that role's Secret, and no other:
+// the services as the runtime role, the migration as the owner.
+func TestEachWorkloadGetsItsOwnRolesCredential(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		marker, role, secret, other string
+	}{
+		{"app.kubernetes.io/component: urls", "url_shortener_app", "example-pg-runtime", "example-pg-app"},
+		{"app.kubernetes.io/component: redirect", "url_shortener_app", "example-pg-runtime", "example-pg-app"},
+		{"name: example-migrate", "url_shortener_owner", "example-pg-app", "example-pg-runtime"},
+	} {
+		var found bool
+		for _, doc := range strings.Split(out, "\n---\n") {
+			if !strings.Contains(doc, tc.marker) || (!strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job")) {
+				continue
+			}
+			found = true
+			if !strings.Contains(doc, "- name: PGUSER\n              value: \""+tc.role+"\"") {
+				t.Errorf("%s: PGUSER is not %s", tc.marker, tc.role)
+			}
+			if !strings.Contains(doc, "secretName: "+tc.secret) || strings.Contains(doc, tc.other) {
+				t.Errorf("%s: the password Secret is not exactly %s", tc.marker, tc.secret)
+			}
+			if !strings.Contains(doc, "path: password") {
+				t.Errorf("%s: the password is not projected to a file", tc.marker)
+			}
+		}
+		if !found {
+			t.Errorf("no workload matched %q", tc.marker)
+		}
+	}
+}
+
+// verify-full is the only setting. `require` is refused with the reason
+// rather than rendered into a Deployment the client would refuse to start,
+// and a missing root is refused too: there would be nothing to verify against.
+func TestDatabaseTLSIsVerifyFullOrNothing(t *testing.T) {
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"require": {
+			args: []string{"--set", "database.tls.mode=require"},
+			want: "verify-full",
+		},
+		"no root": {
+			args: []string{"--set", "database.tls.rootCA.configMapName="},
+			want: "database.tls.rootCA.configMapName is required",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, defaults(append([]string{"--set", "images.web.tag=dev"}, tc.args...)...)...)
+			if err == nil {
+				t.Fatalf("the render was accepted:\n%s", out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("the refusal does not say what is wrong (want %q): %s", tc.want, out)
+			}
+		})
+	}
+
+	// A platform that already sets the one accepted value keeps rendering.
+	if out, err := render(t, defaults("--set", "database.tls.mode=verify-full", "--set", "images.web.tag=dev")...); err != nil {
+		t.Errorf("mode=verify-full is refused: %v\n%s", err, out)
+	}
+}
+
+// The host is the fully-qualified name (the only form a server certificate
+// carries) in the release's namespace, with the cluster's DNS suffix, and the
 // root is mounted as a directory into exactly the three workloads that dial
 // the database.
-func TestDatabaseTLSVerifyFull(t *testing.T) {
+func TestDatabaseHostAndRoot(t *testing.T) {
 	out, err := render(t, defaults(
 		"--namespace", "shop",
-		"--set", "database.tls.mode=verify-full",
-		"--set", "database.tls.rootCA.configMapName=example-root-ca",
 		"--set", "database.clusterDomain=cluster.example",
 		"--set", "images.web.tag=dev",
 	)...)
 	if err != nil {
 		t.Fatalf("does not render: %v\n%s", err, out)
 	}
-	const dsnTail = "@example-pg-rw.shop.svc.cluster.example:5432/url_shortener?sslmode=verify-full&sslrootcert=/etc/url-shortener-pg-ca/ca-certificates.crt"
-	for _, file := range []string{"urls.yaml", "redirect.yaml", "migrate.yaml"} {
-		doc := conformance.ConfigMapData(t, []byte(out), file)
-		if !strings.Contains(string(doc), dsnTail) {
-			t.Errorf("%s does not carry the verify-full URL:\n%s", file, doc)
-		}
+	if n := strings.Count(out, "value: \"example-pg-rw.shop.svc.cluster.example\""); n != 3 {
+		t.Errorf("the qualified host is set %d times, want 3 (urls, redirect, migrate)", n)
 	}
-	if strings.Contains(out, "sslmode=require") {
-		t.Error("a URL is still on require")
-	}
-
 	// urls, redirect, migrate: each mounts it; nothing else does.
 	if n := strings.Count(out, "mountPath: /etc/url-shortener-pg-ca"); n != 3 {
 		t.Errorf("the root is mounted %d times, want 3 (urls, redirect, migrate)", n)
 	}
+	if n := strings.Count(out, "mountPath: /etc/url-shortener-pg-password"); n != 3 {
+		t.Errorf("a password is mounted %d times, want 3 (urls, redirect, migrate)", n)
+	}
 	if strings.Contains(out, "subPath") {
-		t.Error("a subPath mount does not follow a rotation of the ConfigMap")
+		t.Error("a subPath mount does not follow a rotation of the ConfigMap or the Secret")
+	}
+
+	// A host that is already qualified is left alone.
+	out, err = render(t, defaults("--set", "database.host=pg-rw.db.svc.example", "--set", "images.web.tag=dev")...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "value: \"pg-rw.db.svc.example\"") {
+		t.Error("a qualified host was rewritten")
 	}
 }
 
@@ -1618,8 +1708,8 @@ func TestStatHasNoDatabasePassword(t *testing.T) {
 	for _, doc := range strings.Split(out, "\n---\n") {
 		if strings.Contains(doc, "app.kubernetes.io/component: stat") &&
 			strings.Contains(doc, "kind: Deployment") &&
-			strings.Contains(doc, "DATABASE_PASSWORD") {
-			t.Error("stat carries DATABASE_PASSWORD")
+			(strings.Contains(doc, "database-password") || strings.Contains(doc, "PGHOST")) {
+			t.Error("stat carries a database credential or connection")
 		}
 	}
 }
@@ -1627,15 +1717,11 @@ func TestStatHasNoDatabasePassword(t *testing.T) {
 // The cluster's DNS suffix defaults to the one every cluster has unless told
 // otherwise.
 func TestDatabaseClusterDomainDefault(t *testing.T) {
-	out, err := render(t, defaults(
-		"--namespace", "shop",
-		"--set", "database.tls.mode=verify-full",
-		"--set", "database.tls.rootCA.configMapName=example-root-ca",
-	)...)
+	out, err := render(t, defaults("--namespace", "shop")...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "@example-pg-rw.shop.svc." + "cluster." + "local:5432/"; !strings.Contains(out, want) {
+	if want := "example-pg-rw.shop.svc." + "cluster." + "local"; !strings.Contains(out, want) {
 		t.Errorf("the default suffix is not applied; want %q", want)
 	}
 }

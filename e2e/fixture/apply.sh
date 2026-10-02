@@ -29,6 +29,56 @@ eval "$(go run ./e2e/fixture/cmd/resolve \
 
 kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
 
+step "the database server's certificate, so the clients can verify it"
+# The services verify the server (verify-full, and nothing weaker: the
+# database client refuses it), so the box's Postgres needs a certificate that
+# NAMES the address the chart dials and a root the clients are handed. The box
+# is created with a throwaway self-signed certificate that names nothing,
+# which is enough for the encrypt-only connection this example used to ask for
+# and not for this one.
+#
+# So: a root of this fixture's own (made once, kept in a Secret), a server
+# certificate for the address, put in place on the RUNNING server and reloaded
+# (a restart would drop the data: the box keeps it in an emptyDir), and the
+# root published as the ConfigMap the chart's `database.tls.rootCA` names.
+# Idempotent: the certificate is only reissued when it does not verify.
+tls=$(mktemp -d)
+trap 'rm -rf "$tls"' EXIT
+if ! kubectl -n postgres get secret postgres-root-ca >/dev/null 2>&1; then
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+    -keyout "$tls/ca.key" -out "$tls/ca.crt" -days 30 -nodes \
+    -subj "/CN=box-postgres-root" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
+  kubectl -n postgres create secret generic postgres-root-ca \
+    --from-file=ca.crt="$tls/ca.crt" --from-file=ca.key="$tls/ca.key"
+fi
+kubectl -n postgres get secret postgres-root-ca -o jsonpath='{.data.ca\.crt}' | base64 -d >"$tls/ca.crt"
+kubectl -n postgres get secret postgres-root-ca -o jsonpath='{.data.ca\.key}' | base64 -d >"$tls/ca.key"
+kubectl -n postgres get secret postgres-tls -o jsonpath='{.data.tls\.crt}' | base64 -d >"$tls/server.crt"
+
+if ! openssl verify -CAfile "$tls/ca.crt" -verify_hostname "$DATABASE_HOST" "$tls/server.crt" >/dev/null 2>&1; then
+  openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+    -keyout "$tls/server.key" -out "$tls/server.csr" -nodes -subj "/CN=postgres" >/dev/null 2>&1
+  printf 'subjectAltName=DNS:%s,DNS:%s.cluster.local,DNS:postgres\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n' \
+    "$DATABASE_HOST" "$DATABASE_HOST" >"$tls/server.ext"
+  openssl x509 -req -in "$tls/server.csr" -CA "$tls/ca.crt" -CAkey "$tls/ca.key" -CAcreateserial \
+    -days 30 -out "$tls/server.crt" -extfile "$tls/server.ext" >/dev/null 2>&1
+  # Where a restarted server will find it, and where the running one does now.
+  kubectl -n postgres create secret tls postgres-tls --cert="$tls/server.crt" --key="$tls/server.key" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n postgres exec -i deploy/postgres -c postgres -- sh -c 'cat >/pgtls/tls.crt' <"$tls/server.crt"
+  kubectl -n postgres exec -i deploy/postgres -c postgres -- sh -c 'cat >/pgtls/tls.key' <"$tls/server.key"
+  kubectl -n postgres exec deploy/postgres -c postgres -- sh -c \
+    'chown 999:999 /pgtls/tls.crt /pgtls/tls.key && chmod 644 /pgtls/tls.crt && chmod 600 /pgtls/tls.key'
+  kubectl -n postgres exec deploy/postgres -c postgres -- psql -U postgres -v ON_ERROR_STOP=1 -c 'select pg_reload_conf()' >/dev/null
+fi
+
+# The root, as the ConfigMap the chart names. Applied every run: it is the
+# same bytes unless the root was remade.
+kubectl -n "$NAMESPACE" create configmap "$DATABASE_CA" --from-file=ca-certificates.crt="$tls/ca.crt" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
 step "the owner role's credential"
 if ! kubectl -n "$NAMESPACE" get secret "$OWNER_SECRET" >/dev/null 2>&1; then
   kubectl -n "$NAMESPACE" create secret generic "$OWNER_SECRET" \

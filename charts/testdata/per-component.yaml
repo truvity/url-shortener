@@ -6,6 +6,10 @@
 # allow-list); the others take the release's own `<release>-<component>`.
 database:
   host: pg
+  clusterDomain: cluster.example
+  tls:
+    rootCA:
+      configMapName: pg-ca
   owner:
     passwordSecret: owner
   app:

@@ -1,6 +1,6 @@
-# verify-full with no trust root to verify against. The chart refuses it
-# rather than rendering a URL whose root file does not exist, which the
-# driver would only report as a failed connection at start-up.
+# verify-full named, with no trust root to verify against. The chart refuses
+# it rather than rendering a root file that does not exist, which the client
+# would only report as a failed connection at start-up.
 database:
   host: pg-rw
   tls:

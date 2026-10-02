@@ -135,10 +135,6 @@ data:
       trustDomain: example.invalid
       peers:
         []
-    database:
-      url: postgres://url_shortener_app@pg:5432/url_shortener?sslmode=require
-      passwordEnv: DATABASE_PASSWORD
-      maxConnections: 10
     events:
       nats:
         url: nats://nats:4222
@@ -167,10 +163,6 @@ data:
           serviceAccount: counter
         - namespace: other
           serviceAccount: reader
-    database:
-      url: postgres://url_shortener_app@pg:5432/url_shortener?sslmode=require
-      passwordEnv: DATABASE_PASSWORD
-      maxConnections: 20
 
   stat.yaml: |
     probes:
@@ -393,7 +385,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: log
       annotations:
-        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
+        checksum/config: 2f620c1ec77cb31c733a9b629177e7156d7014667359f2426232ef023365a493
     spec:
       serviceAccountName: archiver
       securityContext:
@@ -507,7 +499,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
+        checksum/config: 2f620c1ec77cb31c733a9b629177e7156d7014667359f2426232ef023365a493
     spec:
       serviceAccountName: example-redirect
       securityContext:
@@ -546,11 +538,24 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app
-                  key: password
+            - name: PGHOST
+              value: "pg.default.svc.cluster.example"
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: "url_shortener"
+            - name: PGUSER
+              value: "url_shortener_app"
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/url-shortener-pg-ca/ca-certificates.crt
+            - name: CNPG_CLIENT_PASSWORD_FILE
+              value: /etc/url-shortener-pg-password/password
+            - name: PGAPPNAME
+              value: "example-redirect"
+            - name: CNPG_CLIENT_POOL_MAX
+              value: "10"
           ports:
             - name: http
               containerPort: 8080
@@ -573,6 +578,12 @@ spec:
                 seconds: 5
           volumeMounts:
             
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
+            - name: database-password
+              mountPath: /etc/url-shortener-pg-password
+              readOnly: true
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -586,6 +597,16 @@ spec:
               memory: 64Mi
       volumes:
         
+        - name: database-ca
+          configMap:
+            name: pg-ca
+        - name: database-password
+          secret:
+            secretName: app
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
         - name: config
           configMap:
             name: example-config
@@ -630,7 +651,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: stat
       annotations:
-        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
+        checksum/config: 2f620c1ec77cb31c733a9b629177e7156d7014667359f2426232ef023365a493
     spec:
       serviceAccountName: counter
       securityContext:
@@ -739,7 +760,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
+        checksum/config: 2f620c1ec77cb31c733a9b629177e7156d7014667359f2426232ef023365a493
     spec:
       serviceAccountName: example-urls
       securityContext:
@@ -778,11 +799,24 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app
-                  key: password
+            - name: PGHOST
+              value: "pg.default.svc.cluster.example"
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: "url_shortener"
+            - name: PGUSER
+              value: "url_shortener_app"
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/url-shortener-pg-ca/ca-certificates.crt
+            - name: CNPG_CLIENT_PASSWORD_FILE
+              value: /etc/url-shortener-pg-password/password
+            - name: PGAPPNAME
+              value: "example-urls"
+            - name: CNPG_CLIENT_POOL_MAX
+              value: "20"
           ports:
             - name: http
               containerPort: 8080
@@ -806,6 +840,12 @@ spec:
             - name: identity
               mountPath: /var/run/identity
               readOnly: true
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
+            - name: database-password
+              mountPath: /etc/url-shortener-pg-password
+              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -819,6 +859,16 @@ spec:
           csi:
             driver: spiffe.csi.cert-manager.io
             readOnly: true
+        - name: database-ca
+          configMap:
+            name: pg-ca
+        - name: database-password
+          secret:
+            secretName: app
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
 
 ---
 # Source: url-shortener/templates/web.yaml
@@ -852,7 +902,7 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: c5e774e38d807866a179114e14a42235e6da5fe2b1a2761803032e4d65b58b8c
+        checksum/config: 2f620c1ec77cb31c733a9b629177e7156d7014667359f2426232ef023365a493
     spec:
       serviceAccountName: example-web
       securityContext:
@@ -964,9 +1014,6 @@ data:
   migrate.yaml: |
     log:
       level: info
-    database:
-      url: postgres://url_shortener_owner@pg:5432/url_shortener?sslmode=require
-      passwordEnv: DATABASE_PASSWORD
     ownerRole: url_shortener_owner
     appRole: url_shortener_app
 
@@ -1023,12 +1070,31 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: owner
-                  key: password
+            - name: PGHOST
+              value: "pg.default.svc.cluster.example"
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: "url_shortener"
+            - name: PGUSER
+              value: "url_shortener_owner"
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/url-shortener-pg-ca/ca-certificates.crt
+            - name: CNPG_CLIENT_PASSWORD_FILE
+              value: /etc/url-shortener-pg-password/password
+            - name: PGAPPNAME
+              value: "example-migrate"
+            - name: CNPG_CLIENT_STATEMENT_TIMEOUT
+              value: "10m"
           volumeMounts:
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
+            - name: database-password
+              mountPath: /etc/url-shortener-pg-password
+              readOnly: true
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
@@ -1037,6 +1103,16 @@ spec:
               cpu: 50m
               memory: 64Mi
       volumes:
+        - name: database-ca
+          configMap:
+            name: pg-ca
+        - name: database-password
+          secret:
+            secretName: owner
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
         - name: config
           configMap:
             name: example-migrate-config

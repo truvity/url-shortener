@@ -52,13 +52,6 @@ type (
 		Level string `json:"level"`
 	}
 
-	// Postgres is a connection, with the password named rather than carried.
-	Postgres struct {
-		URL            string `json:"url"`
-		PasswordEnv    string `json:"passwordEnv"`
-		MaxConnections int    `json:"maxConnections"`
-	}
-
 	// NATS is a connection, and nothing about what is done with it.
 	NATS struct {
 		URL       string  `json:"url"`
@@ -117,10 +110,9 @@ type (
 	// Migrate is the migration job: no listener, no probes. A job that runs
 	// once and exits is not a service.
 	Migrate struct {
-		Log       Log      `json:"log"`
-		Database  Postgres `json:"database"`
-		OwnerRole string   `json:"ownerRole"`
-		AppRole   string   `json:"appRole"`
+		Log       Log    `json:"log"`
+		OwnerRole string `json:"ownerRole"`
+		AppRole   string `json:"appRole"`
 	}
 
 	// Urls owns the URL tables and serves the RPC boundary over them.
@@ -130,23 +122,21 @@ type (
 	// is on the answering end of one. It publishes nothing and consumes
 	// nothing.
 	Urls struct {
-		Listen   Listen   `json:"listen"`
-		Probes   Listen   `json:"probes"`
-		Log      Log      `json:"log"`
-		Drain    Drain    `json:"drain"`
-		TLS      TLS      `json:"tls"`
-		Database Postgres `json:"database"`
+		Listen Listen `json:"listen"`
+		Probes Listen `json:"probes"`
+		Log    Log    `json:"log"`
+		Drain  Drain  `json:"drain"`
+		TLS    TLS    `json:"tls"`
 	}
 
 	// Redirect resolves short keys and says what happened.
 	Redirect struct {
-		Listen   Listen   `json:"listen"`
-		Probes   Listen   `json:"probes"`
-		Log      Log      `json:"log"`
-		Drain    Drain    `json:"drain"`
-		TLS      TLS      `json:"tls"`
-		Database Postgres `json:"database"`
-		Events   struct {
+		Listen Listen `json:"listen"`
+		Probes Listen `json:"probes"`
+		Log    Log    `json:"log"`
+		Drain  Drain  `json:"drain"`
+		TLS    TLS    `json:"tls"`
+		Events struct {
 			NATS            NATS   `json:"nats"`
 			RedirectSubject string `json:"redirectSubject"`
 			RequestSubject  string `json:"requestSubject"`

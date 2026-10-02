@@ -21,12 +21,13 @@ require (
 	github.com/nats-io/nats.go v1.54.0
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
+	github.com/truvity/cnpg/v2 v2.6.0
 	github.com/truvity/gemaal v0.24.3
 	github.com/truvity/policy v0.9.3
-	go.opentelemetry.io/otel v1.46.0
-	go.opentelemetry.io/otel/metric v1.46.0
-	go.opentelemetry.io/otel/sdk v1.46.0
-	go.opentelemetry.io/otel/trace v1.46.0
+	go.opentelemetry.io/otel v1.47.0
+	go.opentelemetry.io/otel/metric v1.47.0
+	go.opentelemetry.io/otel/sdk v1.47.0
+	go.opentelemetry.io/otel/trace v1.47.0
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/sync v0.23.0
 	google.golang.org/protobuf v1.36.12
@@ -98,9 +99,9 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.22.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.46.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.46.0 // indirect
-	go.opentelemetry.io/otel/log v0.22.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.22.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.46.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.47.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/net v0.58.0 // indirect

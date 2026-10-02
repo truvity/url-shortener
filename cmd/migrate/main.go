@@ -18,10 +18,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 
-	policyconfig "github.com/truvity/policy/config"
 	policytelemetry "github.com/truvity/policy/telemetry"
 
 	"github.com/truvity/policy/examples/url-shortener/internal/config"
@@ -78,26 +75,17 @@ func run() error {
 	log.InfoContext(ctx, "starting", slog.String("component", "migrate"),
 		slog.String("version", version), slog.String("commit", commit))
 
-	dsn, err := dsn(cfg.Database)
+	// The same client the services use, as the owner role: only PGUSER and
+	// the password differ.
+	dbConfig, err := runtime.DatabaseConfig(os.Getenv)
 	if err != nil {
 		return err
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		// The library logs through the service's logger, not its own.
-		// See runtime.GormLogger.
-		Logger: runtime.GormLogger(log, time.Second),
-	})
+	db, closeDB, err := runtime.OpenDatabase(ctx, log, dbConfig)
 	if err != nil {
-		return fmt.Errorf("connect to the database: %w", err)
-	}
-	if err := runtime.TraceDatabase(db); err != nil {
 		return err
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return fmt.Errorf("reach the connection pool: %w", err)
-	}
-	defer func() { _ = sqlDB.Close() }()
+	defer closeDB()
 
 	if err := withSpan(ctx, "migrate.run", func(ctx context.Context) error {
 		return migration.Run(ctx, log, db, cfg.OwnerRole, cfg.AppRole)
@@ -135,19 +123,4 @@ func withSpan(ctx context.Context, name string, step func(context.Context) error
 	}
 
 	return nil
-}
-
-// dsn puts the password back into the connection string. The configuration
-// carries the NAME of the variable holding it, never the value: a
-// configuration file is rendered into a config map, printed when somebody
-// debugs a deployment, and committed as a test fixture.
-func dsn(pg config.Postgres) (string, error) {
-	if pg.PasswordEnv == "" {
-		return pg.URL, nil
-	}
-	password, err := policyconfig.Secret(pg.PasswordEnv)
-	if err != nil {
-		return "", err
-	}
-	return injectPassword(pg.URL, password)
 }

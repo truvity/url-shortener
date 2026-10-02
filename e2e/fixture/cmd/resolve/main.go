@@ -40,6 +40,7 @@ func main() {
 	print("OWNER_ROLE", names.OwnerRole)
 	print("APP_ROLE", names.AppRole)
 	print("DATABASE_HOST", names.DatabaseHost)
+	print("DATABASE_CA", names.DatabaseCA)
 	print("OWNER_SECRET", names.OwnerSecret)
 	print("APP_SECRET", names.AppSecret)
 	print("STREAM", names.Stream)

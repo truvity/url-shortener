@@ -72,47 +72,72 @@ its release refuses to package without a digest per entry.
 {{- end -}}
 
 {{/*
-A database password, as an environment variable read from a Secret.
+The database connection, as the libpq environment the platform's PostgreSQL
+client library reads (the same names the database chart's `cnpg-client.env`
+helper renders): host, port, database, role, and the CA file. Nothing here is a connection URL. A URL is a string a parameter can
+be dropped from on its way to the driver, and a dropped `sslrootcert` turns
+verify-full into a connection that does not verify; the client takes parts and
+refuses anything weaker than verify-full.
 
-The chart takes the NAME of a secret, never a value: a chart that generated a
-password would put it in the release's own stored manifest, where anyone who
-can read a release can read the password.
+That helper is not included itself: it mounts a CLIENT CERTIFICATE from a
+Secret named for the cluster, and this chart's roles log in with a password
+against a root the platform hands in as a ConfigMap. The names are the same;
+the sources differ.
 
-Takes the role block (.Values.database.owner or .Values.database.app), so the
-migration and the services cannot accidentally be handed the same credential.
+Takes (dict "root" $ "role" <.Values.database.owner|app> "component" <name>).
+The password is a FILE, not a variable: the client re-reads it for every new
+connection, so a rotated Secret reaches a running pod within one connection
+lifetime without a restart. See dbPasswordVolume.
 */}}
-{{- define "url-shortener.passwordEnv" -}}
-- name: DATABASE_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: {{ .passwordSecret }}
-      key: {{ .passwordKey | default "password" }}
+{{- define "url-shortener.dbEnv" -}}
+{{- $root := .root -}}
+- name: PGHOST
+  value: {{ include "url-shortener.dbHost" $root | quote }}
+- name: PGPORT
+  value: "5432"
+- name: PGDATABASE
+  value: {{ $root.Values.database.name | quote }}
+- name: PGUSER
+  value: {{ .role.role | quote }}
+- name: PGSSLMODE
+  value: verify-full
+- name: PGSSLROOTCERT
+  value: {{ include "url-shortener.dbCAMountPath" $root }}/{{ $root.Values.database.tls.rootCA.key | default "ca-certificates.crt" }}
+- name: CNPG_CLIENT_PASSWORD_FILE
+  value: {{ include "url-shortener.dbPasswordMountPath" $root }}/password
+- name: PGAPPNAME
+  value: {{ printf "%s-%s" (include "url-shortener.name" $root) .component | quote }}
 {{- end -}}
 
 {{/*
-dbTLSMode: require | verify-full, refused otherwise. `require` encrypts and
-verifies nobody; `verify-full` also proves who answered, against a root the
-platform hands in.
+dbTLSMode: verify-full, always. The client library refuses anything weaker,
+so a chart that could still render `require` would render a Deployment that
+cannot start. `require` is refused here with the reason, and the root the
+server certificate chains to is required: the platform provides it, the chart
+never creates it.
+
+The value is kept (it is what a platform that set it already passes) and
+accepts only the one setting it ever reaches.
 */}}
 {{- define "url-shortener.dbTLSMode" -}}
-{{- $mode := .Values.database.tls.mode | default "require" -}}
-{{- if not (has $mode (list "require" "verify-full")) -}}
-{{- fail (printf "database.tls.mode %q must be require or verify-full" $mode) -}}
+{{- $mode := .Values.database.tls.mode | default "verify-full" -}}
+{{- if ne $mode "verify-full" -}}
+{{- fail (printf "database.tls.mode %q is refused: the database client verifies the server (verify-full) or does not connect. Unset it, and give database.tls.rootCA.configMapName" $mode) -}}
 {{- end -}}
-{{- if and (eq $mode "verify-full") (not .Values.database.tls.rootCA.configMapName) -}}
-{{- fail "database.tls.rootCA.configMapName is required for verify-full: the ConfigMap holding the root the server certificate chains to" -}}
+{{- if not .Values.database.tls.rootCA.configMapName -}}
+{{- fail "database.tls.rootCA.configMapName is required: the ConfigMap holding the root the database server certificate chains to (the client verifies it, always)" -}}
 {{- end -}}
 {{- $mode -}}
 {{- end -}}
 
 {{/*
-dbHost: `require` keeps the host as given. Under verify-full the name must be
-one the serving certificate carries, and it carries the fully-qualified form
+dbHost: the name the server certificate carries is the fully-qualified one
 only, so a short name becomes `<host>.<namespace>.svc.<clusterDomain>`. A host
 that already has a dot is taken to be qualified and left alone.
 */}}
 {{- define "url-shortener.dbHost" -}}
-{{- if and (eq (include "url-shortener.dbTLSMode" .) "verify-full") (not (contains "." .Values.database.host)) -}}
+{{- $_ := include "url-shortener.dbTLSMode" . -}}
+{{- if not (contains "." .Values.database.host) -}}
 {{- printf "%s.%s.svc.%s" .Values.database.host .Release.Namespace (.Values.database.clusterDomain | default "cluster.local") -}}
 {{- else -}}
 {{- .Values.database.host -}}
@@ -128,30 +153,53 @@ which a rotation of the ConfigMap would not reach).
 {{- end -}}
 
 {{/*
-dbQuery: the sslmode (and root) parameters of the connection URL.
+dbPasswordMountPath: where a role's password is mounted, as a DIRECTORY
+holding one file, `password`. A directory, never a subPath, for the same
+reason as the root: a rotated Secret reaches a running pod.
 */}}
-{{- define "url-shortener.dbQuery" -}}
-{{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" -}}
-sslmode=verify-full&sslrootcert={{ include "url-shortener.dbCAMountPath" . }}/{{ .Values.database.tls.rootCA.key | default "ca-certificates.crt" }}
-{{- else -}}
-sslmode=require
-{{- end -}}
+{{- define "url-shortener.dbPasswordMountPath" -}}
+/etc/url-shortener-pg-password
 {{- end -}}
 
 {{- define "url-shortener.dbCAVolume" -}}
-{{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" -}}
+{{- $_ := include "url-shortener.dbTLSMode" . -}}
 - name: database-ca
   configMap:
     name: {{ .Values.database.tls.rootCA.configMapName }}
-{{- end }}
 {{- end -}}
 
 {{- define "url-shortener.dbCAMount" -}}
-{{- if eq (include "url-shortener.dbTLSMode" .) "verify-full" -}}
 - name: database-ca
   mountPath: {{ include "url-shortener.dbCAMountPath" . }}
   readOnly: true
-{{- end }}
+{{- end -}}
+
+{{/*
+A role's password, as a file from the Secret that holds it.
+
+The chart takes the NAME of a secret, never a value: a chart that generated a
+password would put it in the release's own stored manifest, where anyone who
+can read a release can read the password. The credential is the same Secret
+and key as before; only how it reaches the process changed (a file, which the
+client re-reads, instead of a variable, which is read once).
+
+Takes the role block (.Values.database.owner or .Values.database.app), so the
+migration and the services cannot accidentally be handed the same credential.
+*/}}
+{{- define "url-shortener.dbPasswordVolume" -}}
+- name: database-password
+  secret:
+    secretName: {{ .passwordSecret }}
+    defaultMode: 0440
+    items:
+      - key: {{ .passwordKey | default "password" }}
+        path: password
+{{- end -}}
+
+{{- define "url-shortener.dbPasswordMount" -}}
+- name: database-password
+  mountPath: {{ include "url-shortener.dbPasswordMountPath" . }}
+  readOnly: true
 {{- end -}}
 
 {{/*

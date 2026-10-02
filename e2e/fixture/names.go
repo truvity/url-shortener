@@ -101,6 +101,7 @@ type Names struct {
 	OwnerRole    string // migrates: creates tables and grants the runtime role its rights
 	AppRole      string // the runtime role every service connects as
 	DatabaseHost string // the box's one Postgres server, reached the same cross-namespace way NATS and S3 already are: <service>.<namespace>.svc
+	DatabaseCA   string // the ConfigMap, in the application's namespace, holding the root the box's server certificate chains to; the client verifies the server against it, always
 	OwnerSecret  string // the owner role's password Secret, under CNPG's own naming: <cluster>-app
 	AppSecret    string // the runtime role's password Secret; this fixture names it and tells the infra chart
 
@@ -202,6 +203,7 @@ func Resolve(o Options) (Names, error) {
 	// (and create, if missing) their own durable pull consumer on connect.
 	app, err := helmTemplate(o.AppRelease, filepath.Join(root, "url-shortener"), o.Namespace,
 		"--set", "database.host=placeholder",
+		"--set", "database.tls.rootCA.configMapName=placeholder",
 		"--set", "database.owner.passwordSecret=placeholder",
 		"--set", "database.app.passwordSecret=placeholder",
 		"--set", "events.url=nats://placeholder:4222",
@@ -225,6 +227,7 @@ func Resolve(o Options) (Names, error) {
 		OwnerRole:       ownerRole,
 		AppRole:         appRole,
 		DatabaseHost:    boxPostgresAddress,
+		DatabaseCA:      o.AppRelease + "-pg-ca",
 		OwnerSecret:     clusterName + "-app",
 		AppSecret:       appSecret,
 		Stream:          streamName,
