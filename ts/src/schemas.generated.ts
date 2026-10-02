@@ -189,6 +189,356 @@ export const sharedSchemas: Record<string, object> = {
       }
     }
   },
+  "https://github.com/truvity/policy/schemas/fragments/platform.json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/truvity/policy/schemas/fragments/platform.json",
+    "title": "platform",
+    "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as environment variables, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Where the image is. A digest when there is one; a tag only when there is not. Left out, the library reads the chart's own top-level `images.<component>`, the map a release stamps and refuses to publish with an empty digest.",
+        "required": [
+          "repository"
+        ],
+        "properties": {
+          "registry": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tag": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^(sha256:[0-9a-f]{64})?$"
+          }
+        }
+      },
+      "imagePullPolicy": {
+        "enum": [
+          "Always",
+          "IfNotPresent",
+          "Never"
+        ],
+        "description": "Defaults to IfNotPresent."
+      },
+      "replicas": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Defaults to 1. A service that must survive a rollout runs more than one: one instance cannot be replaced without a gap whatever the strategy says."
+      },
+      "strategy": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The rolling update. The defaults make a rollout gapless: the replacement is READY before the incumbent is touched.",
+        "properties": {
+          "maxUnavailable": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Defaults to 0."
+          },
+          "maxSurge": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Defaults to 1."
+          }
+        }
+      },
+      "resources": {
+        "type": "object",
+        "description": "Kubernetes' own resource requirements. Open: it is passed through unchanged."
+      },
+      "podSecurity": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Who the process is. Every field defaults to 65532, the unprivileged user the runtime images run as; `fsGroup` is the one that matters, because a CSI driver writes what it mounts owned by root.",
+        "properties": {
+          "runAsUser": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "runAsGroup": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fsGroup": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "serviceAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The account this component runs as. EVERY component has its own, always; `default` is refused. The library grants nothing: annotations are where a platform binds the account to rights outside the cluster, and which mechanism does that is the platform's.",
+        "properties": {
+          "create": {
+            "type": "boolean",
+            "description": "False where the platform creates the accounts; they must then exist. Defaults to true."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Defaults to `<release>-<component>`."
+          },
+          "annotations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "service": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "A component that listens has a Service on the ports of its own `config.listen`; one that does not has none.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Defaults to whether `config.listen` exists. Enabling one for a component that listens on nothing is refused."
+          }
+        }
+      },
+      "probes": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "How the component is probed, on the listener its own `config.probes` binds. Liveness is nothing but the process: a probe that checks a dependency restarts a healthy process and makes an outage worse.",
+        "properties": {
+          "liveness": {
+            "$ref": "#/$defs/probe"
+          },
+          "readiness": {
+            "$ref": "#/$defs/probe"
+          },
+          "startup": {
+            "$ref": "#/$defs/probe",
+            "description": "Absent means no startup probe. Present, it needs at least one field."
+          }
+        }
+      },
+      "drain": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The service's own shutdown budget is `config.drain.seconds`; the library derives the grace period from it and this delay, so the three numbers cannot disagree.",
+        "properties": {
+          "preStopSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Fail readiness, then wait this long before the drain starts, so that whatever routes traffic has removed this endpoint first. Defaults to 5."
+          }
+        }
+      },
+      "tls": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Where the platform mounts the workload identity. The files the component's own `config.tls` names must be under `mountPath`; the render refuses a file that is not.",
+        "properties": {
+          "csiDriver": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The driver that mounts the identity. The platform's, so there is no default; required once the identity is mounted."
+          },
+          "mountPath": {
+            "type": "string",
+            "pattern": "^/.+",
+            "description": "Defaults to /var/run/identity."
+          },
+          "mount": {
+            "type": "boolean",
+            "description": "Defaults to whether `config.tls.mode` is permissive or strict. True mounts the identity into a component that presents none of its own, because the release does; false never mounts it."
+          }
+        }
+      },
+      "telemetry": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "OpenTelemetry's own environment variables (decision 0006): they leave the chart as variables, never as configuration keys. No endpoint means do not export.",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Defaults to `<release>-<component>`."
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "protocol": {
+            "enum": [
+              "grpc",
+              "http/protobuf",
+              "http/json"
+            ]
+          },
+          "tracesSampler": {
+            "type": "string"
+          },
+          "sampleRatio": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "resourceAttributes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "secrets": {
+        "type": "object",
+        "description": "The environment variables that carry SECRETS, and nothing else (decision 0002): variable name to the Secret and key its value comes from. The configuration file names the VARIABLE; the value never appears in a values file or a render.",
+        "propertyNames": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "secretName",
+            "key"
+          ],
+          "properties": {
+            "secretName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "env": {
+        "type": "array",
+        "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002). A secret does not belong here; declare it in `secrets`.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "value"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "volumes": {
+        "type": "array",
+        "description": "Extra pod volumes, in Kubernetes' own shape, for what a client library mounts (a trust bundle, a password file). Open: passed through unchanged.",
+        "items": {
+          "type": "object",
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "volumeMounts": {
+        "type": "array",
+        "description": "The mounts for `volumes`, in Kubernetes' own shape.",
+        "items": {
+          "type": "object",
+          "required": [
+            "name",
+            "mountPath"
+          ]
+        }
+      },
+      "config": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "How the file reaches the process. The path is ONE argument or ONE environment variable, never both (decision 0002).",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Defaults to `<component>.yaml`."
+          },
+          "mountPath": {
+            "type": "string",
+            "pattern": "^/.+",
+            "description": "The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`."
+          },
+          "pathFlag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The argument that carries the path. Defaults to `-config`."
+          },
+          "pathEnv": {
+            "type": "string",
+            "minLength": 1,
+            "description": "When set, the path is passed in this environment variable instead of an argument."
+          }
+        }
+      },
+      "configMap": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "annotations": {
+            "type": "object",
+            "description": "For a ConfigMap that must be a hook resource: a pre-install job cannot mount one the release has not created yet.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "$defs": {
+      "probe": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^/"
+          },
+          "periodSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "initialDelaySeconds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "successThreshold": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "failureThreshold": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
   "https://github.com/truvity/policy/schemas/fragments/postgres.json": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/truvity/policy/schemas/fragments/postgres.json",
