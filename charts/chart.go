@@ -10,7 +10,8 @@ package charts
 
 import "embed"
 
-// Files is all THREE charts, exactly as they are published.
+// Files is all THREE charts, exactly as they are published, and the library
+// chart beside them.
 //
 // All three, because the split between them is itself part of the contract
 // — the application chart must not create what its migration migrates, and
@@ -18,5 +19,11 @@ import "embed"
 // other two created — and a test that only ever rendered a subset could not
 // see that hold.
 //
-//go:embed all:url-shortener all:url-shortener-infra all:url-shortener-e2e
+// The library chart is here twice over, deliberately: once as itself
+// (`service-lib`, the source) and once vendored inside the application chart
+// (`url-shortener/charts/service-lib`, the copy that is packaged). A test holds
+// the two equal. `testdata/service-example` is the smallest chart that follows
+// the library convention, which the library's own tests render.
+//
+//go:embed all:url-shortener all:url-shortener-infra all:url-shortener-e2e all:service-lib all:testdata/service-example
 var Files embed.FS

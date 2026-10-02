@@ -1,0 +1,70 @@
+# Every platform field set to something other than its default, and a
+# configuration that exercises what the library derives from it: a permissive
+# transport (a second port, the identity mounted), a declared secret, and a
+# file whose path reaches the process in an environment variable.
+#
+# The `config` block overrides every key the chart's own values.yaml sets, so
+# the file the library renders is exactly this block — which is the property
+# TestAFollowingChartRendersItsConfigurationVerbatim holds it to.
+platform:
+  image:
+    registry: example.io
+    repository: example/echo-custom
+    tag: "9.9.9"
+    digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  imagePullPolicy: Always
+  replicas: 3
+  strategy: {maxUnavailable: 1, maxSurge: 2}
+  resources:
+    requests: {cpu: 11m, memory: 111Mi}
+    limits: {memory: 222Mi}
+  podSecurity: {runAsUser: 1234, runAsGroup: 5678, fsGroup: 9012}
+  serviceAccount:
+    name: echo-account
+    annotations:
+      example.invalid/role: echo
+  probes:
+    liveness: {path: /live, periodSeconds: 7, failureThreshold: 4}
+    readiness: {path: /ready, periodSeconds: 3, timeoutSeconds: 2}
+    startup: {path: /ready, periodSeconds: 2, failureThreshold: 30}
+  drain: {preStopSeconds: 7}
+  tls:
+    csiDriver: example.csi.invalid
+    mountPath: /var/run/example-identity
+  telemetry:
+    serviceName: echo-service
+    endpoint: http://collector.example.invalid:4318
+    protocol: http/protobuf
+    tracesSampler: parentbased_traceidratio
+    sampleRatio: "0.25"
+    resourceAttributes:
+      deployment.example.tier: primary
+  secrets:
+    STORE_TOKEN: {secretName: example-store, key: token}
+  env:
+    - {name: EXAMPLE_CLIENT_HOST, value: client.example.invalid}
+  volumes:
+    - name: extra
+      configMap: {name: example-extra}
+  volumeMounts:
+    - {name: extra, mountPath: /etc/example-extra, readOnly: true}
+  config:
+    mountPath: /etc/echo
+    pathEnv: CONFIG_FILE
+
+config:
+  listen: {address: ":8081"}
+  probes: {address: ":7071"}
+  log: {level: debug}
+  drain: {seconds: 33}
+  greeting: hello everyone
+  store: {tokenEnv: STORE_TOKEN}
+  tls:
+    mode: permissive
+    address: ":9443"
+    certFile: /var/run/example-identity/tls.crt
+    keyFile: /var/run/example-identity/tls.key
+    caFile: /var/run/example-identity/ca.crt
+    trustDomain: example.invalid
+    peers:
+      - {namespace: other, serviceAccount: caller}

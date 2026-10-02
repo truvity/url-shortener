@@ -7,6 +7,13 @@ deletes itself on success leaves nothing to read when the NEXT one fails, and
 "what did the last successful migration do" is a question people ask during
 an incident.
 */}}
+{{- /*
+The migration is a Job, which service-lib does not render (it renders what
+runs forever), so the Job is written out here; everything a pod of this chart
+shares comes from the library all the same, so the migration cannot drift from
+the services on telemetry or on what the pod is allowed to do.
+*/}}
+{{- $spec := dict "context" $ "name" "migrate" "platform" (dict "telemetry" (.Values.otel | default dict) "podSecurity" .Values.podSecurity) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -24,15 +31,15 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "url-shortener.migrateServiceAccountName" . }}
-      {{- include "url-shortener.podSecurity" . | nindent 6 }}
+      {{- include "service-lib.podSecurityContext" $spec | nindent 6 }}
       containers:
         - name: migrate
-          image: {{ include "url-shortener.image" (dict "Values" .Values "root" $ "component" "migrate") }}
+          image: {{ include "service-lib.image" $spec }}
           imagePullPolicy: {{ .Values.pullPolicy }}
-          {{- include "url-shortener.containerSecurity" . | nindent 10 }}
+          {{- include "service-lib.containerSecurityContext" $spec | nindent 10 }}
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
-            {{- include "url-shortener.telemetryEnv" (dict "root" $ "component" "migrate") | nindent 12 }}
+            {{- include "service-lib.telemetryEnv" $spec | nindent 12 }}
             {{- include "url-shortener.dbEnv" (dict "root" $ "role" .Values.database.owner "component" "migrate") | nindent 12 }}
             {{- /* DDL can outlast the services' 30 s default, and a
             migration that is cut off half way is worse than one that is

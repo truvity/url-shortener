@@ -361,7 +361,7 @@ tls:
   # cleartext probes one every component here carries. So the rendered
   # prober configuration (templates/prober-config.yaml) always asks the
   # transport package for `strict` once this is not `off` — the same rule
-  # charts/url-shortener/templates/config.yaml states for `stat` and `web`,
+  # charts/url-shortener/templates/_components.tpl states for `stat` and `web`,
   # and for the same reason: a client either presents an identity or it
   # does not, and `permissive` is meaningless with no second listener to
   # put anywhere.
@@ -424,8 +424,8 @@ tls:
   # trust anything yet.
   #
   # This is NOT granted by the application chart the way it grants its own
-  # internal callers (charts/url-shortener/templates/config.yaml's own
-  # comment on why `urls.yaml` renders its counter's account before any
+  # internal callers (charts/url-shortener/templates/_components.tpl's own
+  # comment on why `urls.yaml` renders its callers' accounts before any
   # operator-supplied peer): that rule is for a chart wiring components IT
   # renders. This chart renders neither `urls` nor `redirect` — it is a
   # SEPARATE Helm release calling somebody else's — so it has no account of

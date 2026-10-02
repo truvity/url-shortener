@@ -1,0 +1,612 @@
+{
+  "$defs": {
+    "https://example.com/service-example/schemas/echo.json": {
+      "$id": "https://example.com/service-example/schemas/echo.json",
+      "allOf": [
+        {
+          "$ref": "https://github.com/truvity/policy/schemas/service.json"
+        }
+      ],
+      "description": "A service that answers with a greeting.",
+      "properties": {
+        "greeting": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "listen": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
+        },
+        "store": {
+          "additionalProperties": false,
+          "description": "A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`.",
+          "properties": {
+            "tokenEnv": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tokenEnv"
+          ],
+          "type": "object"
+        },
+        "tls": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"
+        }
+      },
+      "required": [
+        "listen",
+        "greeting"
+      ],
+      "title": "echo",
+      "type": "object",
+      "unevaluatedProperties": false
+    },
+    "https://github.com/truvity/policy/schemas/fragments/drain.json": {
+      "$id": "https://github.com/truvity/policy/schemas/fragments/drain.json",
+      "additionalProperties": false,
+      "description": "How long the service may take to finish in-flight work after SIGTERM. It is one number shared with whatever deploys the service: the grace period granted to the process and the pre-stop delay before it are derived from this, so that a draining process is never killed at the moment it would have finished.",
+      "properties": {
+        "seconds": {
+          "default": 20,
+          "description": "Seconds to finish in-flight work. Unset means the service's own default, which is only correct if nothing external is counting.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "title": "drain",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/fragments/listen.json": {
+      "$id": "https://github.com/truvity/policy/schemas/fragments/listen.json",
+      "additionalProperties": false,
+      "description": "A TCP listener. `address` is a host:port the service binds; an empty host binds every interface.",
+      "properties": {
+        "address": {
+          "description": "host:port, for example \":8080\" or \"127.0.0.1:8080\".",
+          "pattern": "^[^\\s]*:[0-9]{1,5}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "address"
+      ],
+      "title": "listen",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/fragments/log.json": {
+      "$id": "https://github.com/truvity/policy/schemas/fragments/log.json",
+      "additionalProperties": false,
+      "description": "Structured logging. One level for the whole service: per-package levels are deliberately not part of the contract.",
+      "properties": {
+        "level": {
+          "default": "info",
+          "description": "The lowest level that is written.",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        }
+      },
+      "title": "log",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/fragments/platform.json": {
+      "$defs": {
+        "probe": {
+          "additionalProperties": false,
+          "properties": {
+            "failureThreshold": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "initialDelaySeconds": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "pattern": "^/",
+              "type": "string"
+            },
+            "periodSeconds": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "successThreshold": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "timeoutSeconds": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$id": "https://github.com/truvity/policy/schemas/fragments/platform.json",
+      "additionalProperties": false,
+      "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as environment variables, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
+      "properties": {
+        "config": {
+          "additionalProperties": false,
+          "description": "How the file reaches the process. The path is ONE argument or ONE environment variable, never both (decision 0002).",
+          "properties": {
+            "fileName": {
+              "description": "Defaults to `<component>.yaml`.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "mountPath": {
+              "description": "The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`.",
+              "pattern": "^/.+",
+              "type": "string"
+            },
+            "pathEnv": {
+              "description": "When set, the path is passed in this environment variable instead of an argument.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "pathFlag": {
+              "description": "The argument that carries the path. Defaults to `-config`.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "configMap": {
+          "additionalProperties": false,
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "For a ConfigMap that must be a hook resource: a pre-install job cannot mount one the release has not created yet.",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "drain": {
+          "additionalProperties": false,
+          "description": "The service's own shutdown budget is `config.drain.seconds`; the library derives the grace period from it and this delay, so the three numbers cannot disagree.",
+          "properties": {
+            "preStopSeconds": {
+              "description": "Fail readiness, then wait this long before the drain starts, so that whatever routes traffic has removed this endpoint first. Defaults to 5.",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "env": {
+          "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002). A secret does not belong here; declare it in `secrets`.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "image": {
+          "additionalProperties": false,
+          "description": "Where the image is. A digest when there is one; a tag only when there is not. Left out, the library reads the chart's own top-level `images.<component>`, the map a release stamps and refuses to publish with an empty digest.",
+          "properties": {
+            "digest": {
+              "pattern": "^(sha256:[0-9a-f]{64})?$",
+              "type": "string"
+            },
+            "registry": {
+              "type": "string"
+            },
+            "repository": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repository"
+          ],
+          "type": "object"
+        },
+        "imagePullPolicy": {
+          "description": "Defaults to IfNotPresent.",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "podSecurity": {
+          "additionalProperties": false,
+          "description": "Who the process is. Every field defaults to 65532, the unprivileged user the runtime images run as; `fsGroup` is the one that matters, because a CSI driver writes what it mounts owned by root.",
+          "properties": {
+            "fsGroup": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "runAsGroup": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "runAsUser": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "probes": {
+          "additionalProperties": false,
+          "description": "How the component is probed, on the listener its own `config.probes` binds. Liveness is nothing but the process: a probe that checks a dependency restarts a healthy process and makes an outage worse.",
+          "properties": {
+            "liveness": {
+              "$ref": "#/$defs/probe"
+            },
+            "readiness": {
+              "$ref": "#/$defs/probe"
+            },
+            "startup": {
+              "$ref": "#/$defs/probe",
+              "description": "Absent means no startup probe. Present, it needs at least one field."
+            }
+          },
+          "type": "object"
+        },
+        "replicas": {
+          "description": "Defaults to 1. A service that must survive a rollout runs more than one: one instance cannot be replaced without a gap whatever the strategy says.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resources": {
+          "description": "Kubernetes' own resource requirements. Open: it is passed through unchanged.",
+          "type": "object"
+        },
+        "secrets": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "secretName": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "secretName",
+              "key"
+            ],
+            "type": "object"
+          },
+          "description": "The environment variables that carry SECRETS, and nothing else (decision 0002): variable name to the Secret and key its value comes from. The configuration file names the VARIABLE; the value never appears in a values file or a render.",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "type": "object"
+        },
+        "service": {
+          "additionalProperties": false,
+          "description": "A component that listens has a Service on the ports of its own `config.listen`; one that does not has none.",
+          "properties": {
+            "enabled": {
+              "description": "Defaults to whether `config.listen` exists. Enabling one for a component that listens on nothing is refused.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "serviceAccount": {
+          "additionalProperties": false,
+          "description": "The account this component runs as. EVERY component has its own, always; `default` is refused. The library grants nothing: annotations are where a platform binds the account to rights outside the cluster, and which mechanism does that is the platform's.",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "create": {
+              "description": "False where the platform creates the accounts; they must then exist. Defaults to true.",
+              "type": "boolean"
+            },
+            "name": {
+              "description": "Defaults to `<release>-<component>`.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "strategy": {
+          "additionalProperties": false,
+          "description": "The rolling update. The defaults make a rollout gapless: the replacement is READY before the incumbent is touched.",
+          "properties": {
+            "maxSurge": {
+              "description": "Defaults to 1.",
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "maxUnavailable": {
+              "description": "Defaults to 0.",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "telemetry": {
+          "additionalProperties": false,
+          "description": "OpenTelemetry's own environment variables (decision 0006): they leave the chart as variables, never as configuration keys. No endpoint means do not export.",
+          "properties": {
+            "endpoint": {
+              "type": "string"
+            },
+            "protocol": {
+              "enum": [
+                "grpc",
+                "http/protobuf",
+                "http/json"
+              ]
+            },
+            "resourceAttributes": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "sampleRatio": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "serviceName": {
+              "description": "Defaults to `<release>-<component>`.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "tracesSampler": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "tls": {
+          "additionalProperties": false,
+          "description": "Where the platform mounts the workload identity. The files the component's own `config.tls` names must be under `mountPath`; the render refuses a file that is not.",
+          "properties": {
+            "csiDriver": {
+              "description": "The driver that mounts the identity. The platform's, so there is no default; required once the identity is mounted.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "mount": {
+              "description": "Defaults to whether `config.tls.mode` is permissive or strict. True mounts the identity into a component that presents none of its own, because the release does; false never mounts it.",
+              "type": "boolean"
+            },
+            "mountPath": {
+              "description": "Defaults to /var/run/identity.",
+              "pattern": "^/.+",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "volumeMounts": {
+          "description": "The mounts for `volumes`, in Kubernetes' own shape.",
+          "items": {
+            "required": [
+              "name",
+              "mountPath"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "volumes": {
+          "description": "Extra pod volumes, in Kubernetes' own shape, for what a client library mounts (a trust bundle, a password file). Open: passed through unchanged.",
+          "items": {
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "title": "platform",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/fragments/probes.json": {
+      "$id": "https://github.com/truvity/policy/schemas/fragments/probes.json",
+      "additionalProperties": false,
+      "description": "The health listener. Separate from the service's own traffic, so that readiness is answerable when the service's listener is saturated, and so that a probe is not reachable from outside.",
+      "properties": {
+        "address": {
+          "description": "host:port for /health/live and /health/ready.",
+          "pattern": "^[^\\s]*:[0-9]{1,5}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "address"
+      ],
+      "title": "probes",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/fragments/tls.json": {
+      "$id": "https://github.com/truvity/policy/schemas/fragments/tls.json",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "permissive",
+                  "strict"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "certFile",
+              "keyFile",
+              "caFile",
+              "trustDomain"
+            ]
+          }
+        }
+      ],
+      "description": "Mutually authenticated transport, where the platform provides the identity. A workload presents a certificate it did not mint, reloads it without restarting, and admits peers by the account they run as rather than by the address they call from. Absent, or mode 'off', means cleartext: a service must be installable on a platform that provides none of this.",
+      "properties": {
+        "address": {
+          "description": "Where the authenticated listener binds under 'permissive', beside the cleartext one. Under 'strict' there is one listener and it is the service's own, so this is unused: the protocol changes, the address does not, and nothing downstream has to be told.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "caFile": {
+          "description": "The authority peers are verified against, distributed by the platform as a trust bundle.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "certFile": {
+          "description": "The certificate this workload presents, mounted and rotated by the platform. Re-read when it changes, never cached for the process's lifetime: a one-hour certificate outlives no deployment.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "keyFile": {
+          "description": "Its private key. It lives in the pod and never in a secret, so a workload that can read secrets in its namespace still cannot read a neighbour's key.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mode": {
+          "default": "off",
+          "description": "'off' serves cleartext only. 'permissive' serves BOTH, on two ports, so that an edge can migrate one side at a time without a coordinated window. 'strict' serves only the authenticated port. One listener cannot be both in every runtime, which is why permissive is two ports rather than one that sniffs.",
+          "enum": [
+            "off",
+            "permissive",
+            "strict"
+          ]
+        },
+        "peers": {
+          "description": "Who may call. Each entry is an ACCOUNT, not an address: an address resolves to whoever holds it today. An empty list admits no one, which is the correct default for a service nobody has been granted.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "namespace": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "serviceAccount": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "namespace",
+              "serviceAccount"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "trustDomain": {
+          "description": "The root of every identity this service will admit, for example 'example.internal'. A peer whose identity belongs to another trust domain is refused before its account is even considered.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "title": "tls",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/service.json": {
+      "$id": "https://github.com/truvity/policy/schemas/service.json",
+      "description": "The envelope every service's configuration carries. A service references this from its own schema with allOf, and adds its own properties beside it. What is in here is what EVERY component has, including a job that exits and a consumer that answers nothing: somewhere to report health, a log level, and a shutdown budget. A listener is not one of those — see docs/contracts/config.md.",
+      "properties": {
+        "drain": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/drain.json"
+        },
+        "log": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/log.json"
+        },
+        "probes": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/probes.json"
+        }
+      },
+      "required": [
+        "probes"
+      ],
+      "title": "service",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Two blocks and the image map: `platform` is the platform schema, `config` is the service's own schema, and the chart adds nothing between them.",
+  "properties": {
+    "config": {
+      "$ref": "https://example.com/service-example/schemas/echo.json"
+    },
+    "images": {
+      "additionalProperties": false,
+      "properties": {
+        "echo": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/platform.json#/properties/image"
+        }
+      },
+      "required": [
+        "echo"
+      ],
+      "type": "object"
+    },
+    "platform": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/platform.json"
+    },
+    "service-lib": {
+      "additionalProperties": false,
+      "description": "Not a value: Helm puts a key named for every sub-chart into the values it validates.",
+      "properties": {
+        "global": {
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "config",
+    "images"
+  ],
+  "title": "service-example chart values",
+  "type": "object"
+}

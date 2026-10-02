@@ -14,3 +14,13 @@ appVersion: "0.0.0"
 # renders the keys of every step up to it and compares no version.
 annotations:
   delivery.truvity.io/interface: "10"
+# The platform pieces of every component come from the library chart beside
+# this one. It is VENDORED, committed under charts/service-lib as a copy of
+# ../service-lib and held equal to it by a test (`just vendor` refreshes it):
+# `helmctl package` does not run `helm dependency update`, so a chart whose
+# library arrived only at package time would be published without it.
+# An empty repository is Helm's own form for "already in charts/".
+dependencies:
+  - name: service-lib
+    version: 0.0.0
+    repository: ""

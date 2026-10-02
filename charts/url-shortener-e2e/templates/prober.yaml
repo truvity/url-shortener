@@ -44,7 +44,7 @@ spec:
         app.kubernetes.io/component: prober
       annotations:
         # Restart on a configuration change — the same rule
-        # charts/url-shortener/templates/redirect.yaml states in full: without
+        # charts/service-lib/templates/_workload.tpl states in full: without
         # this, a `helm upgrade` that only edits the ConfigMap changes
         # nothing, because the running pod keeps the file it started with.
         checksum/config: {{ include (print $.Template.BasePath "/prober-config.yaml") . | sha256sum }}

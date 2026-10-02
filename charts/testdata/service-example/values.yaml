@@ -1,0 +1,23 @@
+# The platform's half: everything the library reads, and only that.
+platform:
+  replicas: 2
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+
+# The service's half: EXACTLY echo.schema.json, rendered into the ConfigMap
+# verbatim. Every port the pod exposes is derived from `listen` and `probes`
+# below; there is no second place to write one.
+config:
+  listen:
+    address: ":8080"
+  probes:
+    address: ":7070"
+  log:
+    level: info
+  drain:
+    seconds: 20
+  greeting: hello
+
+# Stamped by a release, so the chart is published with a digest per image.
+images:
+  echo: {registry: registry.example, repository: example/echo, tag: "", digest: ""}

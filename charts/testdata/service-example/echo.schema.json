@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/service-example/schemas/echo.json",
+  "title": "echo",
+  "description": "A service that answers with a greeting.",
+  "allOf": [
+    { "$ref": "https://github.com/truvity/policy/schemas/service.json" }
+  ],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["listen", "greeting"],
+  "properties": {
+    "listen": { "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json" },
+    "tls": { "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json" },
+    "greeting": { "type": "string", "minLength": 1 },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokenEnv"],
+      "description": "A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`.",
+      "properties": {
+        "tokenEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+      }
+    }
+  }
+}

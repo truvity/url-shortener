@@ -1,0 +1,17 @@
+apiVersion: v2
+name: service-example
+description: >-
+  The smallest chart that follows the library convention: ONE service,
+  rendered by service-lib from `platform` and `config` and nothing else. The
+  chart guide (docs/guides/charts.md) walks through it, and the library's own
+  tests render it.
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+# Not vendored here, unlike the published charts: the tests copy the library
+# in beside it (charts_test.go's chartDir), so this directory stays a few
+# lines. A chart that is published vendors it (`just vendor-charts`).
+dependencies:
+  - name: service-lib
+    version: 0.0.0
+    repository: ""

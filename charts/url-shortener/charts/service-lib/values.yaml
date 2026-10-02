@@ -1,0 +1,5 @@
+# A library chart takes no values: every template reads what the including
+# chart hands it (a `platform` and a `config`). This file exists because the
+# release tool bakes a manifest into a chart's values.yaml and refuses a chart
+# that has none.
+{}

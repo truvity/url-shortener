@@ -1,0 +1,228 @@
+---
+# Source: service-example/templates/service.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: echo-account
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: echo
+  annotations:
+    "example.invalid/role": "echo"
+
+---
+# Source: service-example/templates/service.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: r-echo-config
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: echo
+data:
+  echo.yaml: |
+    drain:
+      seconds: 33
+    greeting: hello everyone
+    listen:
+      address: :8081
+    log:
+      level: debug
+    probes:
+      address: :7071
+    store:
+      tokenEnv: STORE_TOKEN
+    tls:
+      address: :9443
+      caFile: /var/run/example-identity/ca.crt
+      certFile: /var/run/example-identity/tls.crt
+      keyFile: /var/run/example-identity/tls.key
+      mode: permissive
+      peers:
+      - namespace: other
+        serviceAccount: caller
+      trustDomain: example.invalid
+
+---
+# Source: service-example/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: r-echo
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  selector:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/component: echo
+  ports:
+    
+    - name: http
+      port: 8081
+      targetPort: http
+    - name: https
+      port: 9443
+      targetPort: https
+
+---
+# Source: service-example/templates/service.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: r-echo
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-example
+      app.kubernetes.io/instance: r
+      app.kubernetes.io/component: echo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: service-example
+        app.kubernetes.io/instance: r
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: echo
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: c050c0cc759689cb238ccd73097a2b49fa41548b3a35c3e807723e339dbf34df
+    spec:
+      serviceAccountName: echo-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1234
+        runAsGroup: 5678
+        fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 45
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: service-example
+              app.kubernetes.io/instance: r
+              app.kubernetes.io/component: echo
+      containers:
+        - name: echo
+          image: example.io/example/echo-custom@sha256:1111111111111111111111111111111111111111111111111111111111111111
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "echo-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "otlp"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
+            - name: CONFIG_FILE
+              value: "/etc/echo/echo.yaml"
+            - name: EXAMPLE_CLIENT_HOST
+              value: client.example.invalid
+            
+            - name: STORE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: example-store
+                  key: token
+          ports:
+            
+            - name: http
+              containerPort: 8081
+            - name: probes
+              containerPort: 7071
+            - name: https
+              containerPort: 9443
+          livenessProbe:
+            failureThreshold: 4
+            httpGet:
+              path: /live
+              port: probes
+            periodSeconds: 7
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: probes
+            periodSeconds: 3
+            timeoutSeconds: 2
+          startupProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /ready
+              port: probes
+            periodSeconds: 2
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 7
+          volumeMounts:
+            - name: config
+              mountPath: /etc/echo
+              readOnly: true
+            
+            - name: identity
+              mountPath: /var/run/example-identity
+              readOnly: true
+            - mountPath: /etc/example-extra
+              name: extra
+              readOnly: true
+          resources:
+            limits:
+              memory: 222Mi
+            requests:
+              cpu: 11m
+              memory: 111Mi
+      volumes:
+        - name: config
+          configMap:
+            name: r-echo-config
+        
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true
+        - configMap:
+            name: example-extra
+          name: extra

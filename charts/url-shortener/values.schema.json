@@ -15,6 +15,16 @@
     "images"
   ],
   "properties": {
+    "service-lib": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "global": {
+          "type": "object"
+        }
+      },
+      "description": "Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl."
+    },
     "installName": {
       "type": "string",
       "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."

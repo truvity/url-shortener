@@ -1,0 +1,49 @@
+{{/*
+The five long-running components, each rendered by service-lib from the
+`platform` and `config` dicts _components.tpl builds: a ConfigMap holding
+exactly the file its binary validates against its own schema at start-up, a
+Deployment, and, for the three that listen, a Service.
+
+This is the configuration contract's first rule made real: the chart and the
+binary read ONE schema, so a key this chart renders that the binary does not
+know is a test failure here rather than a default nobody chose in a cluster.
+The tests that prove it pull these files out of a render and validate them
+with the binary's schema (charts/chart_test.go).
+
+What each component is, and what its absence of a Service means:
+
+  redirect  resolves a short key and emits what happened. Its probes listener
+            is a separate port and is NOT in the Service: readiness must be
+            answerable when the service's own listener is saturated, and a
+            probe endpoint reachable from outside is an information leak.
+  urls      the service that owns the URL tables, the only one that writes
+            them. It serves ONE handler that speaks Connect, gRPC and gRPC-Web
+            on the same port: the port does not know, the content type does.
+  web       the front end. It serves a page and asks `urls`; it writes nothing
+            and holds no database credential.
+  stat      the click counter. A consumer, so no Service and no route: nothing
+            calls it, it calls the stream. It still serves probes, because an
+            orchestrator needs to know whether a consumer is alive and
+            connected to what it consumes.
+  log       the archiver, and the only component that is not Go. That changes
+            nothing here: the same probes, drain, account and configuration
+            contract. A platform that had to know which language a workload
+            was written in would be a platform every new language has to be
+            added to.
+
+The migration's file is NOT here — it is in migrate-config.yaml, as part of the
+hook. See that file for why.
+*/}}
+{{- $all := include "url-shortener.components" . | fromJson }}
+{{- range $name := list "redirect" "urls" "web" "stat" "log" }}
+{{- $c := get $all $name }}
+{{- $spec := dict "context" $ "name" $name "platform" $c.platform "config" $c.config }}
+{{ include "service-lib.configMap" $spec }}
+---
+{{ include "service-lib.deployment" $spec }}
+{{- with include "service-lib.service" $spec }}
+---
+{{ . }}
+{{- end }}
+---
+{{- end }}

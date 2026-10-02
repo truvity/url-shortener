@@ -1,0 +1,6 @@
+{{- /*
+The whole chart. One component, and the two dicts the library takes are the
+two blocks of the values, handed over as they are: nothing is mapped, added or
+renamed on the way, so what the binary reads is `.Values.config`.
+*/ -}}
+{{ include "service-lib.component" (dict "context" $ "name" "echo" "platform" .Values.platform "config" .Values.config) }}

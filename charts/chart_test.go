@@ -64,6 +64,14 @@ func chartDir(t *testing.T, chart string) string {
 			write(e.Name())
 		}
 	}
+	// The example chart that follows the library convention is NOT vendored
+	// (it is a few lines on purpose): the library is copied in beside it, as
+	// `helm dependency update` would have, so that what renders is the library
+	// as it stands rather than a copy that could be stale.
+	if err := os.CopyFS(filepath.Join(root, "testdata", "service-example", "charts", "service-lib"),
+		os.DirFS(filepath.Join(root, "service-lib"))); err != nil {
+		t.Fatal(err)
+	}
 	return filepath.Join(root, chart)
 }
 
@@ -1422,7 +1430,24 @@ func TestTheAppAccountNameIsLogsAndOnlyLogs(t *testing.T) {
 	}
 
 	// The cloud-binding annotation lands on log's account alone.
-	if n := strings.Count(out, "example.invalid/role: archive"); n != 1 {
+	n := 0
+	for _, doc := range strings.Split(out, "\n---\n") {
+		var sa struct {
+			Kind     string
+			Metadata struct {
+				Name        string
+				Annotations map[string]string
+			}
+		}
+		unmarshalYAML(t, []byte(doc), &sa)
+		if sa.Kind == "ServiceAccount" && sa.Metadata.Annotations["example.invalid/role"] == "archive" {
+			n++
+			if sa.Metadata.Name != "archiver" {
+				t.Errorf("the app annotations are on %q, not log's account", sa.Metadata.Name)
+			}
+		}
+	}
+	if n != 1 {
 		t.Errorf("the app annotations are on %d accounts, want 1 (log's)", n)
 	}
 }
@@ -1568,28 +1593,92 @@ func TestTheDatabaseIsParts(t *testing.T) {
 			t.Errorf("%q rendered: the connection is parts, and the password is a file", unwanted)
 		}
 	}
-	for _, doc := range strings.Split(out, "\n---\n") {
-		if !strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job") {
+	dialing := 0
+	for name, doc := range workloadsOf(t, out) {
+		if !dialsTheDatabase(name) {
 			continue
 		}
-		dials := strings.Contains(doc, "app.kubernetes.io/component: urls") ||
-			strings.Contains(doc, "app.kubernetes.io/component: redirect") ||
-			strings.Contains(doc, "name: example-migrate")
-		if !dials {
-			continue
-		}
-		for _, want := range []string{
-			"- name: PGHOST\n              value: \"example-pg-rw.shop.svc." + "cluster." + "local\"",
-			"- name: PGDATABASE\n              value: \"url_shortener\"",
-			"- name: PGSSLMODE\n              value: verify-full",
-			"- name: PGSSLROOTCERT\n              value: /etc/url-shortener-pg-ca/ca-certificates.crt",
-			"- name: CNPG_CLIENT_PASSWORD_FILE\n              value: /etc/url-shortener-pg-password/password",
+		dialing++
+		env := telemetryEnvOf(t, doc)
+		for key, want := range map[string]string{
+			"PGHOST":                    "example-pg-rw.shop.svc." + "cluster." + "local",
+			"PGDATABASE":                "url_shortener",
+			"PGSSLMODE":                 "verify-full",
+			"PGSSLROOTCERT":             "/etc/url-shortener-pg-ca/ca-certificates.crt",
+			"CNPG_CLIENT_PASSWORD_FILE": "/etc/url-shortener-pg-password/password",
 		} {
-			if !strings.Contains(doc, want) {
-				t.Errorf("a workload that dials the database lacks %q:\n%s", want, doc)
+			if env[key] != want {
+				t.Errorf("%s: %s is %q, want %q", name, key, env[key], want)
 			}
 		}
 	}
+	if dialing != 3 {
+		t.Errorf("found %d workloads that dial the database, want 3 (urls, redirect, migrate)", dialing)
+	}
+}
+
+// dialsTheDatabase says whether a workload (by name, in a release called
+// "example") is one of the three that hold a database connection.
+func dialsTheDatabase(name string) bool {
+	return name == "example-urls" || name == "example-redirect" || name == "example-migrate"
+}
+
+// workloadsOf parses a render and returns every Deployment and Job by name.
+// The tests that follow ask what a workload is HANDED, not how the YAML that
+// says so happens to be spelled: a quoting or indentation change in a
+// template is not a change to any of the properties below.
+func workloadsOf(t *testing.T, out string) map[string]map[string]any {
+	t.Helper()
+
+	got := map[string]map[string]any{}
+	for _, doc := range documents(t, out) {
+		if kind, _ := doc["kind"].(string); kind != "Deployment" && kind != "Job" {
+			continue
+		}
+		meta, _ := doc["metadata"].(map[string]any)
+		name, _ := meta["name"].(string)
+		got[name] = doc
+	}
+
+	return got
+}
+
+// podOf is a workload's pod spec.
+func podOf(doc map[string]any) map[string]any {
+	spec, _ := doc["spec"].(map[string]any)
+	template, _ := spec["template"].(map[string]any)
+	pod, _ := template["spec"].(map[string]any)
+
+	return pod
+}
+
+// mountPathsOf is every path any container of a workload mounts something at.
+func mountPathsOf(doc map[string]any) []string {
+	var paths []string
+	containers, _ := podOf(doc)["containers"].([]any)
+	for _, c := range containers {
+		mounts, _ := c.(map[string]any)["volumeMounts"].([]any)
+		for _, m := range mounts {
+			path, _ := m.(map[string]any)["mountPath"].(string)
+			paths = append(paths, path)
+		}
+	}
+
+	return paths
+}
+
+// secretNamesOf is every Secret a workload's volumes read.
+func secretNamesOf(doc map[string]any) []string {
+	var names []string
+	volumes, _ := podOf(doc)["volumes"].([]any)
+	for _, v := range volumes {
+		secret, _ := v.(map[string]any)["secret"].(map[string]any)
+		if name, ok := secret["secretName"].(string); ok {
+			names = append(names, name)
+		}
+	}
+
+	return names
 }
 
 // Each workload logs in as ITS role, with that role's Secret, and no other:
@@ -1599,31 +1688,27 @@ func TestEachWorkloadGetsItsOwnRolesCredential(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	workloads := workloadsOf(t, out)
 	for _, tc := range []struct {
-		marker, role, secret, other string
+		workload, role, secret string
 	}{
-		{"app.kubernetes.io/component: urls", "url_shortener_app", "example-pg-runtime", "example-pg-app"},
-		{"app.kubernetes.io/component: redirect", "url_shortener_app", "example-pg-runtime", "example-pg-app"},
-		{"name: example-migrate", "url_shortener_owner", "example-pg-app", "example-pg-runtime"},
+		{"example-urls", "url_shortener_app", "example-pg-runtime"},
+		{"example-redirect", "url_shortener_app", "example-pg-runtime"},
+		{"example-migrate", "url_shortener_owner", "example-pg-app"},
 	} {
-		var found bool
-		for _, doc := range strings.Split(out, "\n---\n") {
-			if !strings.Contains(doc, tc.marker) || (!strings.Contains(doc, "kind: Deployment") && !strings.Contains(doc, "kind: Job")) {
-				continue
-			}
-			found = true
-			if !strings.Contains(doc, "- name: PGUSER\n              value: \""+tc.role+"\"") {
-				t.Errorf("%s: PGUSER is not %s", tc.marker, tc.role)
-			}
-			if !strings.Contains(doc, "secretName: "+tc.secret) || strings.Contains(doc, tc.other) {
-				t.Errorf("%s: the password Secret is not exactly %s", tc.marker, tc.secret)
-			}
-			if !strings.Contains(doc, "path: password") {
-				t.Errorf("%s: the password is not projected to a file", tc.marker)
-			}
+		doc, ok := workloads[tc.workload]
+		if !ok {
+			t.Errorf("no workload named %q", tc.workload)
+			continue
 		}
-		if !found {
-			t.Errorf("no workload matched %q", tc.marker)
+		if got := telemetryEnvOf(t, doc)["PGUSER"]; got != tc.role {
+			t.Errorf("%s: PGUSER is %q, not %s", tc.workload, got, tc.role)
+		}
+		if got := secretNamesOf(doc); len(got) != 1 || got[0] != tc.secret {
+			t.Errorf("%s: the password Secrets are %v, not exactly %s", tc.workload, got, tc.secret)
+		}
+		if !strings.Contains(fmt.Sprint(podOf(doc)["volumes"]), "path:password") {
+			t.Errorf("%s: the password is not projected to a file", tc.workload)
 		}
 	}
 }
@@ -1675,15 +1760,32 @@ func TestDatabaseHostAndRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("does not render: %v\n%s", err, out)
 	}
-	if n := strings.Count(out, "value: \"example-pg-rw.shop.svc.cluster.example\""); n != 3 {
-		t.Errorf("the qualified host is set %d times, want 3 (urls, redirect, migrate)", n)
+	hosts, roots, passwords := 0, 0, 0
+	for name, doc := range workloadsOf(t, out) {
+		if telemetryEnvOf(t, doc)["PGHOST"] == "example-pg-rw.shop.svc.cluster.example" {
+			hosts++
+		}
+		for _, path := range mountPathsOf(doc) {
+			switch path {
+			case "/etc/url-shortener-pg-ca":
+				roots++
+			case "/etc/url-shortener-pg-password":
+				passwords++
+			}
+		}
+		if !dialsTheDatabase(name) && (telemetryEnvOf(t, doc)["PGHOST"] != "" || len(secretNamesOf(doc)) != 0) {
+			t.Errorf("%s holds a database connection or a password, and does not dial the database", name)
+		}
+	}
+	if hosts != 3 {
+		t.Errorf("the qualified host is set %d times, want 3 (urls, redirect, migrate)", hosts)
 	}
 	// urls, redirect, migrate: each mounts it; nothing else does.
-	if n := strings.Count(out, "mountPath: /etc/url-shortener-pg-ca"); n != 3 {
-		t.Errorf("the root is mounted %d times, want 3 (urls, redirect, migrate)", n)
+	if roots != 3 {
+		t.Errorf("the root is mounted %d times, want 3 (urls, redirect, migrate)", roots)
 	}
-	if n := strings.Count(out, "mountPath: /etc/url-shortener-pg-password"); n != 3 {
-		t.Errorf("a password is mounted %d times, want 3 (urls, redirect, migrate)", n)
+	if passwords != 3 {
+		t.Errorf("a password is mounted %d times, want 3 (urls, redirect, migrate)", passwords)
 	}
 	if strings.Contains(out, "subPath") {
 		t.Error("a subPath mount does not follow a rotation of the ConfigMap or the Secret")
@@ -1694,8 +1796,10 @@ func TestDatabaseHostAndRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "value: \"pg-rw.db.svc.example\"") {
-		t.Error("a qualified host was rewritten")
+	for name, doc := range workloadsOf(t, out) {
+		if dialsTheDatabase(name) && telemetryEnvOf(t, doc)["PGHOST"] != "pg-rw.db.svc.example" {
+			t.Errorf("%s: a qualified host was rewritten to %q", name, telemetryEnvOf(t, doc)["PGHOST"])
+		}
 	}
 }
 
@@ -1736,10 +1840,15 @@ func TestTheContentSecurityPolicyReachesTheFrontEndConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
-	for _, want := range []string{"csp:", "mode: enforce", `connectSrc: ["https://collector.example"]`} {
-		if !strings.Contains(out, want) {
-			t.Errorf("the render lacks %q", want)
+	var web struct {
+		Csp struct {
+			Mode       string
+			ConnectSrc []string `yaml:"connectSrc"`
 		}
+	}
+	unmarshalYAML(t, conformance.ConfigMapData(t, []byte(out), "web.yaml"), &web)
+	if web.Csp.Mode != "enforce" || len(web.Csp.ConnectSrc) != 1 || web.Csp.ConnectSrc[0] != "https://collector.example" {
+		t.Errorf("web.yaml's csp is %+v, want mode enforce and connectSrc [https://collector.example]", web.Csp)
 	}
 }
 
@@ -1769,10 +1878,16 @@ func TestBrowserTelemetryIsOffByDefaultAndRendersWhenEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
-	for _, want := range []string{"faro:", "enabled: true", `collectorUrl: "https://collector.example/collect"`, "sampleRate: 0.5"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("the render lacks %q", want)
+	var web struct {
+		Faro struct {
+			Enabled      bool
+			CollectorURL string  `yaml:"collectorUrl"`
+			SampleRate   float64 `yaml:"sampleRate"`
 		}
+	}
+	unmarshalYAML(t, conformance.ConfigMapData(t, []byte(out), "web.yaml"), &web)
+	if !web.Faro.Enabled || web.Faro.CollectorURL != "https://collector.example/collect" || web.Faro.SampleRate != 0.5 {
+		t.Errorf("web.yaml's faro is %+v, want enabled with the collector given and a sample rate of 0.5", web.Faro)
 	}
 }
 
@@ -1781,8 +1896,14 @@ func TestBrowserTelemetryDefaultsToTheSameOriginPathAndRefusesPlainHTTP(t *testi
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, `collectorUrl: "/faro/collect"`) {
-		t.Errorf("the collector is not the same-origin default:\n%s", out)
+	var web struct {
+		Faro struct {
+			CollectorURL string `yaml:"collectorUrl"`
+		}
+	}
+	unmarshalYAML(t, conformance.ConfigMapData(t, []byte(out), "web.yaml"), &web)
+	if web.Faro.CollectorURL != "/faro/collect" {
+		t.Errorf("the collector is %q, not the same-origin default", web.Faro.CollectorURL)
 	}
 	if out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", "web.faro.enabled=true",
 		"--set", "web.faro.collectorUrl=http://plain.example")...); err == nil {

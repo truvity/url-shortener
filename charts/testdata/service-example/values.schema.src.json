@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "service-example chart values",
+  "description": "Two blocks and the image map: `platform` is the platform schema, `config` is the service's own schema, and the chart adds nothing between them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["config", "images"],
+  "properties": {
+    "service-lib": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "global": { "type": "object" } },
+      "description": "Not a value: Helm puts a key named for every sub-chart into the values it validates."
+    },
+    "platform": { "$ref": "https://github.com/truvity/policy/schemas/fragments/platform.json" },
+    "config": { "$ref": "echo.schema.json" },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["echo"],
+      "properties": {
+        "echo": { "$ref": "https://github.com/truvity/policy/schemas/fragments/platform.json#/properties/image" }
+      }
+    }
+  }
+}

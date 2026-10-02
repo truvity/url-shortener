@@ -37,8 +37,8 @@ Three of these are not written in Go, and that is the point of them rather
 than a detail. Each reads a configuration file this chart rendered,
 validated against a schema it carries itself; each serves the same probes on
 the same port; each drains on SIGTERM within the same number the chart gives
-the platform; and each deployment is [twenty lines that never mention the
-language](charts/url-shortener/templates/log.yaml). A platform that had to
+the platform; and each deployment is the same [library template](charts/service-lib/templates/_workload.tpl)
+that never mentions the language. A platform that had to
 know which language a workload was written in would be a platform every new
 language has to be added to.
 
@@ -149,13 +149,24 @@ commit the bundle was built from, baked in at build time (`BUILD_ID` overrides
 it where there is no checkout), which is also the release a source map is
 looked up by.
 
-## Three charts
+## Three charts, and the library they render with
 
 | Chart | Installs | Who installs it |
 |---|---|---|
 | [`url-shortener`](charts/url-shortener) | the six components, their configuration, probes, rollout and route | whoever installs the example |
 | [`url-shortener-infra`](charts/url-shortener-infra) | what one install owns: its database and roles, its stream, and — at `tier: primary` — its store and the identity that reaches it | the same caller, once per install, with the same release name |
 | [`url-shortener-e2e`](charts/url-shortener-e2e) | the end-to-end suite as a Job, and an optional always-on prober | whoever wants the install proved where it runs |
+
+A fourth, [`service-lib`](charts/service-lib), is a **library chart** and is
+installed by nobody: it renders what every component of the first chart shares
+(a Deployment, a ServiceAccount of its own, a Service, the probes, the mounts,
+the telemetry and secret variables) from a `platform` block and a `config`
+block, with every port derived from the component's own configuration file. It is released beside the others and
+vendored inside `url-shortener`; [the chart guide](../../docs/guides/charts.md)
+says how, and [`charts/testdata/service-example`](charts/testdata/service-example)
+is the smallest chart that follows it exactly. `url-shortener` is the one
+exception the convention names, a product chart that derives each component's
+configuration from the release.
 
 The database and the stream are a **second chart**, not a flag, because the
 application's migration runs as a pre-install hook: a chart that created its

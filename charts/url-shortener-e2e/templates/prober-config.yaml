@@ -1,6 +1,6 @@
 {{/*
 The prober's own configuration file, on the same terms as
-charts/url-shortener/templates/config.yaml: exactly the file the binary
+charts/url-shortener/templates/components.yaml: exactly the file the binary
 validates against its own schema at start-up
 (examples/url-shortener/schemas/prober.json) — see chart_test.go's
 TestWhatTheE2EChartRendersIsWhatTheProberBinaryAccepts.
@@ -32,7 +32,7 @@ data:
     tls:
       {{- /*
       `strict` whenever this is on at all — the SAME rule
-      charts/url-shortener/templates/config.yaml states for `stat` and
+      charts/url-shortener/templates/_components.tpl states for `stat` and
       `web`: the prober SERVES nothing over this transport (its only
       listener is the cleartext probes one above), so for the calls it
       makes there is no second listener a `permissive` address could ever

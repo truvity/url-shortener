@@ -1,0 +1,167 @@
+---
+# Source: service-example/templates/service.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: r-echo
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: echo
+
+---
+# Source: service-example/templates/service.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: r-echo-config
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: echo
+data:
+  echo.yaml: |
+    drain:
+      seconds: 20
+    greeting: hello
+    listen:
+      address: :8080
+    log:
+      level: info
+    probes:
+      address: :7070
+
+---
+# Source: service-example/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: r-echo
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  selector:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/component: echo
+  ports:
+    
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: service-example/templates/service.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: r-echo
+  labels:
+    app.kubernetes.io/name: service-example
+    app.kubernetes.io/instance: r
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-example
+      app.kubernetes.io/instance: r
+      app.kubernetes.io/component: echo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: service-example
+        app.kubernetes.io/instance: r
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: echo
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 7ba5f605ad61fd49df31da7adb4b16413b6a964c4b8241ea2d695d7eba4ed02d
+    spec:
+      serviceAccountName: r-echo
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: service-example
+              app.kubernetes.io/instance: r
+              app.kubernetes.io/component: echo
+      containers:
+        - name: echo
+          image: registry.example/example/echo:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/service-example/echo.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "r-echo"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            
+          ports:
+            
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/service-example
+              readOnly: true
+            
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: r-echo-config

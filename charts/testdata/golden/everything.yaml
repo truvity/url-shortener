@@ -101,156 +101,210 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/component: log
   annotations:
-    example.invalid/role: app
+    "example.invalid/role": "app"
 
 ---
-# Source: url-shortener/templates/config.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: example-config
+  name: example-redirect-config
   labels:
     app.kubernetes.io/name: url-shortener
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: redirect
 data:
   redirect.yaml: |
-    listen:
-      address: ":8080"
-    probes:
-      address: ":7070"
-    log:
-      level: debug
     drain:
       seconds: 33
-    tls:
-      mode: permissive
-      address: ":9443"
-      certFile: /var/run/example-identity/tls.crt
-      keyFile: /var/run/example-identity/tls.key
-      caFile: /var/run/example-identity/ca.crt
-      trustDomain: example.invalid
-      peers:
-        - namespace: other
-          serviceAccount: caller
     events:
       nats:
         url: nats://broker.example.svc:4222
       redirectSubject: default-example-install.redirect
       requestSubject: default-example-install.log
+    listen:
+      address: :8080
+    log:
+      level: debug
+    probes:
+      address: :7070
+    tls:
+      address: :9443
+      caFile: /var/run/example-identity/ca.crt
+      certFile: /var/run/example-identity/tls.crt
+      keyFile: /var/run/example-identity/tls.key
+      mode: permissive
+      peers:
+      - namespace: other
+        serviceAccount: caller
+      trustDomain: example.invalid
 
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-urls-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: urls
+data:
   urls.yaml: |
+    drain:
+      seconds: 33
     listen:
-      address: ":8080"
-    probes:
-      address: ":7070"
+      address: :8080
     log:
       level: debug
-    drain:
-      seconds: 33
-    tls:
-      mode: strict
-      certFile: /var/run/example-identity/tls.crt
-      keyFile: /var/run/example-identity/tls.key
-      caFile: /var/run/example-identity/ca.crt
-      trustDomain: example.invalid
-      peers:
-        - namespace: default
-          serviceAccount: example-web
-        - namespace: default
-          serviceAccount: example-stat
-        - namespace: other
-          serviceAccount: reader
-
-  stat.yaml: |
     probes:
-      address: ":7070"
-    log:
-      level: debug
-    drain:
-      seconds: 33
+      address: :7070
     tls:
-      mode: strict
+      caFile: /var/run/example-identity/ca.crt
       certFile: /var/run/example-identity/tls.crt
       keyFile: /var/run/example-identity/tls.key
-      caFile: /var/run/example-identity/ca.crt
-      trustDomain: example.invalid
+      mode: strict
       peers:
-        - namespace: default
-          serviceAccount: example-urls
-    urls:
-      address: https://example-urls:8080
-    events:
-      nats:
-        url: nats://broker.example.svc:4222
-      consumer:
-        stream: default-example-install-events
-        durable: default-example-install-stat
-        subject: default-example-install.redirect
+      - namespace: default
+        serviceAccount: example-web
+      - namespace: default
+        serviceAccount: example-stat
+      - namespace: other
+        serviceAccount: reader
+      trustDomain: example.invalid
 
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-web-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: web
+data:
   web.yaml: |
-    listen:
-      address: ":8080"
-    probes:
-      address: ":7070"
-    log:
-      level: debug
-    drain:
-      seconds: 33
-    csp:
-      mode: enforce
-      connectSrc: ["https://collector.example"]
-      reportUri: "/csp-report"
-    faro:
-      enabled: true
-      collectorUrl: "https://collector.example/collect"
-      apiKey: "public-app-key"
-      appName: "example-web"
-      environment: "example"
-      sampleRate: 0.25
-    tls:
-      mode: strict
-      certFile: /var/run/example-identity/tls.crt
-      keyFile: /var/run/example-identity/tls.key
-      caFile: /var/run/example-identity/ca.crt
-      trustDomain: example.invalid
-      peers:
-        - namespace: default
-          serviceAccount: example-urls
-    urls:
-      address: https://example-urls:8080
     assets:
       directory: /app/assets
-
-  log.yaml: |
-    probes:
-      address: ":7070"
+    csp:
+      connectSrc:
+      - https://collector.example
+      mode: enforce
+      reportUri: /csp-report
+    drain:
+      seconds: 33
+    faro:
+      apiKey: public-app-key
+      appName: example-web
+      collectorUrl: https://collector.example/collect
+      enabled: true
+      environment: example
+      sampleRate: 0.25
+    listen:
+      address: :8080
     log:
       level: debug
+    probes:
+      address: :7070
+    tls:
+      caFile: /var/run/example-identity/ca.crt
+      certFile: /var/run/example-identity/tls.crt
+      keyFile: /var/run/example-identity/tls.key
+      mode: strict
+      peers:
+      - namespace: default
+        serviceAccount: example-urls
+      trustDomain: example.invalid
+    urls:
+      address: https://example-urls:8080
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-stat-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: stat
+data:
+  stat.yaml: |
     drain:
       seconds: 33
     events:
+      consumer:
+        durable: default-example-install-stat
+        stream: default-example-install-events
+        subject: default-example-install.redirect
       nats:
         url: nats://broker.example.svc:4222
-      consumer:
-        stream: default-example-install-events
-        durable: default-example-install-log
-        subject: default-example-install.log
+    log:
+      level: debug
+    probes:
+      address: :7070
+    tls:
+      caFile: /var/run/example-identity/ca.crt
+      certFile: /var/run/example-identity/tls.crt
+      keyFile: /var/run/example-identity/tls.key
+      mode: strict
+      peers:
+      - namespace: default
+        serviceAccount: example-urls
+      trustDomain: example.invalid
+    urls:
+      address: https://example-urls:8080
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-log-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: log
+data:
+  log.yaml: |
     archive:
-      bucket:
-        name: example-archive
-        region: eu-west-1
-        endpoint: https://s3.example.invalid
-        ca: /var/run/store/ca.crt
-        pathStyle: true
-        credentialsEnv:
-          accessKeyID: S3_ACCESS_KEY_ID
-          secretAccessKey: S3_SECRET_ACCESS_KEY
-      prefix: example/requests
       batch:
         maxRecords: 7
         maxSeconds: 11
+      bucket:
+        ca: /var/run/store/ca.crt
+        credentialsEnv:
+          accessKeyID: S3_ACCESS_KEY_ID
+          secretAccessKey: S3_SECRET_ACCESS_KEY
+        endpoint: https://s3.example.invalid
+        name: example-archive
+        pathStyle: true
+        region: eu-west-1
+      prefix: example/requests
+    drain:
+      seconds: 33
+    events:
+      consumer:
+        durable: default-example-install-log
+        stream: default-example-install-events
+        subject: default-example-install.log
+      nats:
+        url: nats://broker.example.svc:4222
+    log:
+      level: debug
+    probes:
+      address: :7070
 
 ---
 # Source: url-shortener/templates/identity-rbac.yaml
@@ -301,7 +355,7 @@ subjects:
     namespace: default
 
 ---
-# Source: url-shortener/templates/redirect.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -317,6 +371,7 @@ spec:
     app.kubernetes.io/instance: example
     app.kubernetes.io/component: redirect
   ports:
+    
     - name: http
       port: 8080
       targetPort: http
@@ -325,7 +380,7 @@ spec:
       targetPort: https
 
 ---
-# Source: url-shortener/templates/urls.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -341,12 +396,13 @@ spec:
     app.kubernetes.io/instance: example
     app.kubernetes.io/component: urls
   ports:
+    
     - name: http
       port: 8080
       targetPort: http
 
 ---
-# Source: url-shortener/templates/web.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -362,144 +418,13 @@ spec:
     app.kubernetes.io/instance: example
     app.kubernetes.io/component: web
   ports:
+    
     - name: http
       port: 8080
       targetPort: http
 
 ---
-# Source: url-shortener/templates/log.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: example-log
-  labels:
-    app.kubernetes.io/name: url-shortener
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
-spec:
-  replicas: 5
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      # The replacement is READY before the incumbent is touched.
-      maxUnavailable: 0
-      maxSurge: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: url-shortener
-      app.kubernetes.io/instance: example
-      app.kubernetes.io/component: log
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: url-shortener
-        app.kubernetes.io/instance: example
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/version: "0.0.0"
-        app.kubernetes.io/component: log
-      annotations:
-        checksum/config: bfb618a24fdcb05ae91f532dc0749dddcf34f14c4667c69d9d2aa4a957df177d
-    spec:
-      serviceAccountName: app-account
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1234
-        runAsGroup: 5678
-        fsGroup: 9012
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 45
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: url-shortener
-              app.kubernetes.io/instance: example
-              app.kubernetes.io/component: log
-      containers:
-        - name: log
-          image: example.io/shortener/log@sha256:5555555555555555555555555555555555555555555555555555555555555555
-          imagePullPolicy: Always
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          args: ["-config", "/etc/url-shortener/log.yaml"]
-          env:
-            - name: OTEL_SERVICE_NAME
-              value: "example-log"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://collector.example.invalid:4318"
-            - name: OTEL_EXPORTER_OTLP_PROTOCOL
-              value: "http/protobuf"
-            - name: OTEL_TRACES_EXPORTER
-              value: "otlp"
-            - name: OTEL_METRICS_EXPORTER
-              value: "otlp"
-            - name: OTEL_LOGS_EXPORTER
-              value: "none"
-            - name: OTEL_TRACES_SAMPLER
-              value: "parentbased_traceidratio"
-            - name: OTEL_TRACES_SAMPLER_ARG
-              value: "0.25"
-            - name: OTEL_RESOURCE_ATTRIBUTES
-              value: deployment.example.tier=primary
-            # The NAMES are in the configuration file; the values are here,
-            # from a Secret, and appear in nothing that is rendered, printed
-            # or committed.
-            - name: S3_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: archive-secret
-                  key: id-key
-            - name: S3_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: archive-secret
-                  key: secret-key
-          ports:
-            - name: probes
-              containerPort: 7070
-          livenessProbe:
-            httpGet: { path: /health/live, port: probes }
-            periodSeconds: 10
-          readinessProbe:
-            httpGet: { path: /health/ready, port: probes }
-            periodSeconds: 5
-          lifecycle:
-            preStop:
-              sleep:
-                seconds: 7
-          volumeMounts:
-            
-            - name: config
-              mountPath: /etc/url-shortener
-              readOnly: true
-            
-            - name: identity
-              mountPath: /var/run/example-identity
-              readOnly: true
-          resources:
-            requests:
-              cpu: 33m
-              memory: 333Mi
-      volumes:
-        
-        - name: config
-          configMap:
-            name: example-config
-        
-        - name: identity
-          csi:
-            driver: example.csi.invalid
-            readOnly: true
-
----
-# Source: url-shortener/templates/redirect.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -514,9 +439,6 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      # The replacement is READY before the incumbent is touched.
-      # The default is 25%, which on two replicas means one goes
-      # away first.
       maxUnavailable: 0
       maxSurge: 1
   selector:
@@ -536,7 +458,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: bfb618a24fdcb05ae91f532dc0749dddcf34f14c4667c69d9d2aa4a957df177d
+        checksum/config: 2e0e94cac37a9b8e110659b1516fb7298ce64ae5fffb8ca24a96a11b766d1757
     spec:
       serviceAccountName: example-redirect
       securityContext:
@@ -586,13 +508,13 @@ spec:
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
             - name: PGHOST
-              value: "pg-rw.default.svc.cluster.example"
+              value: pg-rw.default.svc.cluster.example
             - name: PGPORT
               value: "5432"
             - name: PGDATABASE
-              value: "shortener"
+              value: shortener
             - name: PGUSER
-              value: "app_role"
+              value: app_role
             - name: PGSSLMODE
               value: verify-full
             - name: PGSSLROOTCERT
@@ -600,192 +522,72 @@ spec:
             - name: CNPG_CLIENT_PASSWORD_FILE
               value: /etc/url-shortener-pg-password/password
             - name: PGAPPNAME
-              value: "example-redirect"
+              value: example-redirect
             - name: CNPG_CLIENT_POOL_MAX
               value: "10"
+            
           ports:
+            
             - name: http
               containerPort: 8080
             - name: probes
               containerPort: 7070
-            
             - name: https
               containerPort: 9443
           livenessProbe:
-            # Nothing but the process. A liveness probe that checks a
-            # dependency restarts a healthy process and makes an outage worse.
-            httpGet: { path: /health/live, port: probes }
+            httpGet:
+              path: /health/live
+              port: probes
             periodSeconds: 10
           readinessProbe:
-            httpGet: { path: /health/ready, port: probes }
+            httpGet:
+              path: /health/ready
+              port: probes
             periodSeconds: 5
           lifecycle:
             preStop:
               sleep:
                 seconds: 7
           volumeMounts:
-            
-            - name: database-ca
-              mountPath: /etc/url-shortener-pg-ca
-              readOnly: true
-            - name: database-password
-              mountPath: /etc/url-shortener-pg-password
-              readOnly: true
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
             
             - name: identity
               mountPath: /var/run/example-identity
+              readOnly: true
+            - mountPath: /etc/url-shortener-pg-ca
+              name: database-ca
+              readOnly: true
+            - mountPath: /etc/url-shortener-pg-password
+              name: database-password
               readOnly: true
           resources:
             requests:
               cpu: 11m
               memory: 111Mi
       volumes:
-        
-        - name: database-ca
+        - name: config
           configMap:
+            name: example-redirect-config
+        
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true
+        - configMap:
             name: example-root-ca
+          name: database-ca
         - name: database-password
           secret:
-            secretName: app-secret
-            defaultMode: 0440
+            defaultMode: 288
             items:
-              - key: app-key
-                path: password
-        - name: config
-          configMap:
-            name: example-config
-        
-        - name: identity
-          csi:
-            driver: example.csi.invalid
-            readOnly: true
+            - key: app-key
+              path: password
+            secretName: app-secret
 
 ---
-# Source: url-shortener/templates/stat.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: example-stat
-  labels:
-    app.kubernetes.io/name: url-shortener
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
-spec:
-  replicas: 4
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      # The replacement is READY before the incumbent is touched.
-      # The default is 25%, which on two replicas means one goes
-      # away first.
-      maxUnavailable: 0
-      maxSurge: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: url-shortener
-      app.kubernetes.io/instance: example
-      app.kubernetes.io/component: stat
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: url-shortener
-        app.kubernetes.io/instance: example
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/version: "0.0.0"
-        app.kubernetes.io/component: stat
-      annotations:
-        checksum/config: bfb618a24fdcb05ae91f532dc0749dddcf34f14c4667c69d9d2aa4a957df177d
-    spec:
-      serviceAccountName: example-stat
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1234
-        runAsGroup: 5678
-        fsGroup: 9012
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 45
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: url-shortener
-              app.kubernetes.io/instance: example
-              app.kubernetes.io/component: stat
-      containers:
-        - name: stat
-          image: example.io/shortener/stat@sha256:4444444444444444444444444444444444444444444444444444444444444444
-          imagePullPolicy: Always
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          args: ["-config", "/etc/url-shortener/stat.yaml"]
-          env:
-            - name: OTEL_SERVICE_NAME
-              value: "example-stat"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://collector.example.invalid:4318"
-            - name: OTEL_EXPORTER_OTLP_PROTOCOL
-              value: "http/protobuf"
-            - name: OTEL_TRACES_EXPORTER
-              value: "otlp"
-            - name: OTEL_METRICS_EXPORTER
-              value: "otlp"
-            - name: OTEL_LOGS_EXPORTER
-              value: "none"
-            - name: OTEL_TRACES_SAMPLER
-              value: "parentbased_traceidratio"
-            - name: OTEL_TRACES_SAMPLER_ARG
-              value: "0.25"
-            - name: OTEL_RESOURCE_ATTRIBUTES
-              value: deployment.example.tier=primary
-          ports:
-            - name: probes
-              containerPort: 7070
-          livenessProbe:
-            httpGet: { path: /health/live, port: probes }
-            periodSeconds: 10
-          readinessProbe:
-            httpGet: { path: /health/ready, port: probes }
-            periodSeconds: 5
-          lifecycle:
-            preStop:
-              sleep:
-                seconds: 7
-          volumeMounts:
-            
-            - name: config
-              mountPath: /etc/url-shortener
-              readOnly: true
-            
-            - name: identity
-              mountPath: /var/run/example-identity
-              readOnly: true
-          resources:
-            requests:
-              cpu: 22m
-              memory: 222Mi
-      volumes:
-        
-        - name: config
-          configMap:
-            name: example-config
-        
-        - name: identity
-          csi:
-            driver: example.csi.invalid
-            readOnly: true
-
----
-# Source: url-shortener/templates/urls.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -800,7 +602,6 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      # The replacement is READY before the incumbent is touched.
       maxUnavailable: 0
       maxSurge: 1
   selector:
@@ -817,7 +618,10 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: urls
       annotations:
-        checksum/config: bfb618a24fdcb05ae91f532dc0749dddcf34f14c4667c69d9d2aa4a957df177d
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 58c33285b7a22dcb6201e7002e30e492e2d5a7c79f79287e89b1c3651b940c65
     spec:
       serviceAccountName: example-urls
       securityContext:
@@ -867,13 +671,13 @@ spec:
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
             - name: PGHOST
-              value: "pg-rw.default.svc.cluster.example"
+              value: pg-rw.default.svc.cluster.example
             - name: PGPORT
               value: "5432"
             - name: PGDATABASE
-              value: "shortener"
+              value: shortener
             - name: PGUSER
-              value: "app_role"
+              value: app_role
             - name: PGSSLMODE
               value: verify-full
             - name: PGSSLROOTCERT
@@ -881,19 +685,25 @@ spec:
             - name: CNPG_CLIENT_PASSWORD_FILE
               value: /etc/url-shortener-pg-password/password
             - name: PGAPPNAME
-              value: "example-urls"
+              value: example-urls
             - name: CNPG_CLIENT_POOL_MAX
               value: "20"
+            
           ports:
+            
             - name: http
               containerPort: 8080
             - name: probes
               containerPort: 7070
           livenessProbe:
-            httpGet: { path: /health/live, port: probes }
+            httpGet:
+              path: /health/live
+              port: probes
             periodSeconds: 10
           readinessProbe:
-            httpGet: { path: /health/ready, port: probes }
+            httpGet:
+              path: /health/ready
+              port: probes
             periodSeconds: 5
           lifecycle:
             preStop:
@@ -907,11 +717,11 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
-            - name: database-ca
-              mountPath: /etc/url-shortener-pg-ca
+            - mountPath: /etc/url-shortener-pg-ca
+              name: database-ca
               readOnly: true
-            - name: database-password
-              mountPath: /etc/url-shortener-pg-password
+            - mountPath: /etc/url-shortener-pg-password
+              name: database-password
               readOnly: true
           resources:
             requests:
@@ -920,25 +730,25 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: example-config
+            name: example-urls-config
         
         - name: identity
           csi:
             driver: example.csi.invalid
             readOnly: true
-        - name: database-ca
-          configMap:
+        - configMap:
             name: example-root-ca
+          name: database-ca
         - name: database-password
           secret:
-            secretName: app-secret
-            defaultMode: 0440
+            defaultMode: 288
             items:
-              - key: app-key
-                path: password
+            - key: app-key
+              path: password
+            secretName: app-secret
 
 ---
-# Source: url-shortener/templates/web.yaml
+# Source: url-shortener/templates/components.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -969,7 +779,10 @@ spec:
         app.kubernetes.io/version: "0.0.0"
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: bfb618a24fdcb05ae91f532dc0749dddcf34f14c4667c69d9d2aa4a957df177d
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 986b6fec65e4e8538f6f30cd16210812d9f0ec28cbde71794da193296c26db09
     spec:
       serviceAccountName: example-web
       securityContext:
@@ -1018,16 +831,22 @@ spec:
               value: "0.25"
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
+            
           ports:
+            
             - name: http
               containerPort: 8080
             - name: probes
               containerPort: 7070
           livenessProbe:
-            httpGet: { path: /health/live, port: probes }
+            httpGet:
+              path: /health/live
+              port: probes
             periodSeconds: 10
           readinessProbe:
-            httpGet: { path: /health/ready, port: probes }
+            httpGet:
+              path: /health/ready
+              port: probes
             periodSeconds: 5
           lifecycle:
             preStop:
@@ -1048,7 +867,267 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: example-config
+            name: example-web-config
+        
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 4
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: stat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: stat
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 47e01380a8812beefa72774fc5b371ca0be47edb0c50ec0202b9d1ae1a7b7ff1
+    spec:
+      serviceAccountName: example-stat
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1234
+        runAsGroup: 5678
+        fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 45
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: stat
+      containers:
+        - name: stat
+          image: example.io/shortener/stat@sha256:4444444444444444444444444444444444444444444444444444444444444444
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/stat.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-stat"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "otlp"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
+            
+          ports:
+            
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 7
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            - name: identity
+              mountPath: /var/run/example-identity
+              readOnly: true
+          resources:
+            requests:
+              cpu: 22m
+              memory: 222Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-stat-config
+        
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-log
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: log
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: log
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 6cc8a12e45c8522a4e7be2a224826d635663b2fae59a75b00908d564dcc9f3ef
+    spec:
+      serviceAccountName: app-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1234
+        runAsGroup: 5678
+        fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 45
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: log
+      containers:
+        - name: log
+          image: example.io/shortener/log@sha256:5555555555555555555555555555555555555555555555555555555555555555
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/log.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-log"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "otlp"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
+            
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: archive-secret
+                  key: id-key
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: archive-secret
+                  key: secret-key
+          ports:
+            
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 7
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            - name: identity
+              mountPath: /var/run/example-identity
+              readOnly: true
+          resources:
+            requests:
+              cpu: 33m
+              memory: 333Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-log-config
         
         - name: identity
           csi:
@@ -1107,13 +1186,12 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: migrate
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    # Before the migration's own configuration at -5, and well before the
-    # Job at 0.
+    "example.invalid/role": "migrate"
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
     "helm.sh/hook-weight": "-10"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    example.invalid/role: migrate
 
 ---
 # Source: url-shortener/templates/migrate-config.yaml
@@ -1126,16 +1204,17 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: migrate
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
     "helm.sh/hook-weight": "-5"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 data:
   migrate.yaml: |
+    appRole: app_role
     log:
       level: debug
     ownerRole: owner_role
-    appRole: app_role
 
 ---
 # Source: url-shortener/templates/migrate.yaml
