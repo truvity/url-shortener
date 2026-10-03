@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
   "resolvedDependencies": {
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.templates@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.templates@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.templates@0.2.1",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.templates@0.3.0",
       "checksums": {
-        "sha256": "057e49d25a801f4127c553f71eab623b7266091ff85107c4bdc10ad63cd07ec5"
+        "sha256": "250b3f6f8f316714417a222be6c12a91a37d86305de7f81182f3da3396d27378"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.vocab@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.vocab@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.vocab@0.2.1",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.vocab@0.3.0",
       "checksums": {
-        "sha256": "61c6b2fd6c5caf6cf2b2b29fcf400546ae39a7cb32b8d0e6cd449c8b7dc1be4d"
+        "sha256": "2e8122c5ce91462bbcc967415f37c8cfb67de8100e8cace3254d0ebbf0710cb5"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.fragments@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.fragments@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.fragments@0.2.1",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.fragments@0.3.0",
       "checksums": {
-        "sha256": "8e641a60095485ec246fd6d88ed988506025fe3f9da203131d58597a12865ab7"
+        "sha256": "5ba597302a3e025006154269e3edb55224badc8033aa29b967c61d0579e64657"
       }
     }
   }
