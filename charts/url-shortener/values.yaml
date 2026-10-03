@@ -525,8 +525,9 @@ alerts:
   ruleLabels: {}
   # Labels added to EVERY alert, e.g. what an Alertmanager routes by.
   alertLabels: {}
-  # Evaluation interval of the group; empty takes the evaluator's default.
-  interval: ""
+  # Evaluation interval of the group, such as 1m. Absent takes the evaluator's
+  # default (`""` is still accepted and means the same).
+  # interval: 1m
   # Render ONLY the rule object, for an install that runs on ANOTHER cluster
   # and is evaluated where the shared store's evaluator runs (a platform
   # installs this chart there as a second source). Nothing else renders: no
@@ -538,11 +539,13 @@ alerts:
   # `<release>-alerts-<clusterName>`.
   remote:
     enabled: false
-    clusterName: ""
-    namespace: ""
-  # The prober's own namespace when it is not the install's.
-  prober:
-    namespace: ""
+    # Required with `enabled`; absent otherwise (`""` is still accepted and
+    # means absent).
+    # clusterName: stage
+    # namespace: url-shortener
+  # The prober's own namespace when it is not the install's. Absent means the
+  # install's own (`""` is still accepted and means the same).
+  prober: {}
   # Thresholds. Each alert can be switched off by setting `enabled: false`.
   #
   # Share of the prober's journeys that did not succeed, per journey, over

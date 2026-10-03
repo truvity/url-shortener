@@ -2029,6 +2029,51 @@ func TestTheTelemetryRuleCarriesItsOwnBodyLimit(t *testing.T) {
 	}
 }
 
+// Four alert values are absent by default (they shipped as the empty string):
+// the interval, the prober's namespace and the remote install's cluster and
+// namespace. Absent and the empty string both mean none, and nothing that
+// rendered with the empty string stops rendering: a platform that still passes
+// it gets the render it got when the default was "", byte for byte.
+func TestAnAlertValueLeftOutAndTheEmptyStringRenderTheSame(t *testing.T) {
+	for _, tc := range []struct {
+		key  string
+		base []string
+	}{
+		{"alerts.interval", []string{"--set", "alerts.enabled=true"}},
+		{"alerts.prober.namespace", []string{"--set", "alerts.enabled=true"}},
+		{"alerts.remote.namespace", []string{"--set", "alerts.enabled=true"}},
+		{"alerts.remote.clusterName", []string{"--set", "alerts.enabled=true"}},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			absent, err := render(t, defaults(tc.base...)...)
+			if err != nil {
+				t.Fatalf("with %s left out the chart does not render: %v\n%s", tc.key, err, absent)
+			}
+			empty, err := render(t, defaults(append(tc.base[:len(tc.base):len(tc.base)], "--set-string", tc.key+"=")...)...)
+			if err != nil {
+				t.Fatalf("with %s empty the chart does not render: %v\n%s", tc.key, err, empty)
+			}
+			if absent != empty {
+				t.Errorf("%s left out and empty render differently:\n%s", tc.key, firstDifference(absent, empty))
+			}
+		})
+	}
+
+	// The remote install needs its cluster and namespace, absent or empty.
+	remote := []string{"--set", "alerts.remote.enabled=true"}
+	for _, missing := range [][]string{
+		nil,
+		{"--set-string", "alerts.remote.clusterName=", "--set-string", "alerts.remote.namespace="},
+		{"--set", "alerts.remote.clusterName=stage"},
+		{"--set", "alerts.remote.namespace=url-shortener"},
+		{"--set", "alerts.remote.clusterName=stage", "--set-string", "alerts.remote.namespace="},
+	} {
+		if out, err := render(t, append(remote[:len(remote):len(remote)], missing...)...); err == nil {
+			t.Errorf("a remote install without both its cluster and namespace (%v) rendered:\n%s", missing, out)
+		}
+	}
+}
+
 // alertRules renders the chart with the given values and returns the rules of
 // its VMRule by alert name, each as {expr, labels}.
 func alertRules(t *testing.T, args ...string) (map[string]struct {

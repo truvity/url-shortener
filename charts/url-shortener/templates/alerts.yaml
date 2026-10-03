@@ -30,8 +30,10 @@ the install's namespace and cluster, and nothing else renders.
 {{- $sel := include "url-shortener.alertSelector" (dict "root" . "namespace" $ns) }}
 {{- $pns := $a.prober.namespace | default $ns }}
 {{- $psel := include "url-shortener.alertSelector" (dict "root" . "namespace" $pns) }}
-{{- $name := ternary (printf "%s-alerts-%s" (include "url-shortener.name" .) $a.remote.clusterName) (printf "%s-alerts" (include "url-shortener.name" .)) (not (empty $remote)) }}
-{{- $cluster := ternary $a.remote.clusterName "" (not (empty $remote)) }}
+{{- /* clusterName and namespace are absent by default: absent and "" mean the same, none. */}}
+{{- $clusterName := $a.remote.clusterName | default "" }}
+{{- $name := ternary (printf "%s-alerts-%s" (include "url-shortener.name" .) $clusterName) (printf "%s-alerts" (include "url-shortener.name" .)) (not (empty $remote)) }}
+{{- $cluster := ternary $clusterName "" (not (empty $remote)) }}
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMRule
 metadata:
