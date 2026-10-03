@@ -312,6 +312,9 @@ export async function traced(
         "http.request.method": req.method ?? "GET",
         "http.route": route,
         "http.response.status_code": failed ? 500 : res.statusCode,
+        // Which component recorded it: a store that keeps no resource
+        // attribute as a label cannot tell this series from redirect's.
+        "url_shortener.component": "web",
       });
     }
   });

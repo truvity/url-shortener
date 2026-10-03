@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
@@ -20,9 +21,15 @@ const RequestDurationMetric = "http.server.request.duration"
 // boundaries are sized for milliseconds and put every request in one bucket.
 var requestDurationBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10}
 
+// ComponentKey is the attribute that says WHICH component of the product
+// recorded a request. A store that keeps no resource attribute as a label
+// (the usual case) cannot tell redirect's series from web's otherwise, and a
+// ratio over both is no use to the one that is failing.
+const ComponentKey = attribute.Key("url_shortener.component")
+
 // RequestMetrics records the duration of every request as the semantic
 // convention histogram `http.server.request.duration`, with the method, the
-// ROUTE TEMPLATE and the response status code.
+// ROUTE TEMPLATE, the response status code and the component's name.
 //
 // It is the metric twin of Tracing, and it has the same rule about names: the
 // route is the registered template ("/r/:key"), never the path, because a
@@ -33,11 +40,11 @@ var requestDurationBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.2
 // this router is not one, so the same instrument is recorded here. Like
 // Tracing it costs almost nothing with no endpoint configured: the global
 // meter provider is then a no-op.
-func RequestMetrics() fiber.Handler {
-	return requestMetrics(otel.GetMeterProvider())
+func RequestMetrics(component string) fiber.Handler {
+	return requestMetrics(otel.GetMeterProvider(), component)
 }
 
-func requestMetrics(provider metric.MeterProvider) fiber.Handler {
+func requestMetrics(provider metric.MeterProvider, component string) fiber.Handler {
 	meter := provider.Meter("github.com/truvity/policy/examples/url-shortener")
 	duration, err := meter.Float64Histogram(RequestDurationMetric,
 		metric.WithUnit("s"),
@@ -71,6 +78,7 @@ func requestMetrics(provider metric.MeterProvider) fiber.Handler {
 			semconv.HTTPRequestMethodKey.String(c.Method()),
 			semconv.HTTPRouteKey.String(routeOf(c, own)),
 			semconv.HTTPResponseStatusCodeKey.Int(status),
+			ComponentKey.String(component),
 		))
 
 		return err

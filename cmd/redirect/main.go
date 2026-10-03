@@ -184,7 +184,7 @@ func run() error {
 	// A span per request, and the incoming trace continued.
 	app.Use(api.Tracing())
 	// The request duration histogram, by route template and status.
-	app.Use(api.RequestMetrics())
+	app.Use(api.RequestMetrics("redirect"))
 	humaAPI := humafiber.New(app, huma.DefaultConfig("URL Shortener", version))
 	redirect.RegisterHumaRoutes(ctx, log, humaAPI, manager, requestLog)
 	app.Get(api.PathVersion, api.NewVersionHandler("redirect", &api.Version{Version: version, Commit: commit}))

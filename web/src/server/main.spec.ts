@@ -117,12 +117,13 @@ describe("traced", () => {
       "POST /api/urls 502": 1,
       "GET /* 404": 1,
     });
-    // Three attributes and no more: nothing that carries a key or a path.
+    // Four attributes and no more: nothing that carries a key or a path.
     for (const p of histogram?.dataPoints ?? []) {
       expect(Object.keys(p.attributes).sort()).toEqual([
         "http.request.method",
         "http.response.status_code",
         "http.route",
+        "url_shortener.component",
       ]);
     }
   });

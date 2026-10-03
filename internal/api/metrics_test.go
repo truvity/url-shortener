@@ -49,7 +49,7 @@ func TestRequestMetricsRecordsTheRouteTemplateAndStatus(t *testing.T) {
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 
 	app := fiber.New()
-	app.Use(requestMetrics(provider))
+	app.Use(requestMetrics(provider, "redirect"))
 	app.Get("/r/:key", func(c fiber.Ctx) error { return c.SendStatus(http.StatusFound) })
 	app.Get("/boom", func(c fiber.Ctx) error { return errors.New("broken") })
 
@@ -68,8 +68,10 @@ func TestRequestMetricsRecordsTheRouteTemplateAndStatus(t *testing.T) {
 		route, _ := dp.Attributes.Value("http.route")
 		status, _ := dp.Attributes.Value("http.response.status_code")
 		got[route.AsString()+"|"+status.Emit()] = int(dp.Count)
-		// Exactly three attributes: nothing that carries a key or a path.
-		require.Equal(t, 3, dp.Attributes.Len())
+		component, _ := dp.Attributes.Value("url_shortener.component")
+		require.Equal(t, "redirect", component.AsString())
+		// Exactly four attributes: nothing that carries a key or a path.
+		require.Equal(t, 4, dp.Attributes.Len())
 		require.Equal(t, requestDurationBuckets, dp.Bounds)
 	}
 	require.Equal(t, want, got)
