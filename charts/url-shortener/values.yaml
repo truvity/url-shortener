@@ -498,7 +498,7 @@ route:
     # (gateway.envoyproxy.io) named `<release name>-faro` that targets this
     # rule alone and buffers the request before forwarding it, answering 413
     # above the limit. Absent (the default) renders no policy; an empty
-    # string is refused. A public write endpoint should
+    # string still means none. A public write endpoint should
     # have one, and the collector's own check happens too late to bound it.
     backend:
       name: ""

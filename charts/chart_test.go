@@ -1973,6 +1973,16 @@ func TestTheTelemetryRuleCarriesItsOwnBodyLimit(t *testing.T) {
 		t.Errorf("a telemetry rule with no limit renders a policy")
 	}
 
+	// The empty string is the old spelling of "none", and still is one: a
+	// platform that passes it keeps rendering, with no policy.
+	out, err = render(t, defaults(append(faro[:len(faro):len(faro)], "--set-string", "route.faro.requestBufferLimit=")...)...)
+	if err != nil {
+		t.Fatalf("an empty limit does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "BackendTrafficPolicy") {
+		t.Errorf("an empty limit renders a policy")
+	}
+
 	out, err = render(t, defaults(append(faro, "--set", "route.faro.requestBufferLimit=256Ki")...)...)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
