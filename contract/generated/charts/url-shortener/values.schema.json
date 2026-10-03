@@ -7,12 +7,7 @@
   "required": [
     "database",
     "events",
-    "archive",
-    "log",
-    "replicas",
-    "resources",
-    "route",
-    "images"
+    "archive"
   ],
   "properties": {
     "service-lib": {
@@ -268,7 +263,8 @@
         "host": {
           "type": "string",
           "minLength": 1,
-          "description": "The database host. Every install names its own."
+          "description": "The database host. Every install names its own.",
+          "x-set-at-install": true
         },
         "name": {
           "type": "string",
@@ -324,7 +320,8 @@
             "passwordSecret": {
               "type": "string",
               "minLength": 1,
-              "description": "The Secret holding the role's password. Every install names its own."
+              "description": "The Secret holding the role's password. Every install names its own.",
+              "x-set-at-install": true
             },
             "passwordKey": {
               "type": "string",
@@ -348,7 +345,8 @@
             "passwordSecret": {
               "type": "string",
               "minLength": 1,
-              "description": "The Secret holding the role's password. Every install names its own."
+              "description": "The Secret holding the role's password. Every install names its own.",
+              "x-set-at-install": true
             },
             "passwordKey": {
               "type": "string",
@@ -369,7 +367,8 @@
         "url": {
           "type": "string",
           "minLength": 1,
-          "description": "The events server's URL. Every install names its own."
+          "description": "The events server's URL. Every install names its own.",
+          "x-set-at-install": true
         },
         "auth": {
           "type": "object",
@@ -428,7 +427,8 @@
             "name": {
               "type": "string",
               "minLength": 1,
-              "description": "The bucket, which exists already. Every install names its own."
+              "description": "The bucket, which exists already. Every install names its own.",
+              "x-set-at-install": true
             },
             "region": {
               "type": "string",
@@ -500,6 +500,9 @@
           ],
           "default": "info"
         }
+      },
+      "default": {
+        "level": "info"
       }
     },
     "replicas": {
@@ -531,6 +534,13 @@
           "minimum": 0,
           "default": 2
         }
+      },
+      "default": {
+        "redirect": 2,
+        "stat": 2,
+        "log": 2,
+        "urls": 2,
+        "web": 2
       }
     },
     "resources": {
@@ -601,7 +611,51 @@
           }
         }
       },
-      "description": "Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+      "description": "Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.",
+      "default": {
+        "redirect": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        },
+        "stat": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        },
+        "migrate": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        },
+        "log": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "128Mi"
+          }
+        },
+        "urls": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        },
+        "web": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "96Mi"
+          }
+        },
+        "verify": {
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        }
+      }
     },
     "route": {
       "type": "object",
@@ -712,6 +766,12 @@
           "description": "The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver.",
           "default": "redirect"
         }
+      },
+      "default": {
+        "enabled": false,
+        "hostname": "",
+        "ruleName": "app",
+        "redirectRuleName": "redirect"
       }
     },
     "serviceAccount": {
@@ -1123,14 +1183,6 @@
     "images": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "migrate",
-        "redirect",
-        "urls",
-        "stat",
-        "log",
-        "web"
-      ],
       "properties": {
         "migrate": {
           "type": "object",
@@ -1154,6 +1206,12 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/migrate",
+            "tag": "",
+            "digest": ""
           }
         },
         "redirect": {
@@ -1178,6 +1236,12 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/redirect",
+            "tag": "",
+            "digest": ""
           }
         },
         "urls": {
@@ -1202,6 +1266,12 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/urls",
+            "tag": "",
+            "digest": ""
           }
         },
         "stat": {
@@ -1226,6 +1296,12 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/stat",
+            "tag": "",
+            "digest": ""
           }
         },
         "log": {
@@ -1250,6 +1326,12 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/log",
+            "tag": "",
+            "digest": ""
           }
         },
         "web": {
@@ -1274,7 +1356,51 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/web",
+            "tag": "",
+            "digest": ""
           }
+        }
+      },
+      "default": {
+        "migrate": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/migrate",
+          "tag": "",
+          "digest": ""
+        },
+        "redirect": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/redirect",
+          "tag": "",
+          "digest": ""
+        },
+        "urls": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/urls",
+          "tag": "",
+          "digest": ""
+        },
+        "stat": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/stat",
+          "tag": "",
+          "digest": ""
+        },
+        "log": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/log",
+          "tag": "",
+          "digest": ""
+        },
+        "web": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/web",
+          "tag": "",
+          "digest": ""
         }
       }
     },

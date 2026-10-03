@@ -8,15 +8,14 @@
     "appRelease",
     "database",
     "events",
-    "archive",
-    "images",
-    "job"
+    "archive"
   ],
   "properties": {
     "appRelease": {
       "type": "string",
       "minLength": 1,
-      "description": "The application release under test. Every install names its own."
+      "description": "The application release under test. Every install names its own.",
+      "x-set-at-install": true
     },
     "mode": {
       "enum": [
@@ -42,12 +41,14 @@
         "host": {
           "type": "string",
           "minLength": 1,
-          "description": "The database host. Every install names its own."
+          "description": "The database host. Every install names its own.",
+          "x-set-at-install": true
         },
         "name": {
           "type": "string",
           "minLength": 1,
-          "description": "The database name. Every install names its own."
+          "description": "The database name. Every install names its own.",
+          "x-set-at-install": true
         },
         "owner": {
           "type": "object",
@@ -59,7 +60,8 @@
             "role": {
               "type": "string",
               "minLength": 1,
-              "description": "The owner role. Every install names its own."
+              "description": "The owner role. Every install names its own.",
+              "x-set-at-install": true
             }
           }
         },
@@ -74,12 +76,14 @@
             "role": {
               "type": "string",
               "minLength": 1,
-              "description": "The role the service connects as. Every install names its own."
+              "description": "The role the service connects as. Every install names its own.",
+              "x-set-at-install": true
             },
             "passwordSecret": {
               "type": "string",
               "minLength": 1,
-              "description": "The Secret holding the role's password. Every install names its own."
+              "description": "The Secret holding the role's password. Every install names its own.",
+              "x-set-at-install": true
             },
             "passwordKey": {
               "type": "string",
@@ -104,23 +108,28 @@
         "stream": {
           "type": "string",
           "minLength": 1,
-          "description": "Every name below is given by the install, never derived."
+          "description": "Every name below is given by the install, never derived.",
+          "x-set-at-install": true
         },
         "redirectSubject": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "x-set-at-install": true
         },
         "requestSubject": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "x-set-at-install": true
         },
         "statConsumer": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "x-set-at-install": true
         },
         "logConsumer": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "x-set-at-install": true
         }
       }
     },
@@ -134,7 +143,8 @@
         "bucket": {
           "type": "string",
           "minLength": 1,
-          "description": "The bucket, which exists already. Every install names its own."
+          "description": "The bucket, which exists already. Every install names its own.",
+          "x-set-at-install": true
         },
         "region": {
           "type": "string",
@@ -206,9 +216,6 @@
     "images": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "e2e"
-      ],
       "properties": {
         "e2e": {
           "type": "object",
@@ -232,6 +239,12 @@
               "type": "string",
               "default": ""
             }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/e2e",
+            "tag": "",
+            "digest": ""
           }
         },
         "prober": {
@@ -257,6 +270,14 @@
               "default": ""
             }
           }
+        }
+      },
+      "default": {
+        "e2e": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/e2e",
+          "tag": "",
+          "digest": ""
         }
       }
     },
@@ -306,6 +327,11 @@
           },
           "description": "The e2e Job's own switch for presenting a workload identity, on top of the release-wide tls block. Needs tls.mode (or a target's override) not off."
         }
+      },
+      "default": {
+        "backoffLimit": 0,
+        "activeDeadlineSeconds": 300,
+        "annotations": {}
       }
     },
     "resources": {

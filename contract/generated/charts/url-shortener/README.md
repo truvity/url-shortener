@@ -27,7 +27,7 @@
 | `alerts.urlsRpcErrors.for` | string | `"10m"` |  |
 | `alerts.urlsRpcErrors.ratio` | number | `0.05` |  |
 | `alerts.urlsRpcErrors.minCallsPerSecond` | number | `0.05` |  |
-| `alerts.urlsRpcErrors.codes` | string | `"INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"` |  |
+| `alerts.urlsRpcErrors.codes` | string | `"INTERNAL\|UNKNOWN\|UNAVAILABLE\|DATA_LOSS\|DEADLINE_EXCEEDED"` |  |
 | `alerts.redirectHttp5xx.enabled` | boolean | `true` |  |
 | `alerts.redirectHttp5xx.for` | string | `"10m"` |  |
 | `alerts.redirectHttp5xx.ratio` | number | `0.05` |  |

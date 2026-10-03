@@ -3,10 +3,6 @@
   "title": "url-shortener-infra chart values",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "postgres",
-    "events"
-  ],
   "properties": {
     "installName": {
       "type": "string",
@@ -189,6 +185,18 @@
             }
           }
         }
+      },
+      "default": {
+        "instances": 1,
+        "storage": "1Gi",
+        "database": "url_shortener",
+        "ownerRole": "url_shortener_owner",
+        "runtimeRole": "url_shortener_app",
+        "runtimePasswordSecret": "",
+        "tenantScopedNames": false,
+        "labels": {},
+        "platformOwned": false,
+        "annotations": {}
       }
     },
     "events": {
@@ -220,6 +228,13 @@
           "type": "string",
           "default": ""
         }
+      },
+      "default": {
+        "storage": "memory",
+        "url": "nats://nats.nats.svc:4222",
+        "account": "",
+        "replicas": 1,
+        "maxAge": ""
       }
     }
   },

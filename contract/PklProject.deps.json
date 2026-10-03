@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
   "resolvedDependencies": {
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.templates@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.1/contracts.templates@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.templates@0.3.0",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.1/contracts.templates@0.3.1",
       "checksums": {
-        "sha256": "250b3f6f8f316714417a222be6c12a91a37d86305de7f81182f3da3396d27378"
+        "sha256": "bdbf8f19ec19139aaa95a056413a16d367e738ea0065fa5c05c26d2f1ca0b2e1"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.vocab@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.1/contracts.vocab@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.vocab@0.3.0",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.1/contracts.vocab@0.3.1",
       "checksums": {
-        "sha256": "2e8122c5ce91462bbcc967415f37c8cfb67de8100e8cace3254d0ebbf0710cb5"
+        "sha256": "146ab36c5f312b7a7aa8ea980d58b341310a9ffbc84623c1f0a266fff9c4a16f"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.fragments@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.3.1/contracts.fragments@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.0/contracts.fragments@0.3.0",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.3.1/contracts.fragments@0.3.1",
       "checksums": {
-        "sha256": "5ba597302a3e025006154269e3edb55224badc8033aa29b967c61d0579e64657"
+        "sha256": "de54d8cf0011357abd2fd41d39522678f6916b97b60026ec9c16bb53b2502f88"
       }
     }
   }
