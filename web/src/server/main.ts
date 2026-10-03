@@ -63,6 +63,23 @@ function logLine(level: string, message: string, rest: Record<string, unknown> =
   );
 }
 
+// What a failed call to the URL service says, whole: the message, the
+// Connect code, and the underlying cause (a TLS or socket error carries its
+// reason there), so a 502 is never a line with nothing to read.
+function refusal(error: unknown): Record<string, unknown> {
+  const e = error as {
+    message?: string;
+    code?: unknown;
+    rawMessage?: string;
+    cause?: { message?: string; code?: string };
+  };
+  return {
+    detail: e?.message ?? String(error),
+    ...(e?.code !== undefined ? { code: e.code } : {}),
+    ...(e?.cause ? { cause: e.cause.message ?? String(e.cause), causeCode: e.cause.code } : {}),
+  };
+}
+
 async function main(): Promise<void> {
   const path = argument() ?? process.env.CONFIG_FILE;
   if (!path) {
@@ -87,7 +104,9 @@ async function main(): Promise<void> {
   // happened in a Node service exactly like this one.
   const stopTelemetry = await startTelemetry();
 
-  const urls = urlsClient(cfg.urls.address, cfg.tls);
+  const urls = urlsClient(cfg.urls.address, cfg.tls, (reason) =>
+    logLine("error", "the URL service's certificate was refused", { reason }),
+  );
 
   const app = createServer((req, res) => {
     // The probe listener below is deliberately NOT traced: a readiness
@@ -289,7 +308,7 @@ async function serve(
         }),
       );
     } catch (error) {
-      logLine("error", "the URL service refused", { detail: (error as Error).message });
+      logLine("error", "the URL service refused", refusal(error));
       res.writeHead(502, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "the URL service could not answer" }));
     }
@@ -310,7 +329,7 @@ async function serve(
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ urls: answer.urls.map(present), nextPageToken: answer.nextPageToken }));
     } catch (error) {
-      logLine("error", "the URL service refused a listing", { detail: (error as Error).message });
+      logLine("error", "the URL service refused a listing", refusal(error));
       res.writeHead(502, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "the URL service could not answer" }));
     }
@@ -327,7 +346,7 @@ async function serve(
       // The service's refusals are the caller's to see — a key already
       // taken, a URL that is not one — so the message goes back rather
       // than being flattened into "could not answer".
-      logLine("warn", "the URL service refused a create", { detail: (error as Error).message });
+      logLine("warn", "the URL service refused a create", refusal(error));
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: (error as Error).message }));
     }
@@ -340,7 +359,7 @@ async function serve(
       await urls.delete({ key });
       res.writeHead(204).end();
     } catch (error) {
-      logLine("warn", "the URL service refused a delete", { detail: (error as Error).message });
+      logLine("warn", "the URL service refused a delete", refusal(error));
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: (error as Error).message }));
     }

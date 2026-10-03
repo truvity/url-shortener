@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type Http2SecureServer, connect, createSecureServer } from "node:http2";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Tls } from "./config.ts";
 import { tlsOptions, verifyPeer } from "./tls.ts";
+import { urlsClient } from "./urls.ts";
 
 const DOMAIN = "example.invalid";
 const dir = mkdtempSync(join(tmpdir(), "web-tls-"));
@@ -17,57 +18,59 @@ function openssl(...args: string[]): void {
   execFileSync("openssl", args, { stdio: "ignore", cwd: dir });
 }
 
-// A workload certificate the way the platform issues one: an identity (a
-// SPIFFE URI) and NO name, signed by an authority the client holds as its
-// trust bundle. Its absence of a DNS name is the whole reason the library's
-// name check cannot be the one used.
-function leaf(name: string, uri: string, ca: string): void {
-  writeFileSync(
-    join(dir, `${name}.ext`),
-    `subjectAltName=URI:${uri}\nextendedKeyUsage=serverAuth,clientAuth\n`,
-  );
-  openssl(
-    "req",
-    "-newkey",
-    "ec",
-    "-pkeyopt",
-    "ec_paramgen_curve:prime256v1",
-    "-nodes",
-    "-keyout",
-    `${name}.key`,
-    "-out",
-    `${name}.csr`,
-    "-subj",
-    `/CN=${name}`,
-  );
+const EC = ["-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes"];
+
+function sign(name: string, parent: string, ext: string): void {
+  writeFileSync(join(dir, `${name}.ext`), ext);
   openssl(
     "x509",
     "-req",
     "-in",
     `${name}.csr`,
     "-CA",
-    `${ca}.crt`,
+    `${parent}.crt`,
     "-CAkey",
-    `${ca}.key`,
+    `${parent}.key`,
     "-CAcreateserial",
     "-days",
     "1",
     "-extfile",
     `${name}.ext`,
     "-out",
-    `${name}.crt`,
+    `${name}.pem`,
   );
+}
+
+// A workload certificate the way the platform issues one: an identity (a
+// critical SPIFFE URI) and NO subject and NO name, signed by an issuing
+// authority, and delivered with its chain. Its absence of a DNS name is why
+// the library's name check cannot be the one used.
+function leaf(name: string, uri: string, ca: string): void {
+  openssl("req", ...EC, "-keyout", `${name}.key`, "-out", `${name}.csr`, "-subj", "/");
+  sign(
+    name,
+    ca,
+    `subjectAltName=critical,URI:${uri}\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth\nbasicConstraints=critical,CA:FALSE\n`,
+  );
+  writeFileSync(
+    join(dir, `${name}.crt`),
+    readFileSync(join(dir, `${name}.pem`), "utf8") + readFileSync(join(dir, `${ca}.crt`), "utf8"),
+  );
+}
+
+// An issuing authority UNDER a root: not self-signed, which is what a
+// platform's trust bundle holds.
+function issuer(name: string, parent: string): void {
+  openssl("req", ...EC, "-keyout", `${name}.key`, "-out", `${name}.csr`, "-subj", `/CN=${name}`);
+  sign(name, parent, "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\n");
+  copyFileSync(join(dir, `${name}.pem`), join(dir, `${name}.crt`));
 }
 
 function authority(name: string): void {
   openssl(
     "req",
     "-x509",
-    "-newkey",
-    "ec",
-    "-pkeyopt",
-    "ec_paramgen_curve:prime256v1",
-    "-nodes",
+    ...EC,
     "-keyout",
     `${name}.key`,
     "-out",
@@ -86,26 +89,33 @@ const client: Tls = {
   mode: "strict",
   certFile: join(dir, "web.crt"),
   keyFile: join(dir, "web.key"),
-  caFile: join(dir, "ca.crt"),
+  caFile: join(dir, "bundle-root.crt"),
   trustDomain: DOMAIN,
   peers: [{ namespace: "ns", serviceAccount: "urls" }],
 };
 
 beforeAll(async () => {
   mkdirSync(dir, { recursive: true });
-  authority("ca");
+  authority("root");
   authority("other");
+  issuer("ca", "root");
   leaf("urls", `spiffe://${DOMAIN}/ns/ns/sa/urls`, "ca");
   leaf("web", `spiffe://${DOMAIN}/ns/ns/sa/web`, "ca");
-  leaf("intruder", `spiffe://${DOMAIN}/ns/ns/sa/intruder`, "ca");
-  leaf("foreign", `spiffe://${DOMAIN}/ns/ns/sa/urls`, "other");
+  // The bundles a platform may distribute: the root, the issuing authority
+  // alone (not self-signed), and both.
+  copyFileSync(join(dir, "root.crt"), join(dir, "bundle-root.crt"));
+  copyFileSync(join(dir, "ca.crt"), join(dir, "bundle-issuer.crt"));
+  writeFileSync(
+    join(dir, "bundle-both.crt"),
+    readFileSync(join(dir, "root.crt"), "utf8") + readFileSync(join(dir, "ca.crt"), "utf8"),
+  );
 
-  const read = (f: string) => execFileSync("cat", [join(dir, f)]);
+  const read = (f: string) => readFileSync(join(dir, f));
   const serve = (name: string) => {
     server = createSecureServer({
       key: read(`${name}.key`),
       cert: read(`${name}.crt`),
-      ca: read("ca.crt"),
+      ca: [read("root.crt"), read("ca.crt")],
       requestCert: true,
       rejectUnauthorized: true,
       minVersion: "TLSv1.3",
@@ -158,10 +168,28 @@ describe("the call to the URL service", () => {
     await expect(call({ ...client, trustDomain: "elsewhere.invalid" })).rejects.toThrow(/trust domain/);
   });
 
-  it("refuses a server whose chain is not the trust bundle's", async () => {
-    await expect(call({ ...client, caFile: join(dir, "other.crt") })).rejects.toThrow(
-      /unable to get local issuer certificate|self.signed/,
-    );
+  // The regression: a platform bundle that holds the ISSUING authority and no
+  // self-signed root. Go accepts it as an anchor; Node's own check does not.
+  it("accepts a bundle that holds only the issuing authority", async () => {
+    await expect(call({ ...client, caFile: join(dir, "bundle-issuer.crt") })).resolves.toBe("ok");
+  });
+
+  it("accepts a bundle that holds the root and the issuing authority", async () => {
+    await expect(call({ ...client, caFile: join(dir, "bundle-both.crt") })).resolves.toBe("ok");
+  });
+
+  it("refuses a server whose chain is not the trust bundle's, and reports why", async () => {
+    const reasons: string[] = [];
+    const options = tlsOptions({ ...client, caFile: join(dir, "other.crt") }, (r) => reasons.push(r));
+    const session = connect(`https://localhost:${port}`, options);
+    await expect(
+      new Promise((_, reject) => {
+        session.on("error", reject);
+        session.request({ ":path": "/" }).on("error", reject);
+      }),
+    ).rejects.toThrow(/does not chain to the trust bundle/);
+    expect(reasons).toEqual([expect.stringMatching(/does not chain/)]);
+    session.destroy();
   });
 
   it("fails on Node's own roots, as the field did, without the bundle", async () => {
@@ -176,6 +204,38 @@ describe("the call to the URL service", () => {
     session.destroy();
   });
 });
+
+describe("the front end's own client", () => {
+  // Through the real gRPC client the front end builds, not a bare HTTP/2
+  // session: the server here is no gRPC server, so the call fails, but it must
+  // fail PAST the handshake (a protocol answer), and never on trust.
+  it("gets through the handshake against a platform-shaped bundle", async () => {
+    const client = urlsClient(`https://localhost:${port}`, {
+      ...tls0(),
+      caFile: join(dir, "bundle-issuer.crt"),
+    });
+    const error = await client.get({ key: "k" }).then(
+      () => undefined,
+      (e: Error) => e,
+    );
+    expect(error?.message ?? "").not.toMatch(/certificate|chain|trust bundle|admits/);
+  });
+
+  it("is refused on trust, with the reason, when the bundle is not the server's", async () => {
+    const reasons: string[] = [];
+    const client = urlsClient(
+      `https://localhost:${port}`,
+      { ...tls0(), caFile: join(dir, "other.crt") },
+      (r) => reasons.push(r),
+    );
+    await expect(client.get({ key: "k" })).rejects.toThrow(/does not chain to the trust bundle/);
+    expect(reasons).toHaveLength(1);
+  });
+});
+
+function tls0(): Tls {
+  return client;
+}
 
 describe("tlsOptions", () => {
   it("is nothing while the transport is off or absent", () => {

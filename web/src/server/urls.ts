@@ -11,7 +11,7 @@ import { context, propagation, SpanKind, SpanStatusCode, trace } from "@opentele
 import { createGrpcTransport } from "@connectrpc/connect-node";
 
 import type { Tls } from "./config.ts";
-import { tlsOptions } from "./tls.ts";
+import { type Report, tlsOptions } from "./tls.ts";
 import { UrlsService } from "../gen/urlshortener/v1/urls_pb.ts";
 
 /**
@@ -25,10 +25,10 @@ import { UrlsService } from "../gen/urlshortener/v1/urls_pb.ts";
  * With `tls` on, the connection presents the mounted identity and trusts the
  * platform's bundle (tls.ts); Node's own roots would never include it.
  */
-export function urlsClient(address: string, tls?: Tls): Client<typeof UrlsService> {
+export function urlsClient(address: string, tls?: Tls, report?: Report): Client<typeof UrlsService> {
   return createClient(
     UrlsService,
-    createGrpcTransport({ baseUrl: address, interceptors: [tracing], nodeOptions: tlsOptions(tls) }),
+    createGrpcTransport({ baseUrl: address, interceptors: [tracing], nodeOptions: tlsOptions(tls, report) }),
   );
 }
 
