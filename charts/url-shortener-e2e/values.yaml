@@ -18,8 +18,11 @@
 # what this chart's templates/job.yaml fills in from the values below.
 
 # The release under test, in THIS namespace. Required: there is no sane
-# default for whose release this Job verifies.
-appRelease: ""
+# default for whose release this Job verifies. Not set here: the schema asks
+# for a non-empty one and this file leaves the key out rather than shipping
+# an empty placeholder (the same holds for every value below that an install
+# gives: the database host, name, roles and Secret, the five event names and
+# the bucket).
 
 # full | tenant.
 #
@@ -55,19 +58,14 @@ rolloutTimeout: ""
 # are trusted with different things — see charts/url-shortener/values.yaml
 # for why there are two.
 database:
-  host: ""
-  name: ""
-  owner:
-    role: ""
+  owner: {}
   app:
-    role: ""
     # The Secret holding the runtime role's password, and the key inside
     # it. Read into the suite as an ENVIRONMENT VARIABLE via
     # `secretKeyRef` (templates/job.yaml) — which needs no RBAC grant at
     # all, because the value is resolved when this Pod is admitted, never
     # read back by its own ServiceAccount token. That is also why this
     # chart's Role names no Secret permission: see templates/rbac.yaml.
-    passwordSecret: ""
     passwordKey: password
 
 # The stream, its two subjects and the two durable consumer names — all
@@ -75,12 +73,7 @@ database:
 # charts/url-shortener/templates/_helpers.tpl's own comment on why they
 # are a formula rather than a value on THAT chart) and read off
 # url-shortener-infra's render here for the same reason database.* is.
-events:
-  stream: ""
-  redirectSubject: ""
-  requestSubject: ""
-  statConsumer: ""
-  logConsumer: ""
+events: {}
 
 # Where the request archive is, on the same terms as
 # charts/url-shortener/values.yaml's own archive.bucket: an endpoint, a
@@ -90,7 +83,6 @@ events:
 # archive is reached under a workload identity; a local store needs it
 # set (see examples/url-shortener/hack/install.sh's LOCAL_STORE_ARGS).
 archive:
-  bucket: ""
   region: ""
   endpoint: ""
   # STATIC credentials for the endpoint above, on exactly the same terms

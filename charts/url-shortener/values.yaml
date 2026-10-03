@@ -21,7 +21,10 @@ installName: ""
 database:
   # The read-write service of the cluster url-shortener-infra created, for
   # example `<infra release>-pg-rw`.
-  host: ""
+  #
+  # REQUIRED and not set here: `host` is a value only an install can give, so
+  # the schema asks for a non-empty one and this file leaves the key out
+  # rather than shipping an empty placeholder.
   name: url_shortener
 
   # How the connection is secured: ALWAYS verify-full. The database client
@@ -61,15 +64,15 @@ database:
   # connection, so a rotated Secret is picked up without a restart.
   owner:
     role: url_shortener_owner
-    passwordSecret: ""
+    # `passwordSecret` is REQUIRED and not set here, as `host` above.
     passwordKey: password
   app:
     role: url_shortener_app
-    passwordSecret: ""
+    # `passwordSecret` is REQUIRED and not set here, as `host` above.
     passwordKey: password
 
 events:
-  url: ""
+  # `url` is REQUIRED and not set here, as `database.host` above.
 
   # The stream, its two subjects and the two durable consumer names are
   # NOT here. All five are cluster-global on the broker, computed from
@@ -130,7 +133,8 @@ archive:
     # It exists already. A service does not create its own store: a component
     # that can create a bucket can create it in the wrong account, with the
     # wrong retention, and nothing notices until somebody looks.
-    name: ""
+    #
+    # `name` is REQUIRED and not set here, as `database.host` above.
     region: ""
     # Unset means the SDK's own resolution for the region.
     endpoint: ""
@@ -493,9 +497,9 @@ route:
     # quantity such as `256Ki`. Set, it renders a BackendTrafficPolicy
     # (gateway.envoyproxy.io) named `<release name>-faro` that targets this
     # rule alone and buffers the request before forwarding it, answering 413
-    # above the limit. Empty renders no policy. A public write endpoint should
+    # above the limit. Absent (the default) renders no policy; an empty
+    # string is refused. A public write endpoint should
     # have one, and the collector's own check happens too late to bound it.
-    requestBufferLimit: ""
     backend:
       name: ""
       namespace: ""
