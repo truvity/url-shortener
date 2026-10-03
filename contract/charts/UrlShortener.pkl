@@ -2,11 +2,13 @@
 @A.Chart { title = "url-shortener chart values" }
 module urlshortener.charts.UrlShortener
 
+import "@fragments/Fragments.pkl" as F
 import "@vocab/Annotations.pkl" as A
+import "@vocab/Check.pkl"
 import "@vocab/Vocab.pkl" as V
 
 /// Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl.
-`service-lib`: ServiceLib?
+`service-lib`: F.ServiceLib?
 
 /// The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
 installName: String = ""
@@ -46,11 +48,6 @@ pullPolicy: V.PullPolicy = "IfNotPresent"
 
 otel: Otel?
 
-/// Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl.
-class ServiceLib {
-  `global`: V.OpenObject?
-}
-
 class DatabaseTlsRootCA {
   /// The ConfigMap holding the root the database server certificate chains to. Required.
   configMapName: String = ""
@@ -68,7 +65,9 @@ class DatabaseTls {
 class DatabaseOwner {
   role: V.NonEmptyString = "url_shortener_owner"
 
-  passwordSecret: V.NonEmptyString
+  /// The Secret holding the role's password. Every install names its own.
+  @A.SetAtInstall
+  passwordSecret: V.NonEmptyString?
 
   passwordKey: V.NonEmptyString = "password"
 }
@@ -76,13 +75,17 @@ class DatabaseOwner {
 class DatabaseApp {
   role: V.NonEmptyString = "url_shortener_app"
 
-  passwordSecret: V.NonEmptyString
+  /// The Secret holding the role's password. Every install names its own.
+  @A.SetAtInstall
+  passwordSecret: V.NonEmptyString?
 
   passwordKey: V.NonEmptyString = "password"
 }
 
 class Database {
-  host: V.NonEmptyString
+  /// The database host. Every install names its own.
+  @A.SetAtInstall
+  host: V.NonEmptyString?
 
   name: V.NonEmptyString = "url_shortener"
 
@@ -98,7 +101,8 @@ class Database {
 class EventsAuth {
   audience: String = ""
 
-  expirationSeconds: Int = 3600
+  @A.Range { min = 600 }
+  expirationSeconds: V.PositiveInt = 3600
 }
 
 class EventsTls {
@@ -112,7 +116,9 @@ class EventsTls {
 }
 
 class Events {
-  url: V.NonEmptyString
+  /// The events server's URL. Every install names its own.
+  @A.SetAtInstall
+  url: V.NonEmptyString?
 
   auth: EventsAuth?
 
@@ -120,8 +126,9 @@ class Events {
 }
 
 class ArchiveBucket {
-  /// The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema.
-  name: String = ""
+  /// The bucket, which exists already. Every install names its own.
+  @A.SetAtInstall
+  name: V.NonEmptyString?
 
   region: String = ""
 
@@ -172,19 +179,19 @@ class Replicas {
 
 /// Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.
 class Resources {
-  redirect: V.OpenObject?
+  redirect: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "64Mi" } }
 
-  stat: V.OpenObject?
+  stat: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "64Mi" } }
 
-  migrate: V.OpenObject?
+  migrate: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "64Mi" } }
 
-  log: V.OpenObject?
+  log: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "128Mi" } }
 
-  urls: V.OpenObject?
+  urls: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "64Mi" } }
 
-  web: V.OpenObject?
+  web: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "96Mi" } }
 
-  verify: V.OpenObject?
+  verify: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "64Mi" } }
 }
 
 class RouteParentRef {
@@ -204,7 +211,8 @@ class RouteFaroBackend {
 
   namespace: String = ""
 
-  port: Int = 0
+  @A.Range { max = 65535 }
+  port: V.NonNegativeInt = 0
 }
 
 /// An optional PUBLIC rule that routes the page's telemetry path to a collector Service. Off by default.
@@ -217,8 +225,8 @@ class RouteFaro {
 
   rewritePath: V.UrlPathOrEmpty = ""
 
-  /// The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy.
-  requestBufferLimit: String = ""
+  /// The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Absent renders no policy.
+  requestBufferLimit: V.BufferLimit?
 
   backend: RouteFaroBackend?
 }
@@ -247,6 +255,7 @@ class ServiceAccountApp {
 
 /// One component's account override.
 class ServiceAccountOverride {
+  @A.Length { max = 253 }
   name: V.DnsName?
 
   annotations: Mapping<String, String>?
@@ -453,11 +462,15 @@ class Images {
 class Otel {
   endpoint: String = ""
 
-  protocol: "http/protobuf" | "grpc" = "http/protobuf"
+  protocol: V.OtelProtocol = "http/protobuf"
 
   tracesSampler: V.NonEmptyString = "parentbased_traceidratio"
 
   sampleRatio: V.NonEmptyString = "0.1"
 
   resourceAttributes: Mapping<String, String> = new Mapping {}
+}
+
+output {
+  value = Check.checked(module)
 }

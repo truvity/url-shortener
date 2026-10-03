@@ -2,6 +2,7 @@
 module urlshortener.charts.UrlShortenerInfra
 
 import "@vocab/Annotations.pkl" as A
+import "@vocab/Check.pkl"
 import "@vocab/Vocab.pkl" as V
 
 /// The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
@@ -44,7 +45,8 @@ class Cloud {
 class PostgresRuntimePassword {
   generate: Boolean = false
 
-  length: Int = 32
+  @A.Range { min = 16 }
+  length: V.PositiveInt = 32
 }
 
 class PostgresScheduling {
@@ -107,4 +109,8 @@ class Events {
   replicas: V.PositiveInt = 1
 
   maxAge: String = ""
+}
+
+output {
+  value = Check.checked(module)
 }

@@ -1,10 +1,10 @@
 // Generated from a contract by contracts.typescript. Do not edit.
 import { z } from "zod";
 
-const noNewline = (s: string): boolean => !s.includes("\n");
+const noLineBreak = (s: string): boolean => !/[\n\r\f\v\u0085\u2028\u2029]/.test(s);
 
 /** host:port as the configuration contract spells it today. It does NOT bound the port at 65535, because the hand-written pattern does not; `Port` is the stricter vocabulary a contract may move to. */
-export const HostPort = z.string().regex(/^[^\s]*:[0-9]{1,5}$/).refine(noNewline);
+export const HostPort = z.string().regex(/^[^\t \xA0  -   　]*:[0-9]{1,5}$/).refine(noLineBreak);
 export type HostPort = z.infer<typeof HostPort>;
 /** How a workload's transport is authenticated. */
 export const TlsMode = z.enum(["off", "permissive", "strict"]);
@@ -13,7 +13,7 @@ export type TlsMode = z.infer<typeof TlsMode>;
 export const NonEmptyString = z.string().min(1);
 export type NonEmptyString = z.infer<typeof NonEmptyString>;
 /** The name of an environment variable. */
-export const EnvName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).refine(noNewline);
+export const EnvName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).refine(noLineBreak);
 export type EnvName = z.infer<typeof EnvName>;
 /** The lowest level a service writes. */
 export const LogLevel = z.enum(["debug", "info", "warn", "error"]);
@@ -25,7 +25,7 @@ export type PositiveInt = z.infer<typeof PositiveInt>;
 export const Url = z.string();
 export type Url = z.infer<typeof Url>;
 /** An image digest, or empty when there is none. */
-export const ImageDigest = z.string().regex(/^(sha256:[0-9a-f]{64})?$/).refine(noNewline);
+export const ImageDigest = z.string().regex(/^(sha256:[0-9a-f]{64})?$/).refine(noLineBreak);
 export type ImageDigest = z.infer<typeof ImageDigest>;
 /** When a container image is pulled. */
 export const PullPolicy = z.enum(["Always", "IfNotPresent", "Never"]);
@@ -37,10 +37,10 @@ export type NonNegativeInt = z.infer<typeof NonNegativeInt>;
 export const OpenObject = z.looseObject({});
 export type OpenObject = z.infer<typeof OpenObject>;
 /** A path that starts at the root, the root itself included. */
-export const RootedPath = z.string().regex(/^\//).refine(noNewline);
+export const RootedPath = z.string().regex(/^\//).refine(noLineBreak);
 export type RootedPath = z.infer<typeof RootedPath>;
 /** An absolute path that is not the root. */
-export const AbsPath = z.string().regex(/^\/.+/).refine(noNewline);
+export const AbsPath = z.string().regex(/^\/[^\n]+/).refine(noLineBreak);
 export type AbsPath = z.infer<typeof AbsPath>;
 /** The protocol OpenTelemetry exports over. */
 export const OtelProtocol = z.enum(["grpc", "http/protobuf", "http/json"]);
@@ -52,25 +52,25 @@ export type Named = z.infer<typeof Named>;
 export const Mounted = z.looseObject({}).refine((o) => ["name", "mountPath"].every((k) => k in o));
 export type Mounted = z.infer<typeof Mounted>;
 /** A PostgreSQL connection URL, by its scheme. */
-export const PostgresUrl = z.string().regex(/^postgres(ql)?:\/\//).refine(noNewline);
+export const PostgresUrl = z.string().regex(/^postgres(ql)?:\/\//).refine(noLineBreak);
 export type PostgresUrl = z.infer<typeof PostgresUrl>;
 /** A duration in Go's spelling, as a string: `10s`, `500ms`. Pkl's own `Duration` renders as an object, which no other language reads. */
-export const GoDuration = z.string().regex(/^[0-9]+(ns|us|µs|ms|s|m|h)$/).refine(noNewline);
+export const GoDuration = z.string().regex(/^[0-9]+(ns|us|µs|ms|s|m|h)$/).refine(noLineBreak);
 export type GoDuration = z.infer<typeof GoDuration>;
 /** What a page's content security policy does. */
 export const CspMode = z.enum(["off", "report-only", "enforce"]);
 export type CspMode = z.infer<typeof CspMode>;
 /** A bare web origin: scheme, host and an optional port, never a path. */
-export const HttpOrigin = z.string().regex(/^https?:\/\/[A-Za-z0-9.*-]+(:[0-9]+)?$/).refine(noNewline);
+export const HttpOrigin = z.string().regex(/^https?:\/\/[A-Za-z0-9.*-]+(:[0-9]+)?$/).refine(noLineBreak);
 export type HttpOrigin = z.infer<typeof HttpOrigin>;
 /** Where a browser reports a violation: empty, a path or an absolute URL, with nothing that would end a directive. */
-export const ReportUri = z.string().regex(/^[^\s;,'"]*$/).refine(noNewline);
+export const ReportUri = z.string().regex(/^[^\t \xA0  -   　;,'"]*$/).refine(noLineBreak);
 export type ReportUri = z.infer<typeof ReportUri>;
 /** Where a page posts telemetry: a path on its own origin, or an absolute HTTPS URL. */
-export const CollectorUrl = z.string().regex(/^(https:\/\/[^\s'"<>;,]+|\/[^\s'"<>;,?#]*)$/).refine(noNewline);
+export const CollectorUrl = z.string().regex(/^(https:\/\/[^\t \xA0  -   　'"<>;,]+|\/[^\t \xA0  -   　'"<>;,?#]*)$/).refine(noLineBreak);
 export type CollectorUrl = z.infer<typeof CollectorUrl>;
 /** A public identifier: URL-safe characters only. Not a secret. */
-export const PublicKey = z.string().regex(/^[A-Za-z0-9._~-]*$/).refine(noNewline);
+export const PublicKey = z.string().regex(/^[A-Za-z0-9._~-]*$/).refine(noLineBreak);
 export type PublicKey = z.infer<typeof PublicKey>;
 /** A fraction, zero to one. */
 export const Ratio = z.number().min(0).max(1);

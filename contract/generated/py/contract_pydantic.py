@@ -14,9 +14,10 @@ from pydantic import (
 )
 
 
-def _no_newline(value: str) -> str:
-    if "\n" in value:
-        raise ValueError("a newline is not allowed")
+def _no_line_break(value: str) -> str:
+    # Every character that ends a line in some engine: LF, CR, FF, VT, NEL, LS, PS.
+    if any(c in value for c in "\n\r\f\v\x85\u2028\u2029"):
+        raise ValueError("a line break is not allowed")
     return value
 
 
@@ -50,29 +51,29 @@ class _Closed(BaseModel):
                     raise ValueError(f"{key}: null is not a value; omit the key")
         return data
 
-HostPort = Annotated[str, StringConstraints(pattern=r"^[^\s]*:[0-9]{1,5}$"), AfterValidator(_no_newline)]
+HostPort = Annotated[str, StringConstraints(pattern=r"^[^\t \xA0  -   　]*:[0-9]{1,5}$"), AfterValidator(_no_line_break)]
 TlsMode = Literal["off", "permissive", "strict"]
 NonEmptyString = Annotated[str, StringConstraints(min_length=1)]
-EnvName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"), AfterValidator(_no_newline)]
+EnvName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"), AfterValidator(_no_line_break)]
 LogLevel = Literal["debug", "info", "warn", "error"]
 PositiveInt = Annotated[int, BeforeValidator(_integral), Field(ge=1)]
 Url = str
-ImageDigest = Annotated[str, StringConstraints(pattern=r"^(sha256:[0-9a-f]{64})?$"), AfterValidator(_no_newline)]
+ImageDigest = Annotated[str, StringConstraints(pattern=r"^(sha256:[0-9a-f]{64})?$"), AfterValidator(_no_line_break)]
 PullPolicy = Literal["Always", "IfNotPresent", "Never"]
 NonNegativeInt = Annotated[int, BeforeValidator(_integral), Field(ge=0)]
 OpenObject = dict[str, Any]
-RootedPath = Annotated[str, StringConstraints(pattern=r"^/"), AfterValidator(_no_newline)]
-AbsPath = Annotated[str, StringConstraints(pattern=r"^/.+"), AfterValidator(_no_newline)]
+RootedPath = Annotated[str, StringConstraints(pattern=r"^/"), AfterValidator(_no_line_break)]
+AbsPath = Annotated[str, StringConstraints(pattern=r"^/[^\n]+"), AfterValidator(_no_line_break)]
 OtelProtocol = Literal["grpc", "http/protobuf", "http/json"]
 Named = Annotated[dict[str, Any], AfterValidator(_has_keys(["name"]))]
 Mounted = Annotated[dict[str, Any], AfterValidator(_has_keys(["name", "mountPath"]))]
-PostgresUrl = Annotated[str, StringConstraints(pattern=r"^postgres(ql)?://"), AfterValidator(_no_newline)]
-GoDuration = Annotated[str, StringConstraints(pattern=r"^[0-9]+(ns|us|µs|ms|s|m|h)$"), AfterValidator(_no_newline)]
+PostgresUrl = Annotated[str, StringConstraints(pattern=r"^postgres(ql)?://"), AfterValidator(_no_line_break)]
+GoDuration = Annotated[str, StringConstraints(pattern=r"^[0-9]+(ns|us|µs|ms|s|m|h)$"), AfterValidator(_no_line_break)]
 CspMode = Literal["off", "report-only", "enforce"]
-HttpOrigin = Annotated[str, StringConstraints(pattern=r"^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$"), AfterValidator(_no_newline)]
-ReportUri = Annotated[str, StringConstraints(pattern=r"^[^\s;,'\"]*$"), AfterValidator(_no_newline)]
-CollectorUrl = Annotated[str, StringConstraints(pattern=r"^(https://[^\s'\"<>;,]+|/[^\s'\"<>;,?#]*)$"), AfterValidator(_no_newline)]
-PublicKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9._~-]*$"), AfterValidator(_no_newline)]
+HttpOrigin = Annotated[str, StringConstraints(pattern=r"^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$"), AfterValidator(_no_line_break)]
+ReportUri = Annotated[str, StringConstraints(pattern=r"^[^\t \xA0  -   　;,'\"]*$"), AfterValidator(_no_line_break)]
+CollectorUrl = Annotated[str, StringConstraints(pattern=r"^(https://[^\t \xA0  -   　'\"<>;,]+|/[^\t \xA0  -   　'\"<>;,?#]*)$"), AfterValidator(_no_line_break)]
+PublicKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9._~-]*$"), AfterValidator(_no_line_break)]
 Ratio = Annotated[float, Field(ge=0, le=1)]
 
 

@@ -20,7 +20,8 @@
       "additionalProperties": false,
       "properties": {
         "global": {
-          "type": "object"
+          "type": "object",
+          "description": "Helm's own `global` block, passed through unchanged."
         }
       },
       "description": "Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl."
@@ -41,7 +42,8 @@
       "properties": {
         "host": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "The database host. Every install names its own."
         },
         "name": {
           "type": "string",
@@ -96,7 +98,8 @@
             },
             "passwordSecret": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "The Secret holding the role's password. Every install names its own."
             },
             "passwordKey": {
               "type": "string",
@@ -119,7 +122,8 @@
             },
             "passwordSecret": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "The Secret holding the role's password. Every install names its own."
             },
             "passwordKey": {
               "type": "string",
@@ -139,7 +143,8 @@
       "properties": {
         "url": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "The events server's URL. Every install names its own."
         },
         "auth": {
           "type": "object",
@@ -151,6 +156,7 @@
             },
             "expirationSeconds": {
               "type": "integer",
+              "minimum": 600,
               "default": 3600
             }
           }
@@ -190,11 +196,14 @@
         "bucket": {
           "type": "object",
           "additionalProperties": false,
+          "required": [
+            "name"
+          ],
           "properties": {
             "name": {
               "type": "string",
-              "description": "The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema.",
-              "default": ""
+              "minLength": 1,
+              "description": "The bucket, which exists already. Every install names its own."
             },
             "region": {
               "type": "string",
@@ -304,25 +313,67 @@
       "additionalProperties": false,
       "properties": {
         "redirect": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            }
+          }
         },
         "stat": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            }
+          }
         },
         "migrate": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            }
+          }
         },
         "log": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "128Mi"
+            }
+          }
         },
         "urls": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            }
+          }
         },
         "web": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "96Mi"
+            }
+          }
         },
         "verify": {
-          "type": "object"
+          "type": "object",
+          "default": {
+            "requests": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            }
+          }
         }
       },
       "description": "Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale."
@@ -385,24 +436,27 @@
             },
             "path": {
               "type": "string",
-              "pattern": "^/[^\\s'\"<>;,?#]*$",
+              "pattern": "^/[^\\t \\xA0  -   　'\"<>;,?#]*$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "default": "/faro/collect"
             },
             "rewritePath": {
               "type": "string",
-              "pattern": "^(/[^\\s'\"<>;,?#]*)?$",
+              "pattern": "^(/[^\\t \\xA0  -   　'\"<>;,?#]*)?$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "default": ""
             },
             "requestBufferLimit": {
               "type": "string",
-              "description": "The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy.",
-              "default": ""
+              "pattern": "^[0-9]+(Ki|Mi|Gi|k|M|G)?$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
+              "description": "The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Absent renders no policy."
             },
             "backend": {
               "type": "object",
@@ -418,6 +472,8 @@
                 },
                 "port": {
                   "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
                   "default": 0
                 }
               }
@@ -485,9 +541,10 @@
               "properties": {
                 "name": {
                   "type": "string",
+                  "maxLength": 253,
                   "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
                   "not": {
-                    "pattern": "\\n"
+                    "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
                 },
                 "annotations": {
@@ -504,9 +561,10 @@
               "properties": {
                 "name": {
                   "type": "string",
+                  "maxLength": 253,
                   "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
                   "not": {
-                    "pattern": "\\n"
+                    "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
                 },
                 "annotations": {
@@ -523,9 +581,10 @@
               "properties": {
                 "name": {
                   "type": "string",
+                  "maxLength": 253,
                   "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
                   "not": {
-                    "pattern": "\\n"
+                    "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
                 },
                 "annotations": {
@@ -542,9 +601,10 @@
               "properties": {
                 "name": {
                   "type": "string",
+                  "maxLength": 253,
                   "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
                   "not": {
-                    "pattern": "\\n"
+                    "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
                 },
                 "annotations": {
@@ -561,9 +621,10 @@
               "properties": {
                 "name": {
                   "type": "string",
+                  "maxLength": 253,
                   "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
                   "not": {
-                    "pattern": "\\n"
+                    "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
                 },
                 "annotations": {
@@ -601,16 +662,16 @@
                 "type": "string",
                 "pattern": "^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$",
                 "not": {
-                  "pattern": "\\n"
+                  "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                 }
               },
               "default": []
             },
             "reportUri": {
               "type": "string",
-              "pattern": "^[^\\s;,'\"]*$",
+              "pattern": "^[^\\t \\xA0  -   　;,'\"]*$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "default": ""
             }
@@ -626,9 +687,9 @@
             },
             "collectorUrl": {
               "type": "string",
-              "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$",
+              "pattern": "^(https://[^\\t \\xA0  -   　'\"<>;,]+|/[^\\t \\xA0  -   　'\"<>;,?#]*)$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "default": "/faro/collect"
             },
@@ -636,7 +697,7 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9._~-]*$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "default": ""
             },
@@ -1010,8 +1071,9 @@
         },
         "protocol": {
           "enum": [
+            "grpc",
             "http/protobuf",
-            "grpc"
+            "http/json"
           ],
           "default": "http/protobuf"
         },

@@ -18,7 +18,7 @@
           "description": "Helm's own `global` block, passed through unchanged."
         }
       },
-      "description": "Not a value: see `ServiceLib`."
+      "description": "Not a value: Helm puts a key named for every sub-chart into the values it\nvalidates, and the library chart is one. `F.ServiceLib`, in the fragments, so\nthat a chart that does not extend this module can use it too."
     },
     "platform": {
       "$ref": "https://github.com/truvity/policy/schemas/fragments/platform.json",
@@ -59,7 +59,7 @@
               "type": "string",
               "pattern": "^(sha256:[0-9a-f]{64})?$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "description": "The content digest, `sha256:` and 64 hex digits; empty when there is none."
             }
@@ -102,7 +102,7 @@
               "type": "string",
               "pattern": "^(sha256:[0-9a-f]{64})?$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "description": "The content digest, `sha256:` and 64 hex digits; empty when there is none."
             }
@@ -245,9 +245,9 @@
             },
             "mountPath": {
               "type": "string",
-              "pattern": "^/.+",
+              "pattern": "^/[^\\n]+",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "description": "Defaults to /var/run/identity."
             },
@@ -305,7 +305,7 @@
           "propertyNames": {
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
             "not": {
-              "pattern": "\\n"
+              "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
             }
           },
           "additionalProperties": {
@@ -385,9 +385,9 @@
             },
             "mountPath": {
               "type": "string",
-              "pattern": "^/.+",
+              "pattern": "^/[^\\n]+",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "description": "The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`."
             },
@@ -428,7 +428,7 @@
               "type": "string",
               "pattern": "^/",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
               "description": "The path on the probe listener. Defaults to the contract's own."
             },
@@ -498,7 +498,7 @@
               "type": "string",
               "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
               "not": {
-                "pattern": "\\n"
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               }
             }
           },
@@ -518,9 +518,9 @@
       "properties": {
         "address": {
           "type": "string",
-          "pattern": "^[^\\s]*:[0-9]{1,5}$",
+          "pattern": "^[^\\t \\xA0  -   　]*:[0-9]{1,5}$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "host:port, for example \":8080\" or \"127.0.0.1:8080\"."
         }
@@ -653,9 +653,9 @@
       "properties": {
         "address": {
           "type": "string",
-          "pattern": "^[^\\s]*:[0-9]{1,5}$",
+          "pattern": "^[^\\t \\xA0  -   　]*:[0-9]{1,5}$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "host:port for /health/live and /health/ready."
         }

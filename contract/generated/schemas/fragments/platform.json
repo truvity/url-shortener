@@ -30,7 +30,7 @@
           "type": "string",
           "pattern": "^(sha256:[0-9a-f]{64})?$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "The content digest, `sha256:` and 64 hex digits; empty when there is none."
         }
@@ -173,9 +173,9 @@
         },
         "mountPath": {
           "type": "string",
-          "pattern": "^/.+",
+          "pattern": "^/[^\\n]+",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "Defaults to /var/run/identity."
         },
@@ -233,7 +233,7 @@
       "propertyNames": {
         "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
         "not": {
-          "pattern": "\\n"
+          "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
         }
       },
       "additionalProperties": {
@@ -313,9 +313,9 @@
         },
         "mountPath": {
           "type": "string",
-          "pattern": "^/.+",
+          "pattern": "^/[^\\n]+",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`."
         },
@@ -356,7 +356,7 @@
           "type": "string",
           "pattern": "^/",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "The path on the probe listener. Defaults to the contract's own."
         },

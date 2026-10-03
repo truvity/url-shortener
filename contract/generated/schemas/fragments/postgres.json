@@ -13,7 +13,7 @@
       "type": "string",
       "pattern": "^postgres(ql)?://",
       "not": {
-        "pattern": "\\n"
+        "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
       },
       "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require."
     },

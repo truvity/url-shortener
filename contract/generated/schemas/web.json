@@ -55,7 +55,7 @@
             "type": "string",
             "pattern": "^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$",
             "not": {
-              "pattern": "\\n"
+              "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
             }
           },
           "description": "Origins the page may connect to besides its own, added to `connect-src 'self'`. Each is a bare origin, scheme and host and optional port, never a path and never a keyword.",
@@ -63,9 +63,9 @@
         },
         "reportUri": {
           "type": "string",
-          "pattern": "^[^\\s;,'\"]*$",
+          "pattern": "^[^\\t \\xA0  -   　;,'\"]*$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "Where a browser POSTs violation reports. A path on this origin or an absolute URL; empty or absent adds no report-uri directive."
         }
@@ -83,9 +83,9 @@
         },
         "collectorUrl": {
           "type": "string",
-          "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$",
+          "pattern": "^(https://[^\\t \\xA0  -   　'\"<>;,]+|/[^\\t \\xA0  -   　'\"<>;,?#]*)$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "Where the page POSTs telemetry: a path on its own origin (the default, `/faro/collect`, which the gateway routes to the collector, so connect-src 'self' is enough) or an absolute HTTPS URL, whose origin is then added to connect-src.",
           "default": "/faro/collect"
@@ -94,7 +94,7 @@
           "type": "string",
           "pattern": "^[A-Za-z0-9._~-]*$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "description": "The app's public key at the collector, sent as `x-api-key`. A public identifier, not a secret."
         },

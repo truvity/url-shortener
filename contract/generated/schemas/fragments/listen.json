@@ -11,9 +11,9 @@
   "properties": {
     "address": {
       "type": "string",
-      "pattern": "^[^\\s]*:[0-9]{1,5}$",
+      "pattern": "^[^\\t \\xA0  -   　]*:[0-9]{1,5}$",
       "not": {
-        "pattern": "\\n"
+        "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
       },
       "description": "host:port, for example \":8080\" or \"127.0.0.1:8080\"."
     }

@@ -3,9 +3,12 @@
 module urlshortener.charts.UrlShortenerE2e
 
 import "@vocab/Annotations.pkl" as A
+import "@vocab/Check.pkl"
 import "@vocab/Vocab.pkl" as V
 
-appRelease: V.NonEmptyString
+/// The application release under test. Every install names its own.
+@A.SetAtInstall
+appRelease: V.NonEmptyString?
 
 mode: "full" | "tenant" = "full"
 
@@ -26,7 +29,7 @@ pullPolicy: V.PullPolicy = "IfNotPresent"
 job: Job
 
 /// Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale.
-resources: V.OpenObject
+resources: V.OpenObject = new Dynamic { requests { cpu = "50m"; memory = "64Mi" } }
 
 serviceAccount: ServiceAccount?
 
@@ -39,21 +42,31 @@ tls: Tls?
 otel: Otel?
 
 class DatabaseOwner {
-  role: V.NonEmptyString
+  /// The owner role. Every install names its own.
+  @A.SetAtInstall
+  role: V.NonEmptyString?
 }
 
 class DatabaseApp {
-  role: V.NonEmptyString
+  /// The role the service connects as. Every install names its own.
+  @A.SetAtInstall
+  role: V.NonEmptyString?
 
-  passwordSecret: V.NonEmptyString
+  /// The Secret holding the role's password. Every install names its own.
+  @A.SetAtInstall
+  passwordSecret: V.NonEmptyString?
 
   passwordKey: V.NonEmptyString = "password"
 }
 
 class Database {
-  host: V.NonEmptyString
+  /// The database host. Every install names its own.
+  @A.SetAtInstall
+  host: V.NonEmptyString?
 
-  name: V.NonEmptyString
+  /// The database name. Every install names its own.
+  @A.SetAtInstall
+  name: V.NonEmptyString?
 
   owner: DatabaseOwner
 
@@ -61,19 +74,27 @@ class Database {
 }
 
 class Events {
-  stream: V.NonEmptyString
+  /// Every name below is given by the install, never derived.
+  @A.SetAtInstall
+  stream: V.NonEmptyString?
 
-  redirectSubject: V.NonEmptyString
+  @A.SetAtInstall
+  redirectSubject: V.NonEmptyString?
 
-  requestSubject: V.NonEmptyString
+  @A.SetAtInstall
+  requestSubject: V.NonEmptyString?
 
-  statConsumer: V.NonEmptyString
+  @A.SetAtInstall
+  statConsumer: V.NonEmptyString?
 
-  logConsumer: V.NonEmptyString
+  @A.SetAtInstall
+  logConsumer: V.NonEmptyString?
 }
 
 class Archive {
-  bucket: V.NonEmptyString
+  /// The bucket, which exists already. Every install names its own.
+  @A.SetAtInstall
+  bucket: V.NonEmptyString?
 
   region: String = ""
 
@@ -139,7 +160,8 @@ class JobTls {
 
 class Job {
   /// OPTIONAL, and UNSET by default: a GitOps controller with self-heal on recreates a Job that deleted itself, so templates/job.yaml renders this key only when it is set. Absent or null skip it; a value must still clear the floor below.
-  ttlSecondsAfterFinished: Int?
+  @A.Range { min = 120 }
+  ttlSecondsAfterFinished: V.PositiveInt?
 
   backoffLimit: V.NonNegativeInt = 0
 
@@ -186,7 +208,7 @@ class Prober {
   pullPolicy: V.PullPolicy = "IfNotPresent"
 
   /// Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale.
-  resources: V.OpenObject?
+  resources: V.OpenObject = new Dynamic { requests { cpu = "10m"; memory = "32Mi" } }
 
   log: ProberLog?
 
@@ -203,7 +225,8 @@ class TlsComponentsUrls {
 
 /// Never `strict`: the application chart runs redirect behind a gateway that terminates TLS.
 class TlsComponentsRedirect {
-  mode: ("off" | "permissive")?
+  /// `strict` is refused by the hand-written schema and accepted here: the vocabulary has no enum of `off` and `permissive` (a literal union in two modules must be one).
+  mode: V.TlsMode?
 }
 
 /// Per-target override of tls.mode: the mode the APPLICATION RELEASE runs `urls` and `redirect` in, which decides the port and scheme this chart's callers dial. Same meaning as charts/url-shortener's own tls.components. Unset means tls.mode.
@@ -242,11 +265,15 @@ class Tls {
 class Otel {
   endpoint: String = ""
 
-  protocol: "http/protobuf" | "grpc" = "http/protobuf"
+  protocol: V.OtelProtocol = "http/protobuf"
 
   tracesSampler: V.NonEmptyString = "parentbased_traceidratio"
 
   sampleRatio: V.NonEmptyString = "0.1"
 
   resourceAttributes: Mapping<String, String> = new Mapping {}
+}
+
+output {
+  value = Check.checked(module)
 }

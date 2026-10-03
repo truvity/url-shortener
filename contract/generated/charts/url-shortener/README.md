@@ -4,28 +4,28 @@
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `service-lib.global` | OpenObject |  |  |
+| `service-lib.global` | OpenObject |  | Helm's own `global` block, passed through unchanged. |
 | `installName` | string | `""` | The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters. |
-| `database.host` | NonEmptyString |  | **Required.**  |
+| `database.host` | NonEmptyString |  | **Set at install.** The database host. Every install names its own. |
 | `database.name` | NonEmptyString | `"url_shortener"` |  |
 | `database.clusterDomain` | NonEmptyString | `"cluster.local"` |  |
 | `database.tls.mode` | "verify-full" | `"verify-full"` | Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused. |
 | `database.tls.rootCA.configMapName` | string | `""` | The ConfigMap holding the root the database server certificate chains to. Required. |
 | `database.tls.rootCA.key` | NonEmptyString | `"ca-certificates.crt"` |  |
 | `database.owner.role` | NonEmptyString | `"url_shortener_owner"` |  |
-| `database.owner.passwordSecret` | NonEmptyString |  | **Required.**  |
+| `database.owner.passwordSecret` | NonEmptyString |  | **Set at install.** The Secret holding the role's password. Every install names its own. |
 | `database.owner.passwordKey` | NonEmptyString | `"password"` |  |
 | `database.app.role` | NonEmptyString | `"url_shortener_app"` |  |
-| `database.app.passwordSecret` | NonEmptyString |  | **Required.**  |
+| `database.app.passwordSecret` | NonEmptyString |  | **Set at install.** The Secret holding the role's password. Every install names its own. |
 | `database.app.passwordKey` | NonEmptyString | `"password"` |  |
-| `events.url` | NonEmptyString |  | **Required.**  |
+| `events.url` | NonEmptyString |  | **Set at install.** The events server's URL. Every install names its own. |
 | `events.auth.audience` | string | `""` |  |
-| `events.auth.expirationSeconds` | integer | `3600` |  |
+| `events.auth.expirationSeconds` | PositiveInt | `3600` |  |
 | `events.tls.enabled` | boolean | `false` |  |
 | `events.tls.serverName` | string | `""` |  |
 | `events.tls.caConfigMap` | string | `""` |  |
 | `events.tls.caKey` | NonEmptyString | `"ca-certificates.crt"` |  |
-| `archive.bucket.name` | string | `""` | The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema. |
+| `archive.bucket.name` | NonEmptyString |  | **Set at install.** The bucket, which exists already. Every install names its own. |
 | `archive.bucket.region` | string | `""` |  |
 | `archive.bucket.endpoint` | string | `""` |  |
 | `archive.bucket.ca` | string | `""` |  |
@@ -42,13 +42,13 @@
 | `replicas.log` | NonNegativeInt | `2` |  |
 | `replicas.urls` | NonNegativeInt | `2` |  |
 | `replicas.web` | NonNegativeInt | `2` |  |
-| `resources.redirect` | OpenObject |  |  |
-| `resources.stat` | OpenObject |  |  |
-| `resources.migrate` | OpenObject |  |  |
-| `resources.log` | OpenObject |  |  |
-| `resources.urls` | OpenObject |  |  |
-| `resources.web` | OpenObject |  |  |
-| `resources.verify` | OpenObject |  |  |
+| `resources.redirect` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
+| `resources.stat` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
+| `resources.migrate` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
+| `resources.log` | OpenObject | `{"requests": {"cpu": "50m", "memory": "128Mi"}}` |  |
+| `resources.urls` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
+| `resources.web` | OpenObject | `{"requests": {"cpu": "50m", "memory": "96Mi"}}` |  |
+| `resources.verify` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
 | `route.enabled` | boolean | `false` |  |
 | `route.hostname` | string | `""` |  |
 | `route.parentRef.name` | string | `""` |  |
@@ -61,16 +61,16 @@
 | `route.faro.ruleName` | NonEmptyString | `"faro"` |  |
 | `route.faro.path` | UrlPath | `"/faro/collect"` |  |
 | `route.faro.rewritePath` | UrlPathOrEmpty | `""` |  |
-| `route.faro.requestBufferLimit` | string | `""` | The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy. |
+| `route.faro.requestBufferLimit` | BufferLimit |  | The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Absent renders no policy. |
 | `route.faro.backend.name` | string | `""` |  |
 | `route.faro.backend.namespace` | string | `""` |  |
-| `route.faro.backend.port` | integer | `0` |  |
+| `route.faro.backend.port` | NonNegativeInt | `0` |  |
 | `route.redirectRuleName` | NonEmptyString | `"redirect"` | The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver. |
 | `serviceAccount.create` | boolean | `true` |  |
 | `serviceAccount.app.name` | string | `""` |  |
-| `serviceAccount.app.annotations` | map of string | `Map()` |  |
+| `serviceAccount.app.annotations` | map of string | `{}` |  |
 | `serviceAccount.migrate.name` | string | `""` |  |
-| `serviceAccount.migrate.annotations` | map of string | `Map()` |  |
+| `serviceAccount.migrate.annotations` | map of string | `{}` |  |
 | `serviceAccount.components.redirect.name` | DnsName |  |  |
 | `serviceAccount.components.redirect.annotations` | map of string |  |  |
 | `serviceAccount.components.urls.name` | DnsName |  |  |
@@ -133,7 +133,7 @@
 | `images.web.digest` | string | `""` |  |
 | `pullPolicy` | PullPolicy | `"IfNotPresent"` |  |
 | `otel.endpoint` | string | `""` |  |
-| `otel.protocol` | "http/protobuf" \| "grpc" | `"http/protobuf"` |  |
+| `otel.protocol` | OtelProtocol | `"http/protobuf"` |  |
 | `otel.tracesSampler` | NonEmptyString | `"parentbased_traceidratio"` |  |
 | `otel.sampleRatio` | NonEmptyString | `"0.1"` |  |
-| `otel.resourceAttributes` | map of string | `Map()` |  |
+| `otel.resourceAttributes` | map of string | `{}` |  |

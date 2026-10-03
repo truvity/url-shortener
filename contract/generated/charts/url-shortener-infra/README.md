@@ -14,7 +14,7 @@
 | `cloud.serviceAccount` | string | `""` |  |
 | `cloud.permissionsBoundary` | string | `""` |  |
 | `cloud.project` | string | `""` | The project this install belongs to, tagged as `project` beside `cluster` on every AWS resource this chart creates. Empty means this release's own namespace — the platforms this chart targets already treat a namespace as a project. |
-| `cloud.tags` | map of string | `Map()` | Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here. |
+| `cloud.tags` | map of string | `{}` | Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here. |
 | `postgres.instances` | PositiveInt | `1` |  |
 | `postgres.storage` | NonEmptyString | `"1Gi"` |  |
 | `postgres.database` | NonEmptyString | `"url_shortener"` |  |
@@ -23,11 +23,11 @@
 | `postgres.runtimePasswordSecret` | string | `""` |  |
 | `postgres.tenantScopedNames` | boolean | `false` | Off by default, so every existing consumer keeps the fixed database and role names byte-for-byte. When true, `database`, `ownerRole` and `runtimeRole` are derived from this install's tenant scope instead, for whichever of the three a caller left at its own chart default; an explicit value always wins regardless of this flag. |
 | `postgres.runtimePassword.generate` | boolean | `false` |  |
-| `postgres.runtimePassword.length` | integer | `32` |  |
-| `postgres.labels` | map of string | `Map()` |  |
+| `postgres.runtimePassword.length` | PositiveInt | `32` |  |
+| `postgres.labels` | map of string | `{}` |  |
 | `postgres.platformOwned` | boolean | `false` |  |
-| `postgres.annotations` | map of string | `Map()` |  |
-| `postgres.scheduling.nodeSelector` | map of string | `Map()` |  |
+| `postgres.annotations` | map of string | `{}` |  |
+| `postgres.scheduling.nodeSelector` | map of string | `{}` |  |
 | `postgres.scheduling.tolerations` | list of OpenObject | `[]` |  |
 | `postgres.backup.objectStoreName` | string | `""` |  |
 | `postgres.backup.serverName` | string | `""` |  |

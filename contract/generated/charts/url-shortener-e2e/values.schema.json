@@ -10,13 +10,13 @@
     "events",
     "archive",
     "images",
-    "job",
-    "resources"
+    "job"
   ],
   "properties": {
     "appRelease": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "The application release under test. Every install names its own."
     },
     "mode": {
       "enum": [
@@ -41,11 +41,13 @@
       "properties": {
         "host": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "The database host. Every install names its own."
         },
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "The database name. Every install names its own."
         },
         "owner": {
           "type": "object",
@@ -56,7 +58,8 @@
           "properties": {
             "role": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "The owner role. Every install names its own."
             }
           }
         },
@@ -70,11 +73,13 @@
           "properties": {
             "role": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "The role the service connects as. Every install names its own."
             },
             "passwordSecret": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "The Secret holding the role's password. Every install names its own."
             },
             "passwordKey": {
               "type": "string",
@@ -98,7 +103,8 @@
       "properties": {
         "stream": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Every name below is given by the install, never derived."
         },
         "redirectSubject": {
           "type": "string",
@@ -127,7 +133,8 @@
       "properties": {
         "bucket": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "The bucket, which exists already. Every install names its own."
         },
         "region": {
           "type": "string",
@@ -267,6 +274,7 @@
       "properties": {
         "ttlSecondsAfterFinished": {
           "type": "integer",
+          "minimum": 120,
           "description": "OPTIONAL, and UNSET by default: a GitOps controller with self-heal on recreates a Job that deleted itself, so templates/job.yaml renders this key only when it is set. Absent or null skip it; a value must still clear the floor below."
         },
         "backoffLimit": {
@@ -302,7 +310,13 @@
     },
     "resources": {
       "type": "object",
-      "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+      "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale.",
+      "default": {
+        "requests": {
+          "cpu": "50m",
+          "memory": "64Mi"
+        }
+      }
     },
     "serviceAccount": {
       "type": "object",
@@ -361,7 +375,7 @@
           "type": "string",
           "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
           "not": {
-            "pattern": "\\n"
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           },
           "default": "60s"
         },
@@ -375,7 +389,13 @@
         },
         "resources": {
           "type": "object",
-          "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+          "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale.",
+          "default": {
+            "requests": {
+              "cpu": "10m",
+              "memory": "32Mi"
+            }
+          }
         },
         "log": {
           "type": "object",
@@ -476,8 +496,10 @@
                 "mode": {
                   "enum": [
                     "off",
-                    "permissive"
-                  ]
+                    "permissive",
+                    "strict"
+                  ],
+                  "description": "`strict` is refused by the hand-written schema and accepted here: the vocabulary has no enum of `off` and `permissive` (a literal union in two modules must be one)."
                 }
               },
               "description": "Never `strict`: the application chart runs redirect behind a gateway that terminates TLS."
@@ -543,8 +565,9 @@
         },
         "protocol": {
           "enum": [
+            "grpc",
             "http/protobuf",
-            "grpc"
+            "http/json"
           ],
           "default": "http/protobuf"
         },

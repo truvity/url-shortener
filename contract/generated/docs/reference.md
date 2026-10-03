@@ -28,33 +28,33 @@
 
 ## Types
 
-The constrained types the fields use. A pattern is a search, and never matches a string with a newline in it.
+The constrained types the fields use. A pattern is a search, and never matches a string with a line break in it.
 
 | Type | Kind | Constraints | Description |
 |---|---|---|---|
-| `HostPort` | string | matches `^[^\s]*:[0-9]{1,5}$`, never a newline | host:port as the configuration contract spells it today. It does NOT bound the port at 65535, because the hand-written pattern does not; `Port` is the stricter vocabulary a contract may move to. |
+| `HostPort` | string | matches `^[^\t \xA0  -   　]*:[0-9]{1,5}$`, never a line break | host:port as the configuration contract spells it today. It does NOT bound the port at 65535, because the hand-written pattern does not; `Port` is the stricter vocabulary a contract may move to. |
 | `TlsMode` | one of `off`, `permissive`, `strict` |  | How a workload's transport is authenticated. |
 | `NonEmptyString` | string | at least 1 character | A string of at least one character. |
-| `EnvName` | string | matches `^[A-Za-z_][A-Za-z0-9_]*$`, never a newline | The name of an environment variable. |
+| `EnvName` | string | matches `^[A-Za-z_][A-Za-z0-9_]*$`, never a line break | The name of an environment variable. |
 | `LogLevel` | one of `debug`, `info`, `warn`, `error` |  | The lowest level a service writes. |
 | `PositiveInt` | integer | at least 1 | A whole number of at least one. |
 | `Url` | string | format `uri` | An RFC 3986 URI. `format: uri` is an annotation here, never asserted, so the alias asserts nothing either. |
-| `ImageDigest` | string | matches `^(sha256:[0-9a-f]{64})?$`, never a newline | An image digest, or empty when there is none. |
+| `ImageDigest` | string | matches `^(sha256:[0-9a-f]{64})?$`, never a line break | An image digest, or empty when there is none. |
 | `PullPolicy` | one of `Always`, `IfNotPresent`, `Never` |  | When a container image is pulled. |
 | `NonNegativeInt` | integer | at least 0 | A whole number of at least zero. |
 | `OpenObject` | open |  | Kubernetes' own object shape, passed through unchanged. |
-| `RootedPath` | string | matches `^/`, never a newline | A path that starts at the root, the root itself included. |
-| `AbsPath` | string | matches `^/.+`, never a newline | An absolute path that is not the root. |
+| `RootedPath` | string | matches `^/`, never a line break | A path that starts at the root, the root itself included. |
+| `AbsPath` | string | matches `^/[^\n]+`, never a line break | An absolute path that is not the root. |
 | `OtelProtocol` | one of `grpc`, `http/protobuf`, `http/json` |  | The protocol OpenTelemetry exports over. |
 | `Named` | open | has the keys `name` | An open object that must carry `name`. |
 | `Mounted` | open | has the keys `name`, `mountPath` | An open object that must carry `name` and `mountPath`. |
-| `PostgresUrl` | string | matches `^postgres(ql)?://`, never a newline | A PostgreSQL connection URL, by its scheme. |
-| `GoDuration` | string | matches `^[0-9]+(ns\|us\|µs\|ms\|s\|m\|h)$`, never a newline | A duration in Go's spelling, as a string: `10s`, `500ms`. Pkl's own `Duration` renders as an object, which no other language reads. |
+| `PostgresUrl` | string | matches `^postgres(ql)?://`, never a line break | A PostgreSQL connection URL, by its scheme. |
+| `GoDuration` | string | matches `^[0-9]+(ns\|us\|µs\|ms\|s\|m\|h)$`, never a line break | A duration in Go's spelling, as a string: `10s`, `500ms`. Pkl's own `Duration` renders as an object, which no other language reads. |
 | `CspMode` | one of `off`, `report-only`, `enforce` |  | What a page's content security policy does. |
-| `HttpOrigin` | string | matches `^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$`, never a newline | A bare web origin: scheme, host and an optional port, never a path. |
-| `ReportUri` | string | matches `^[^\s;,'"]*$`, never a newline | Where a browser reports a violation: empty, a path or an absolute URL, with nothing that would end a directive. |
-| `CollectorUrl` | string | matches `^(https://[^\s'"<>;,]+\|/[^\s'"<>;,?#]*)$`, never a newline | Where a page posts telemetry: a path on its own origin, or an absolute HTTPS URL. |
-| `PublicKey` | string | matches `^[A-Za-z0-9._~-]*$`, never a newline | A public identifier: URL-safe characters only. Not a secret. |
+| `HttpOrigin` | string | matches `^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$`, never a line break | A bare web origin: scheme, host and an optional port, never a path. |
+| `ReportUri` | string | matches `^[^\t \xA0  -   　;,'"]*$`, never a line break | Where a browser reports a violation: empty, a path or an absolute URL, with nothing that would end a directive. |
+| `CollectorUrl` | string | matches `^(https://[^\t \xA0  -   　'"<>;,]+\|/[^\t \xA0  -   　'"<>;,?#]*)$`, never a line break | Where a page posts telemetry: a path on its own origin, or an absolute HTTPS URL. |
+| `PublicKey` | string | matches `^[A-Za-z0-9._~-]*$`, never a line break | A public identifier: URL-safe characters only. Not a secret. |
 | `Ratio` | number | from 0 to 1 | A fraction, zero to one. |
 
 ## Classes
@@ -109,7 +109,7 @@ Document `https://github.com/truvity/policy/schemas/fragments/listen.json`.
 
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
-| `address` | HostPort | yes |  | matches `^[^\s]*:[0-9]{1,5}$`, never a newline | host:port, for example ":8080" or "127.0.0.1:8080". |
+| `address` | HostPort | yes |  | matches `^[^\t \xA0  -   　]*:[0-9]{1,5}$`, never a line break | host:port, for example ":8080" or "127.0.0.1:8080". |
 
 ### `TlsFields`
 
@@ -142,7 +142,7 @@ A store the service reads. The token is a SECRET, so the file names the environm
 
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
-| `tokenEnv` | EnvName | yes |  | matches `^[A-Za-z_][A-Za-z0-9_]*$`, never a newline | **Names a secret.**  |
+| `tokenEnv` | EnvName | yes |  | matches `^[A-Za-z_][A-Za-z0-9_]*$`, never a line break | **Names a secret.**  |
 
 ### `Probes`
 
@@ -152,7 +152,7 @@ Document `https://github.com/truvity/policy/schemas/fragments/probes.json`.
 
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
-| `address` | HostPort | yes |  | matches `^[^\s]*:[0-9]{1,5}$`, never a newline | host:port for /health/live and /health/ready. |
+| `address` | HostPort | yes |  | matches `^[^\t \xA0  -   　]*:[0-9]{1,5}$`, never a line break | host:port for /health/live and /health/ready. |
 
 ### `Log`
 
@@ -267,7 +267,7 @@ Where the image is. A digest when there is one; a tag only when there is not. Le
 | `registry` | string | no |  |  | The registry host. Left out, the repository is read as the whole name. |
 | `repository` | NonEmptyString | yes |  | at least 1 character | The repository path, without the registry and without a tag. |
 | `tag` | string | no |  |  | The tag. Empty or absent when there is a digest. |
-| `digest` | ImageDigest | no |  | matches `^(sha256:[0-9a-f]{64})?$`, never a newline | The content digest, `sha256:` and 64 hex digits; empty when there is none. |
+| `digest` | ImageDigest | no |  | matches `^(sha256:[0-9a-f]{64})?$`, never a line break | The content digest, `sha256:` and 64 hex digits; empty when there is none. |
 
 ### `PlatformStrategy`
 
@@ -322,7 +322,7 @@ One probe's timing. Every field has the library's own default.
 
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
-| `path` | RootedPath | no |  | matches `^/`, never a newline | The path on the probe listener. Defaults to the contract's own. |
+| `path` | RootedPath | no |  | matches `^/`, never a line break | The path on the probe listener. Defaults to the contract's own. |
 | `periodSeconds` | PositiveInt | no |  | at least 1 | How often to probe, in seconds. |
 | `initialDelaySeconds` | NonNegativeInt | no |  | at least 0 | How long to wait after the start before the first probe, in seconds. |
 | `timeoutSeconds` | PositiveInt | no |  | at least 1 | How long one probe may take, in seconds. |
@@ -344,7 +344,7 @@ Where the platform mounts the workload identity. The files the component's own `
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
 | `csiDriver` | NonEmptyString | no |  | at least 1 character | The driver that mounts the identity. The platform's, so there is no default; required once the identity is mounted. |
-| `mountPath` | AbsPath | no |  | matches `^/.+`, never a newline | Defaults to /var/run/identity. |
+| `mountPath` | AbsPath | no |  | matches `^/[^\n]+`, never a line break | Defaults to /var/run/identity. |
 | `mount` | boolean | no |  |  | Defaults to whether `config.tls.mode` is permissive or strict. True mounts the identity into a component that presents none of its own, because the release does; false never mounts it. |
 
 ### `PlatformTelemetry`
@@ -385,7 +385,7 @@ How the file reaches the process. The path is ONE argument or ONE environment va
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
 | `fileName` | NonEmptyString | no |  | at least 1 character | Defaults to `<component>.yaml`. |
-| `mountPath` | AbsPath | no |  | matches `^/.+`, never a newline | The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`. |
+| `mountPath` | AbsPath | no |  | matches `^/[^\n]+`, never a line break | The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`. |
 | `pathFlag` | NonEmptyString | no |  | at least 1 character | The argument that carries the path. Defaults to `-config`. |
 | `pathEnv` | NonEmptyString | no |  | at least 1 character | **Names a secret.** When set, the path is passed in this environment variable instead of an argument. |
 
@@ -405,7 +405,7 @@ Document `https://github.com/truvity/policy/schemas/fragments/postgres.json`.
 
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
-| `url` | PostgresUrl | yes |  | matches `^postgres(ql)?://`, never a newline | A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require. |
+| `url` | PostgresUrl | yes |  | matches `^postgres(ql)?://`, never a line break | A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require. |
 | `passwordEnv` | NonEmptyString | no |  | at least 1 character | **Names a secret.** The NAME of the environment variable holding the password. Unset means the connection needs none. |
 | `maxConnections` | PositiveInt | no | `10` | at least 1 | Pool size for this instance. Sized against the server's limit divided by the number of instances, not guessed. |
 
@@ -468,9 +468,9 @@ Document `https://example.com/url-shortener/schemas/prober.json`.
 
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
-| `interval` | GoDuration | yes |  | matches `^[0-9]+(ns\|us\|µs\|ms\|s\|m\|h)$`, never a newline | How often the loop repeats one full pass of every journey, as a Go duration string, for example "10s". |
+| `interval` | GoDuration | yes |  | matches `^[0-9]+(ns\|us\|µs\|ms\|s\|m\|h)$`, never a line break | How often the loop repeats one full pass of every journey, as a Go duration string, for example "10s". |
 | `keyPrefix` | NonEmptyString | no |  | at least 1 character | Marks every long URL and key this prober invents, the same role examples/url-shortener/e2e/suite's own testDataPrefix plays for the e2e suite: a person reading the urls table or the archive bucket by hand can tell synthetic traffic from a real caller's at a glance. |
-| `statSettle` | GoDuration | no |  | matches `^[0-9]+(ns\|us\|µs\|ms\|s\|m\|h)$`, never a newline | How long the "stat" journey keeps watching a link's click count AFTER it first reads exactly 1, as a Go duration string, and fails if it moves again. A consumer that fails to acknowledge a message has it redelivered after its ack wait, so a click counted twice looks right at the first read and wrong one ack wait later; this window has to outlast at least one redelivery, so it defaults to twice the consumer's 30s ack wait ("60s"). "0s" turns the hold off. |
+| `statSettle` | GoDuration | no |  | matches `^[0-9]+(ns\|us\|µs\|ms\|s\|m\|h)$`, never a line break | How long the "stat" journey keeps watching a link's click count AFTER it first reads exactly 1, as a Go duration string, and fails if it moves again. A consumer that fails to acknowledge a message has it redelivered after its ack wait, so a click counted twice looks right at the first read and wrong one ack wait later; this window has to outlast at least one redelivery, so it defaults to twice the consumer's 30s ack wait ("60s"). "0s" turns the hold off. |
 | `urls` | ProberUrls | yes |  |  | The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is a platform decision this component does not make for itself. |
 | `redirect` | ProberRedirect | yes |  |  | The service that resolves a short key. An address and nothing else, on the same terms as `urls` above. |
 | `tls` | Tls | no |  | when `mode` is `permissive` or `strict`, `certFile`, `keyFile`, `caFile`, `trustDomain` are required |  |
@@ -588,7 +588,7 @@ The Content-Security-Policy this server sends with every response. Absent means 
 |---|---|---|---|---|---|
 | `mode` | CspMode | no | `"report-only"` |  | `report-only` sends Content-Security-Policy-Report-Only: a browser reports a violation to its console (and to reportUri) and blocks nothing. `enforce` sends Content-Security-Policy. `off` sends neither. |
 | `connectSrc` | list of HttpOrigin | no | `[]` |  | Origins the page may connect to besides its own, added to `connect-src 'self'`. Each is a bare origin, scheme and host and optional port, never a path and never a keyword. |
-| `reportUri` | ReportUri | no |  | matches `^[^\s;,'"]*$`, never a newline | Where a browser POSTs violation reports. A path on this origin or an absolute URL; empty or absent adds no report-uri directive. |
+| `reportUri` | ReportUri | no |  | matches `^[^\t \xA0  -   　;,'"]*$`, never a line break | Where a browser POSTs violation reports. A path on this origin or an absolute URL; empty or absent adds no report-uri directive. |
 
 ### `WebFaro`
 
@@ -597,8 +597,8 @@ Browser telemetry (Grafana Faro). Absent, or `enabled: false`, means the page se
 | Field | Type | Required | Default | Constraints | Description |
 |---|---|---|---|---|---|
 | `enabled` | boolean | no | `false` |  | Whether the page sends telemetry at all. |
-| `collectorUrl` | CollectorUrl | no | `"/faro/collect"` | matches `^(https://[^\s'"<>;,]+\|/[^\s'"<>;,?#]*)$`, never a newline | Where the page POSTs telemetry: a path on its own origin (the default, `/faro/collect`, which the gateway routes to the collector, so connect-src 'self' is enough) or an absolute HTTPS URL, whose origin is then added to connect-src. |
-| `apiKey` | PublicKey | no |  | matches `^[A-Za-z0-9._~-]*$`, never a newline | The app's public key at the collector, sent as `x-api-key`. A public identifier, not a secret. |
+| `collectorUrl` | CollectorUrl | no | `"/faro/collect"` | matches `^(https://[^\t \xA0  -   　'"<>;,]+\|/[^\t \xA0  -   　'"<>;,?#]*)$`, never a line break | Where the page POSTs telemetry: a path on its own origin (the default, `/faro/collect`, which the gateway routes to the collector, so connect-src 'self' is enough) or an absolute HTTPS URL, whose origin is then added to connect-src. |
+| `apiKey` | PublicKey | no |  | matches `^[A-Za-z0-9._~-]*$`, never a line break | The app's public key at the collector, sent as `x-api-key`. A public identifier, not a secret. |
 | `appName` | NonEmptyString | no | `"url-shortener-web"` | at least 1 character | The app name the collector sees. |
 | `environment` | string | no |  |  | A label for where this install runs, for example `devel`. |
 | `sampleRate` | Ratio | no | `1` | from 0 to 1 | The fraction of browser SESSIONS that report anything, 0 to 1. |

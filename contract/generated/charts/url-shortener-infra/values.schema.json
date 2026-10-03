@@ -117,6 +117,7 @@
             },
             "length": {
               "type": "integer",
+              "minimum": 16,
               "default": 32
             }
           },
