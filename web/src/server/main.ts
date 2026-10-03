@@ -11,7 +11,15 @@
  * consuming side.
  */
 import { start as startTelemetry } from "@truvity/policy/telemetry";
-import { context, propagation, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  context,
+  type Histogram,
+  metrics,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
@@ -231,7 +239,31 @@ async function readBody(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-// traced wraps a request in a SERVER span.
+// The OpenTelemetry HTTP semantic convention's name for a server's request
+// duration, in seconds. A Prometheus-compatible store sees it as
+// http_server_request_duration_seconds_*.
+export const REQUEST_DURATION = "http.server.request.duration";
+
+let requestDuration: Histogram | undefined;
+
+// The histogram, made on first use: the global meter provider is installed by
+// startTelemetry() AFTER this module is imported, and an instrument made
+// before that would stay a no-op. With no endpoint configured the provider is
+// the API's no-op one and recording costs nothing.
+function durationHistogram(): Histogram {
+  requestDuration ??= metrics.getMeter("url-shortener-web").createHistogram(REQUEST_DURATION, {
+    unit: "s",
+    description: "Duration of HTTP server requests.",
+    // The boundaries the semantic conventions advise; the SDK default is
+    // sized for milliseconds and puts every request in one bucket.
+    advice: {
+      explicitBucketBoundaries: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10],
+    },
+  });
+  return requestDuration;
+}
+
+// traced wraps a request in a SERVER span, and records its duration.
 //
 // Installing exporters is not instrumentation. A provider with nothing
 // creating spans exports nothing, and the only symptom is a service that
@@ -252,6 +284,8 @@ export async function traced(
   // Named for the ROUTE, never the path: `/api/urls/abc12345` as a span
   // name makes one span per key, and a trace store groups by name.
   const route = routeOf(req);
+  const started = performance.now();
+  let failed = false;
 
   await context.with(incoming, async () => {
     const span = tracer.startSpan(`${req.method ?? "GET"} ${route}`, {
@@ -266,11 +300,19 @@ export async function traced(
         span.setStatus({ code: SpanStatusCode.ERROR });
       }
     } catch (error) {
+      failed = true;
       span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
       span.recordException(error as Error);
       throw error;
     } finally {
       span.end();
+      // The same low-cardinality route as the span, never the path, and
+      // the status the client saw (a handler that threw is a 500).
+      durationHistogram().record((performance.now() - started) / 1000, {
+        "http.request.method": req.method ?? "GET",
+        "http.route": route,
+        "http.response.status_code": failed ? 500 : res.statusCode,
+      });
     }
   });
 }

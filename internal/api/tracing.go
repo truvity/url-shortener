@@ -49,12 +49,10 @@ func Tracing() fiber.Handler {
 
 		c.SetContext(ctx)
 
+		own := c.Route()
 		err := c.Next()
 
-		route := c.Route().Path
-		if route == "" {
-			route = "unmatched"
-		}
+		route := routeOf(c, own)
 		span.SetName(c.Method() + " " + route)
 		span.SetAttributes(semconv.HTTPRouteKey.String(route))
 
