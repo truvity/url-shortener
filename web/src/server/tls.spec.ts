@@ -180,7 +180,9 @@ describe("the call to the URL service", () => {
   // (OpenSSL) accepts no other anchor, and the log says so.
   it("refuses a bundle that holds only the issuing authority, and logs the reason", async () => {
     const reasons: string[] = [];
-    const options = tlsOptions({ ...client, caFile: join(dir, "bundle-issuer.crt") }, (r) => reasons.push(r));
+    const options = tlsOptions({ ...client, caFile: join(dir, "bundle-issuer.crt") }, (r) =>
+      reasons.push(r),
+    );
     const session = connect(`https://localhost:${port}`, options);
     await expect(
       new Promise((_, reject) => {
@@ -242,7 +244,9 @@ describe("the front end's own client", () => {
       { ...tls0(), caFile: join(dir, "other.crt") },
       (r) => reasons.push(r),
     );
-    await expect(client.get({ key: "k" })).rejects.toThrow(/issuer certificate|self-signed|unable to verify/);
+    await expect(client.get({ key: "k" })).rejects.toThrow(
+      /issuer certificate|self-signed|unable to verify/,
+    );
     expect(reasons).toHaveLength(1);
   });
 });
