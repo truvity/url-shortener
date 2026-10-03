@@ -25,11 +25,22 @@ export interface Faro {
   sampleRate?: number;
 }
 
+/** The authenticated transport; see tls.ts and the tls fragment's schema. */
+export interface Tls {
+  mode?: "off" | "permissive" | "strict";
+  certFile?: string;
+  keyFile?: string;
+  caFile?: string;
+  trustDomain?: string;
+  peers?: { namespace: string; serviceAccount: string }[];
+}
+
 export interface Web {
   listen: { address: string };
   probes: { address: string };
   log?: { level: string };
   drain?: { seconds: number };
+  tls?: Tls;
   urls: { address: string };
   assets: { directory: string };
   csp?: Csp;

@@ -87,7 +87,7 @@ async function main(): Promise<void> {
   // happened in a Node service exactly like this one.
   const stopTelemetry = await startTelemetry();
 
-  const urls = urlsClient(cfg.urls.address);
+  const urls = urlsClient(cfg.urls.address, cfg.tls);
 
   const app = createServer((req, res) => {
     // The probe listener below is deliberately NOT traced: a readiness

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1951,5 +1952,50 @@ func TestTheTelemetryRouteRuleIsOptionalAndNarrow(t *testing.T) {
 
 	if out, err := render(t, defaults(append(routed, "--set", "route.faro.enabled=true")...)...); err == nil {
 		t.Fatalf("a telemetry rule with no backend rendered:\n%s", out)
+	}
+}
+
+// A component that CALLS the URL service over the authenticated transport
+// holds everything it needs to trust the answer: the identity volume is
+// mounted, and the trust bundle (`caFile`) it verifies the answer against, its
+// own certificate and its key are all named UNDER that mount. The front end is
+// a Node process that verifies the answer against exactly this bundle and
+// nothing else (its built-in roots never include the platform's), so a release
+// where this drifts — the file moved, the mount gone — answers 502 on every
+// listing while every probe stays green. This holds the wiring release 1.36.0
+// rendered: a regression here is a front end that cannot verify its backend.
+func TestTheCallersOfTheURLServiceTrustItsAnswers(t *testing.T) {
+	out, err := render(t, componentArgs()...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	const mount = "/var/run/identity"
+	workloads := workloadsOf(t, out)
+
+	for _, c := range []string{"web", "stat"} {
+		block := tlsOf(t, out, c+".yaml")
+		if block == nil {
+			t.Fatalf("%s has no tls block while the URL service is strict", c)
+		}
+		if block["mode"] != "strict" {
+			t.Errorf("%s tls.mode = %v, want strict", c, block["mode"])
+		}
+		for key, file := range map[string]string{"caFile": "ca.crt", "certFile": "tls.crt", "keyFile": "tls.key"} {
+			if got, want := block[key], mount+"/"+file; got != want {
+				t.Errorf("%s tls.%s = %v, want %s", c, key, got, want)
+			}
+		}
+
+		deploy := workloads["example-"+c]
+		if deploy == nil {
+			t.Fatalf("no workload example-%s in %v", c, workloads)
+		}
+		if volumeNamed(podOf(deploy), "identity") == nil {
+			t.Errorf("%s does not carry the identity volume, so tls.caFile names a file nothing mounts", c)
+		}
+		if !slices.Contains(mountPathsOf(deploy), mount) {
+			t.Errorf("%s does not mount the identity at %s: %v", c, mount, mountPathsOf(deploy))
+		}
 	}
 }

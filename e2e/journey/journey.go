@@ -26,6 +26,7 @@ package journey
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -96,4 +97,48 @@ func Resolve(ctx context.Context, httpClient *http.Client, redirectBase, key str
 	defer func() { _ = resp.Body.Close() }()
 
 	return resp.Header.Get("Location"), resp.StatusCode, nil
+}
+
+// Web is the front end's own journey: its name beside the others.
+const Web = "web"
+
+// ListViaWeb asks the FRONT END for the listing the page shows —
+// GET /api/urls — and returns the keys it answered with. The front end makes
+// that call to the URL service itself, over whatever transport the release
+// runs (an authenticated one when the identity is on), so this is the
+// journey that fails when the front end cannot verify, or be verified by, its
+// backend: the other journeys call the URL service directly and never go
+// through the front end's own client. A non-200 answer is an error here, the
+// one place a 502 means the journey is broken rather than a status to report.
+func ListViaWeb(ctx context.Context, httpClient *http.Client, webBase string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, webBase+"/api/urls?pageSize=100", http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("build the listing request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("the front end answered %d to a listing, wanted %d", resp.StatusCode, http.StatusOK)
+	}
+
+	var body struct {
+		URLs []struct {
+			Key string `json:"key"`
+		} `json:"urls"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("decode the listing: %w", err)
+	}
+
+	keys := make([]string, 0, len(body.URLs))
+	for _, u := range body.URLs {
+		keys = append(keys, u.Key)
+	}
+
+	return keys, nil
 }
