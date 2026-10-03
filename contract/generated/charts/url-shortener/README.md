@@ -6,6 +6,42 @@
 |---|---|---|---|
 | `service-lib.global` | OpenObject |  | Helm's own `global` block, passed through unchanged. |
 | `installName` | string | `""` | The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters. |
+| `alerts.enabled` | boolean | `false` |  |
+| `alerts.ruleLabels` | map of string | `{}` |  |
+| `alerts.alertLabels` | map of NonEmptyString | `{}` |  |
+| `alerts.interval` | string | `""` |  |
+| `alerts.remote.enabled` | boolean | `false` |  |
+| `alerts.remote.clusterName` | string | `""` |  |
+| `alerts.remote.namespace` | string | `""` |  |
+| `alerts.prober.namespace` | string | `""` |  |
+| `alerts.journeyFailing.enabled` | boolean | `true` |  |
+| `alerts.journeyFailing.for` | string | `"10m"` |  |
+| `alerts.journeyFailing.ratio` | number | `0.5` |  |
+| `alerts.journeyFailing.window` | string | `"15m"` |  |
+| `alerts.proberAbsent.enabled` | boolean | `true` |  |
+| `alerts.proberAbsent.for` | string | `"15m"` |  |
+| `alerts.urlsRpcLatency.enabled` | boolean | `true` |  |
+| `alerts.urlsRpcLatency.for` | string | `"15m"` |  |
+| `alerts.urlsRpcLatency.seconds` | number | `1` |  |
+| `alerts.urlsRpcErrors.enabled` | boolean | `true` |  |
+| `alerts.urlsRpcErrors.for` | string | `"10m"` |  |
+| `alerts.urlsRpcErrors.ratio` | number | `0.05` |  |
+| `alerts.urlsRpcErrors.minCallsPerSecond` | number | `0.05` |  |
+| `alerts.urlsRpcErrors.codes` | string | `"INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"` |  |
+| `alerts.redirectHttp5xx.enabled` | boolean | `true` |  |
+| `alerts.redirectHttp5xx.for` | string | `"10m"` |  |
+| `alerts.redirectHttp5xx.ratio` | number | `0.05` |  |
+| `alerts.redirectHttp5xx.minRequestsPerSecond` | number | `0.05` |  |
+| `alerts.webHttp5xx.enabled` | boolean | `true` |  |
+| `alerts.webHttp5xx.for` | string | `"10m"` |  |
+| `alerts.webHttp5xx.ratio` | number | `0.05` |  |
+| `alerts.webHttp5xx.minRequestsPerSecond` | number | `0.05` |  |
+| `alerts.redirectLatency.enabled` | boolean | `true` |  |
+| `alerts.redirectLatency.for` | string | `"15m"` |  |
+| `alerts.redirectLatency.seconds` | number | `0.5` |  |
+| `alerts.webLatency.enabled` | boolean | `true` |  |
+| `alerts.webLatency.for` | string | `"15m"` |  |
+| `alerts.webLatency.seconds` | number | `2` |  |
 | `database.host` | NonEmptyString |  | **Set at install.** The database host. Every install names its own. |
 | `database.name` | NonEmptyString | `"url_shortener"` |  |
 | `database.clusterDomain` | NonEmptyString | `"cluster.local"` |  |

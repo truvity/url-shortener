@@ -13,6 +13,9 @@ import "@vocab/Vocab.pkl" as V
 /// The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
 installName: String = ""
 
+/// Product alerts as a VMRule. Off by default; `remote` renders only the rule object, for an install evaluated on another cluster (no other value is then required).
+alerts: Alerts?
+
 database: Database
 
 events: Events
@@ -47,6 +50,116 @@ images: Images
 pullPolicy: V.PullPolicy = "IfNotPresent"
 
 otel: Otel?
+
+class AlertsRemote {
+  enabled: Boolean = false
+
+  clusterName: String = ""
+
+  namespace: String = ""
+}
+
+class AlertsProber {
+  namespace: String = ""
+}
+
+class AlertsJourneyFailing {
+  enabled: Boolean = true
+
+  `for`: String = "10m"
+
+  @A.Range { max = 1 }
+  ratio: Number = 0.5
+
+  window: String = "15m"
+}
+
+class AlertsProberAbsent {
+  enabled: Boolean = true
+
+  `for`: String = "15m"
+}
+
+class AlertsUrlsRpcLatency {
+  enabled: Boolean = true
+
+  `for`: String = "15m"
+
+  seconds: Number = 1
+}
+
+class AlertsUrlsRpcErrors {
+  enabled: Boolean = true
+
+  `for`: String = "10m"
+
+  @A.Range { max = 1 }
+  ratio: Number = 0.05
+
+  @A.Range { min = 0 }
+  minCallsPerSecond: Number = 0.05
+
+  codes: String = "INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"
+}
+
+class AlertsHttp5xx {
+  enabled: Boolean = true
+
+  `for`: String = "10m"
+
+  @A.Range { max = 1 }
+  ratio: Number = 0.05
+
+  @A.Range { min = 0 }
+  minRequestsPerSecond: Number = 0.05
+}
+
+class AlertsRedirectLatency {
+  enabled: Boolean = true
+
+  `for`: String = "15m"
+
+  seconds: Number = 0.5
+}
+
+class AlertsWebLatency {
+  enabled: Boolean = true
+
+  `for`: String = "15m"
+
+  seconds: Number = 2
+}
+
+/// Product alerts as a VMRule. Off by default; `remote` renders only the rule object, for an install evaluated on another cluster (no other value is then required).
+class Alerts {
+  enabled: Boolean = false
+
+  ruleLabels: Mapping<String, String> = new Mapping {}
+
+  alertLabels: Mapping<String, V.NonEmptyString> = new Mapping {}
+
+  interval: String = ""
+
+  remote: AlertsRemote?
+
+  prober: AlertsProber?
+
+  journeyFailing: AlertsJourneyFailing?
+
+  proberAbsent: AlertsProberAbsent?
+
+  urlsRpcLatency: AlertsUrlsRpcLatency?
+
+  urlsRpcErrors: AlertsUrlsRpcErrors?
+
+  redirectHttp5xx: AlertsHttp5xx?
+
+  webHttp5xx: AlertsHttp5xx?
+
+  redirectLatency: AlertsRedirectLatency?
+
+  webLatency: AlertsWebLatency?
+}
 
 class DatabaseTlsRootCA {
   /// The ConfigMap holding the root the database server certificate chains to. Required.

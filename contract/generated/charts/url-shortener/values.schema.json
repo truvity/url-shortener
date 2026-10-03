@@ -31,6 +31,231 @@
       "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.",
       "default": ""
     },
+    "alerts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "ruleLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "alertLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": {}
+        },
+        "interval": {
+          "type": "string",
+          "default": ""
+        },
+        "remote": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "clusterName": {
+              "type": "string",
+              "default": ""
+            },
+            "namespace": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        },
+        "prober": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        },
+        "journeyFailing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "10m"
+            },
+            "ratio": {
+              "type": "number",
+              "maximum": 1,
+              "default": 0.5
+            },
+            "window": {
+              "type": "string",
+              "default": "15m"
+            }
+          }
+        },
+        "proberAbsent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "15m"
+            }
+          }
+        },
+        "urlsRpcLatency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "15m"
+            },
+            "seconds": {
+              "type": "number",
+              "default": 1
+            }
+          }
+        },
+        "urlsRpcErrors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "10m"
+            },
+            "ratio": {
+              "type": "number",
+              "maximum": 1,
+              "default": 0.05
+            },
+            "minCallsPerSecond": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0.05
+            },
+            "codes": {
+              "type": "string",
+              "default": "INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"
+            }
+          }
+        },
+        "redirectHttp5xx": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "10m"
+            },
+            "ratio": {
+              "type": "number",
+              "maximum": 1,
+              "default": 0.05
+            },
+            "minRequestsPerSecond": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0.05
+            }
+          }
+        },
+        "webHttp5xx": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "10m"
+            },
+            "ratio": {
+              "type": "number",
+              "maximum": 1,
+              "default": 0.05
+            },
+            "minRequestsPerSecond": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0.05
+            }
+          }
+        },
+        "redirectLatency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "15m"
+            },
+            "seconds": {
+              "type": "number",
+              "default": 0.5
+            }
+          }
+        },
+        "webLatency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "for": {
+              "type": "string",
+              "default": "15m"
+            },
+            "seconds": {
+              "type": "number",
+              "default": 2
+            }
+          }
+        }
+      },
+      "description": "Product alerts as a VMRule. Off by default; `remote` renders only the rule object, for an install evaluated on another cluster (no other value is then required)."
+    },
     "database": {
       "type": "object",
       "additionalProperties": false,
