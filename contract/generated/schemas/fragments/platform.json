@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/truvity/policy/schemas/fragments/platform.json",
+  "title": "platform",
+  "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as environment variables, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009 of the policy repository). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository"
+      ],
+      "properties": {
+        "registry": {
+          "type": "string",
+          "description": "The registry host. Left out, the repository is read as the whole name."
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The repository path, without the registry and without a tag."
+        },
+        "tag": {
+          "type": "string",
+          "description": "The tag. Empty or absent when there is a digest."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[0-9a-f]{64})?$",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "The content digest, `sha256:` and 64 hex digits; empty when there is none."
+        }
+      },
+      "description": "Where the image is. A digest when there is one; a tag only when there is not. Left out, the library reads the chart's own top-level `images.<component>`, the map a release stamps and refuses to publish with an empty digest."
+    },
+    "imagePullPolicy": {
+      "enum": [
+        "Always",
+        "IfNotPresent",
+        "Never"
+      ],
+      "description": "Defaults to IfNotPresent."
+    },
+    "replicas": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Defaults to 1. A service that must survive a rollout runs more than one: one instance cannot be replaced without a gap whatever the strategy says."
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxUnavailable": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "description": "Defaults to 0."
+        },
+        "maxSurge": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "description": "Defaults to 1."
+        }
+      },
+      "description": "The rolling update. The defaults make a rollout gapless: the replacement is READY before the incumbent is touched."
+    },
+    "resources": {
+      "type": "object",
+      "description": "Kubernetes' own resource requirements. Open: it is passed through unchanged."
+    },
+    "podSecurity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runAsUser": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The user ID the process runs as. Never zero."
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The group ID the process runs as. Never zero."
+        },
+        "fsGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The group that owns what a CSI driver mounts. Never zero."
+        }
+      },
+      "description": "Who the process is. Every field defaults to 65532, the unprivileged user the runtime images run as; `fsGroup` is the one that matters, because a CSI driver writes what it mounts owned by root."
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "description": "False where the platform creates the accounts; they must then exist. Defaults to true."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Defaults to `<release>-<component>`."
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations put on the account, where a platform binds it to rights outside the cluster."
+        }
+      },
+      "description": "The account this component runs as. EVERY component has its own, always; `default` is refused. The library grants nothing: annotations are where a platform binds the account to rights outside the cluster, and which mechanism does that is the platform's."
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Defaults to whether `config.listen` exists. Enabling one for a component that listens on nothing is refused."
+        }
+      },
+      "description": "A component that listens has a Service on the ports of its own `config.listen`; one that does not has none."
+    },
+    "probes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "liveness": {
+          "$ref": "#/$defs/probe",
+          "description": "The liveness probe: the process and nothing else."
+        },
+        "readiness": {
+          "$ref": "#/$defs/probe",
+          "description": "The readiness probe: this instance can serve now."
+        },
+        "startup": {
+          "$ref": "#/$defs/probe",
+          "description": "Absent means no startup probe. Present, it needs at least one field."
+        }
+      },
+      "description": "How the component is probed, on the listener its own `config.probes` binds. Liveness is nothing but the process: a probe that checks a dependency restarts a healthy process and makes an outage worse."
+    },
+    "drain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preStopSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fail readiness, then wait this long before the drain starts, so that whatever routes traffic has removed this endpoint first. Defaults to 5."
+        }
+      },
+      "description": "The service's own shutdown budget is `config.drain.seconds`; the library derives the grace period from it and this delay, so the three numbers cannot disagree."
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "csiDriver": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The driver that mounts the identity. The platform's, so there is no default; required once the identity is mounted."
+        },
+        "mountPath": {
+          "type": "string",
+          "pattern": "^/.+",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "Defaults to /var/run/identity."
+        },
+        "mount": {
+          "type": "boolean",
+          "description": "Defaults to whether `config.tls.mode` is permissive or strict. True mounts the identity into a component that presents none of its own, because the release does; false never mounts it."
+        }
+      },
+      "description": "Where the platform mounts the workload identity. The files the component's own `config.tls` names must be under `mountPath`; the render refuses a file that is not."
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serviceName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Defaults to `<release>-<component>`."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "The collector to export to. Absent means do not export."
+        },
+        "protocol": {
+          "enum": [
+            "grpc",
+            "http/protobuf",
+            "http/json"
+          ],
+          "description": "The protocol to export over."
+        },
+        "tracesSampler": {
+          "type": "string",
+          "description": "OpenTelemetry's `OTEL_TRACES_SAMPLER`."
+        },
+        "sampleRatio": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "The sampler's argument: a ratio, as a number or a string."
+        },
+        "resourceAttributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Attributes that describe the resource, name to value."
+        }
+      },
+      "description": "OpenTelemetry's own environment variables (decision 0006 of the policy repository): they leave the chart as variables, never as configuration keys. No endpoint means do not export."
+    },
+    "secrets": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+        "not": {
+          "pattern": "\\n"
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "secretName",
+          "key"
+        ],
+        "properties": {
+          "secretName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the Secret."
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The key within it."
+          }
+        }
+      },
+      "description": "The environment variables that carry SECRETS, and nothing else (decision 0002 of the policy repository): variable name to the Secret and key its value comes from. The configuration file names the VARIABLE; the value never appears in a values file or a render."
+    },
+    "env": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The variable's name."
+          },
+          "value": {
+            "type": "string",
+            "description": "Its value."
+          }
+        }
+      },
+      "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002 of the policy repository). A secret does not belong here; declare it in `secrets`."
+    },
+    "volumes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ]
+      },
+      "description": "Extra pod volumes, in Kubernetes' own shape, for what a client library mounts (a trust bundle, a password file). Open: passed through unchanged."
+    },
+    "volumeMounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "mountPath"
+        ]
+      },
+      "description": "The mounts for `volumes`, in Kubernetes' own shape."
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Defaults to `<component>.yaml`."
+        },
+        "mountPath": {
+          "type": "string",
+          "pattern": "^/.+",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "The directory the ConfigMap is mounted at. Defaults to `/etc/<chart name>`."
+        },
+        "pathFlag": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The argument that carries the path. Defaults to `-config`."
+        },
+        "pathEnv": {
+          "type": "string",
+          "minLength": 1,
+          "description": "When set, the path is passed in this environment variable instead of an argument."
+        }
+      },
+      "description": "How the file reaches the process. The path is ONE argument or ONE environment variable, never both (decision 0002 of the policy repository)."
+    },
+    "configMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "For a ConfigMap that must be a hook resource: a pre-install job cannot mount one the release has not created yet."
+        }
+      },
+      "description": "The ConfigMap the file is rendered into."
+    }
+  },
+  "$defs": {
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "The path on the probe listener. Defaults to the contract's own."
+        },
+        "periodSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How often to probe, in seconds."
+        },
+        "initialDelaySeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How long to wait after the start before the first probe, in seconds."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How long one probe may take, in seconds."
+        },
+        "successThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Consecutive successes that make the probe pass again."
+        },
+        "failureThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Consecutive failures that make the probe fail."
+        }
+      }
+    }
+  }
+}

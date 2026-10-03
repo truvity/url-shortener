@@ -1,0 +1,110 @@
+@A.Chart { title = "url-shortener-infra chart values" }
+module urlshortener.charts.UrlShortenerInfra
+
+import "@vocab/Annotations.pkl" as A
+import "@vocab/Vocab.pkl" as V
+
+/// The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
+installName: String = ""
+
+/// Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns.
+tier: "test" | "primary" = "test"
+
+/// The objects a primary install owns. Every name is given, never derived. Unused on a test install.
+cloud: Cloud?
+
+postgres: Postgres
+
+events: Events
+
+/// The objects a primary install owns. Every name is given, never derived. Unused on a test install.
+class Cloud {
+  bucket: String = ""
+
+  iamName: String = ""
+
+  clusterName: String = ""
+
+  accountID: String = ""
+
+  region: String = ""
+
+  serviceAccount: String = ""
+
+  permissionsBoundary: String = ""
+
+  /// The project this install belongs to, tagged as `project` beside `cluster` on every AWS resource this chart creates. Empty means this release's own namespace — the platforms this chart targets already treat a namespace as a project.
+  project: String = ""
+
+  /// Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here.
+  tags: Mapping<String, String> = new Mapping {}
+}
+
+/// Have the chart mint the runtime role's password via the ExternalSecrets Password generator, instead of taking the name of a secret someone else made.
+class PostgresRuntimePassword {
+  generate: Boolean = false
+
+  length: Int = 32
+}
+
+class PostgresScheduling {
+  nodeSelector: Mapping<String, String> = new Mapping {}
+
+  tolerations: Listing<V.OpenObject> = new Listing {}
+}
+
+class PostgresBackup {
+  objectStoreName: String = ""
+
+  serverName: String = ""
+}
+
+class PostgresServerTLS {
+  secretName: String = ""
+
+  caSecretName: String = ""
+}
+
+class Postgres {
+  instances: V.PositiveInt = 1
+
+  storage: V.NonEmptyString = "1Gi"
+
+  database: V.NonEmptyString = "url_shortener"
+
+  ownerRole: V.NonEmptyString = "url_shortener_owner"
+
+  runtimeRole: V.NonEmptyString = "url_shortener_app"
+
+  runtimePasswordSecret: String = ""
+
+  /// Off by default, so every existing consumer keeps the fixed database and role names byte-for-byte. When true, `database`, `ownerRole` and `runtimeRole` are derived from this install's tenant scope instead, for whichever of the three a caller left at its own chart default; an explicit value always wins regardless of this flag.
+  tenantScopedNames: Boolean = false
+
+  /// Have the chart mint the runtime role's password via the ExternalSecrets Password generator, instead of taking the name of a secret someone else made.
+  runtimePassword: PostgresRuntimePassword?
+
+  labels: Mapping<String, String> = new Mapping {}
+
+  platformOwned: Boolean = false
+
+  annotations: Mapping<String, String> = new Mapping {}
+
+  scheduling: PostgresScheduling?
+
+  backup: PostgresBackup?
+
+  serverTLS: PostgresServerTLS?
+}
+
+class Events {
+  storage: "memory" | "file" = "memory"
+
+  url: V.NonEmptyString = "nats://nats.nats.svc:4222"
+
+  account: String = ""
+
+  replicas: V.PositiveInt = 1
+
+  maxAge: String = ""
+}

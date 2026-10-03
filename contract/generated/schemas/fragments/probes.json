@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/truvity/policy/schemas/fragments/probes.json",
+  "title": "probes",
+  "description": "The health listener. Separate from the service's own traffic, so that readiness is answerable when the service's listener is saturated, and so that a probe is not reachable from outside.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "address"
+  ],
+  "properties": {
+    "address": {
+      "type": "string",
+      "pattern": "^[^\\s]*:[0-9]{1,5}$",
+      "not": {
+        "pattern": "\\n"
+      },
+      "description": "host:port for /health/live and /health/ready."
+    }
+  }
+}

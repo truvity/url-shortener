@@ -1,0 +1,28 @@
+/// A service that answers with a greeting.
+///
+/// Not a url-shortener component: it is the service of the chart in
+/// `charts/testdata/service-example`, the smallest chart that follows the library
+/// convention (docs/guides/charts.md), and is modelled here because that chart's
+/// values are exactly the two blocks `ChartValues` is made of.
+@A.Schema { id = "https://example.com/service-example/schemas/echo.json"; title = "echo" }
+module urlshortener.config.Echo
+
+extends "@templates/ServiceConfig.pkl"
+
+import "@fragments/Fragments.pkl" as F
+import "@vocab/Annotations.pkl" as A
+import "@vocab/Vocab.pkl" as V
+
+listen: F.Listen
+
+tls: F.Tls?
+
+greeting: V.NonEmptyString
+
+/// A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`.
+store: Store?
+
+/// A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`.
+class Store {
+  tokenEnv: V.EnvName
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/service-example/schemas/echo.json",
+  "title": "echo",
+  "description": "A service that answers with a greeting.\n\nNot a url-shortener component: it is the service of the chart in\n`charts/testdata/service-example`, the smallest chart that follows the library\nconvention (docs/guides/charts.md), and is modelled here because that chart's\nvalues are exactly the two blocks `ChartValues` is made of.",
+  "allOf": [
+    {
+      "$ref": "https://github.com/truvity/policy/schemas/service.json"
+    }
+  ],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "listen",
+    "greeting"
+  ],
+  "properties": {
+    "listen": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
+    },
+    "tls": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"
+    },
+    "greeting": {
+      "type": "string",
+      "minLength": 1
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokenEnv"
+      ],
+      "properties": {
+        "tokenEnv": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "not": {
+            "pattern": "\\n"
+          }
+        }
+      },
+      "description": "A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`."
+    }
+  }
+}

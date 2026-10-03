@@ -1,0 +1,37 @@
+/// The archiver: consume what the redirect service recorded about each request, and write it to an object store as NDJSON. It owns no database and answers no calls.
+@A.Schema { id = "https://example.com/url-shortener/schemas/log.json"; title = "log" }
+module urlshortener.config.Archiver
+
+extends "@templates/ServiceConfig.pkl"
+
+import "@fragments/Fragments.pkl" as F
+import "@vocab/Annotations.pkl" as A
+import "@vocab/Vocab.pkl" as V
+
+events: Events
+
+archive: Archive
+
+class Events {
+  nats: F.Nats
+  consumer: F.NatsConsumer
+}
+
+class Archive {
+  bucket: F.Bucket
+
+  /// What every key this component writes begins with. A bucket is usually shared, and a component that writes to the root of one cannot be given permission to write only its own objects.
+  prefix: String = "url-shortener/requests"
+
+  /// When to close an object and write it. Both limits apply: whichever is reached first. A size-only rule means a quiet hour is never archived; a time-only rule means a busy one is archived in objects too small to be worth reading.
+  batch: Batch?
+}
+
+/// When to close an object and write it. Both limits apply: whichever is reached first. A size-only rule means a quiet hour is never archived; a time-only rule means a busy one is archived in objects too small to be worth reading.
+class Batch {
+  /// Write once this many records are held.
+  maxRecords: V.PositiveInt = 500
+
+  /// Write this long after the first record of a batch arrived, however few there are.
+  maxSeconds: V.PositiveInt = 60
+}

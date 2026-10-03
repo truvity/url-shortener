@@ -1,0 +1,22 @@
+/// Two blocks and the image map: `platform` is the platform schema, `config` is the service's own schema, and the chart adds nothing between them.
+@A.Chart { title = "service-example chart values" }
+module urlshortener.charts.ServiceExample
+
+extends "@templates/ChartValues.pkl"
+
+import "@fragments/Platform.pkl"
+import "@vocab/Annotations.pkl" as A
+
+import "../config/Echo.pkl"
+
+/// The service's own configuration: exactly `Echo`.
+config: Echo
+
+/// The one image this chart ships.
+images: Images
+
+/// The images of this chart, by component.
+class Images {
+  /// The service's image.
+  echo: Platform.PlatformImage
+}

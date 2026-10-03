@@ -1,0 +1,36 @@
+/// Always-on synthetic traffic: walk the SAME journeys a real caller does (create a short link, resolve it, watch its counter move), in a loop, over the two Services this release already serves. Separate from the e2e suite: the suite proves a release IS healthy once; this proves it STAYS healthy, so a bake window has signal to read even when nothing real is happening.
+@A.Schema { id = "https://example.com/url-shortener/schemas/prober.json"; title = "prober" }
+module urlshortener.config.Prober
+
+extends "@templates/ServiceConfig.pkl"
+
+import "@fragments/Fragments.pkl" as F
+import "@vocab/Annotations.pkl" as A
+import "@vocab/Vocab.pkl" as V
+
+/// How often the loop repeats one full pass of every journey, as a Go duration string, for example "10s".
+interval: V.GoDuration
+
+/// Marks every long URL and key this prober invents, the same role examples/url-shortener/e2e/suite's own testDataPrefix plays for the e2e suite: a person reading the urls table or the archive bucket by hand can tell synthetic traffic from a real caller's at a glance.
+keyPrefix: V.NonEmptyString?
+
+/// How long the "stat" journey keeps watching a link's click count AFTER it first reads exactly 1, as a Go duration string, and fails if it moves again. A consumer that fails to acknowledge a message has it redelivered after its ack wait, so a click counted twice looks right at the first read and wrong one ack wait later; this window has to outlast at least one redelivery, so it defaults to twice the consumer's 30s ack wait ("60s"). "0s" turns the hold off.
+statSettle: V.GoDuration?
+
+/// The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is a platform decision this component does not make for itself.
+urls: Urls
+
+/// The service that resolves a short key. An address and nothing else, on the same terms as `urls` above.
+redirect: Redirect
+
+tls: F.Tls?
+
+/// The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is a platform decision this component does not make for itself.
+class Urls {
+  address: V.NonEmptyString
+}
+
+/// The service that resolves a short key. An address and nothing else, on the same terms as `urls` above.
+class Redirect {
+  address: V.NonEmptyString
+}

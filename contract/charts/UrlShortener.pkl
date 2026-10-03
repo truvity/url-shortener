@@ -1,0 +1,463 @@
+/// Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.
+@A.Chart { title = "url-shortener chart values" }
+module urlshortener.charts.UrlShortener
+
+import "@vocab/Annotations.pkl" as A
+import "@vocab/Vocab.pkl" as V
+
+/// Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl.
+`service-lib`: ServiceLib?
+
+/// The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
+installName: String = ""
+
+database: Database
+
+events: Events
+
+/// Where the request archive goes. The vendor is not in here: an endpoint, a region and a path-style flag reach a cloud service, a store inside the cluster or a test double.
+archive: Archive
+
+log: Log
+
+replicas: Replicas
+
+/// Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.
+resources: Resources
+
+route: Route
+
+serviceAccount: ServiceAccount?
+
+/// The front end's own settings.
+web: Web?
+
+drain: Drain?
+
+disruption: Disruption?
+
+tls: Tls?
+
+podSecurity: PodSecurity?
+
+images: Images
+
+pullPolicy: V.PullPolicy = "IfNotPresent"
+
+otel: Otel?
+
+/// Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl.
+class ServiceLib {
+  `global`: V.OpenObject?
+}
+
+class DatabaseTlsRootCA {
+  /// The ConfigMap holding the root the database server certificate chains to. Required.
+  configMapName: String = ""
+
+  key: V.NonEmptyString = "ca-certificates.crt"
+}
+
+class DatabaseTls {
+  /// Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused.
+  mode: "verify-full" = "verify-full"
+
+  rootCA: DatabaseTlsRootCA?
+}
+
+class DatabaseOwner {
+  role: V.NonEmptyString = "url_shortener_owner"
+
+  passwordSecret: V.NonEmptyString
+
+  passwordKey: V.NonEmptyString = "password"
+}
+
+class DatabaseApp {
+  role: V.NonEmptyString = "url_shortener_app"
+
+  passwordSecret: V.NonEmptyString
+
+  passwordKey: V.NonEmptyString = "password"
+}
+
+class Database {
+  host: V.NonEmptyString
+
+  name: V.NonEmptyString = "url_shortener"
+
+  clusterDomain: V.NonEmptyString = "cluster.local"
+
+  tls: DatabaseTls?
+
+  owner: DatabaseOwner
+
+  app: DatabaseApp
+}
+
+class EventsAuth {
+  audience: String = ""
+
+  expirationSeconds: Int = 3600
+}
+
+class EventsTls {
+  enabled: Boolean = false
+
+  serverName: String = ""
+
+  caConfigMap: String = ""
+
+  caKey: V.NonEmptyString = "ca-certificates.crt"
+}
+
+class Events {
+  url: V.NonEmptyString
+
+  auth: EventsAuth?
+
+  tls: EventsTls?
+}
+
+class ArchiveBucket {
+  /// The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema.
+  name: String = ""
+
+  region: String = ""
+
+  endpoint: String = ""
+
+  ca: String = ""
+
+  pathStyle: Boolean = false
+
+  /// The Secret holding static credentials. Empty means the SDK's ambient credentials, which is what a workload identity provides.
+  credentialsSecret: String = ""
+
+  accessKeyIDKey: V.NonEmptyString = "accessKeyID"
+
+  secretAccessKeyKey: V.NonEmptyString = "secretAccessKey"
+}
+
+class ArchiveBatch {
+  maxRecords: V.PositiveInt = 500
+
+  maxSeconds: V.PositiveInt = 60
+}
+
+/// Where the request archive goes. The vendor is not in here: an endpoint, a region and a path-style flag reach a cloud service, a store inside the cluster or a test double.
+class Archive {
+  bucket: ArchiveBucket
+
+  prefix: V.NonEmptyString = "url-shortener/requests"
+
+  batch: ArchiveBatch?
+}
+
+class Log {
+  level: V.LogLevel = "info"
+}
+
+class Replicas {
+  redirect: V.NonNegativeInt = 2
+
+  stat: V.NonNegativeInt = 2
+
+  log: V.NonNegativeInt = 2
+
+  urls: V.NonNegativeInt = 2
+
+  web: V.NonNegativeInt = 2
+}
+
+/// Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.
+class Resources {
+  redirect: V.OpenObject?
+
+  stat: V.OpenObject?
+
+  migrate: V.OpenObject?
+
+  log: V.OpenObject?
+
+  urls: V.OpenObject?
+
+  web: V.OpenObject?
+
+  verify: V.OpenObject?
+}
+
+class RouteParentRef {
+  name: String = ""
+
+  namespace: String = ""
+
+  sectionName: String = ""
+
+  group: String = ""
+
+  kind: String = ""
+}
+
+class RouteFaroBackend {
+  name: String = ""
+
+  namespace: String = ""
+
+  port: Int = 0
+}
+
+/// An optional PUBLIC rule that routes the page's telemetry path to a collector Service. Off by default.
+class RouteFaro {
+  enabled: Boolean = false
+
+  ruleName: V.NonEmptyString = "faro"
+
+  path: V.UrlPath = "/faro/collect"
+
+  rewritePath: V.UrlPathOrEmpty = ""
+
+  /// The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy.
+  requestBufferLimit: String = ""
+
+  backend: RouteFaroBackend?
+}
+
+class Route {
+  enabled: Boolean = false
+
+  hostname: String = ""
+
+  parentRef: RouteParentRef?
+
+  ruleName: V.NonEmptyString = "app"
+
+  /// An optional PUBLIC rule that routes the page's telemetry path to a collector Service. Off by default.
+  faro: RouteFaro?
+
+  /// The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver.
+  redirectRuleName: V.NonEmptyString = "redirect"
+}
+
+class ServiceAccountApp {
+  name: String = ""
+
+  annotations: Mapping<String, String> = new Mapping {}
+}
+
+/// One component's account override.
+class ServiceAccountOverride {
+  name: V.DnsName?
+
+  annotations: Mapping<String, String>?
+}
+
+/// Per-component account overrides. Every component always runs as its own account.
+class ServiceAccountComponents {
+  redirect: ServiceAccountOverride?
+
+  urls: ServiceAccountOverride?
+
+  web: ServiceAccountOverride?
+
+  stat: ServiceAccountOverride?
+
+  log: ServiceAccountOverride?
+}
+
+class ServiceAccount {
+  create: Boolean = true
+
+  app: ServiceAccountApp?
+
+  migrate: ServiceAccountApp?
+
+  /// Per-component account overrides. Every component always runs as its own account.
+  components: ServiceAccountComponents?
+}
+
+class WebCsp {
+  mode: V.CspMode = "report-only"
+
+  connectSrc: Listing<V.HttpOrigin> = new Listing {}
+
+  reportUri: V.ReportUri = ""
+}
+
+/// Browser telemetry. Public by design: every value is shipped to every visitor, so no secret belongs here.
+class WebFaro {
+  enabled: Boolean = false
+
+  collectorUrl: V.CollectorUrl = "/faro/collect"
+
+  apiKey: V.PublicKey = ""
+
+  appName: String = "url-shortener-web"
+
+  environment: String = ""
+
+  sampleRate: V.Ratio = 1
+}
+
+/// The front end's own settings.
+class Web {
+  csp: WebCsp?
+
+  /// Browser telemetry. Public by design: every value is shipped to every visitor, so no secret belongs here.
+  faro: WebFaro?
+}
+
+class Drain {
+  seconds: V.PositiveInt = 20
+
+  preStopSeconds: V.NonNegativeInt = 5
+}
+
+class Disruption {
+  enabled: Boolean = true
+
+  maxUnavailable: V.NonNegativeInt = 1
+}
+
+class TlsComponentsUrls {
+  mode: V.TlsMode?
+}
+
+/// Never `strict`: the redirect service is fronted by a gateway that terminates TLS and forwards cleartext.
+class TlsComponentsRedirect {
+  mode: ("off" | "permissive")?
+}
+
+/// Per-component override of tls.mode, for the two components that SERVE an authenticated boundary. `web` and `stat` only call out and have no mode of their own. Unset means tls.mode.
+class TlsComponents {
+  urls: TlsComponentsUrls?
+
+  /// Never `strict`: the redirect service is fronted by a gateway that terminates TLS and forwards cleartext.
+  redirect: TlsComponentsRedirect?
+}
+
+class TlsPeersRedirectItem {
+  namespace: V.NonEmptyString
+
+  serviceAccount: V.NonEmptyString
+}
+
+class TlsPeers {
+  redirect: Listing<TlsPeersRedirectItem> = new Listing {}
+
+  urls: Listing<TlsPeersRedirectItem> = new Listing {}
+}
+
+class Tls {
+  /// The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`.
+  mode: V.TlsMode = "off"
+
+  /// Per-component override of tls.mode, for the two components that SERVE an authenticated boundary. `web` and `stat` only call out and have no mode of their own. Unset means tls.mode.
+  components: TlsComponents?
+
+  trustDomain: String = ""
+
+  csiDriver: V.NonEmptyString = "spiffe.csi.cert-manager.io"
+
+  mountPath: V.NonEmptyString = "/var/run/identity"
+
+  grantRequest: Boolean = true
+
+  port: V.Port = 8443
+
+  peers: TlsPeers?
+}
+
+class PodSecurity {
+  runAsUser: V.NonNegativeInt = 65532
+
+  runAsGroup: V.NonNegativeInt = 65532
+
+  fsGroup: V.NonNegativeInt = 65532
+}
+
+class ImagesMigrate {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/migrate"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
+class ImagesRedirect {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/redirect"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
+class ImagesUrls {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/urls"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
+class ImagesStat {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/stat"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
+class ImagesLog {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/log"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
+class ImagesWeb {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/web"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
+class Images {
+  migrate: ImagesMigrate
+
+  redirect: ImagesRedirect
+
+  urls: ImagesUrls
+
+  stat: ImagesStat
+
+  log: ImagesLog
+
+  web: ImagesWeb
+}
+
+class Otel {
+  endpoint: String = ""
+
+  protocol: "http/protobuf" | "grpc" = "http/protobuf"
+
+  tracesSampler: V.NonEmptyString = "parentbased_traceidratio"
+
+  sampleRatio: V.NonEmptyString = "0.1"
+
+  resourceAttributes: Mapping<String, String> = new Mapping {}
+}

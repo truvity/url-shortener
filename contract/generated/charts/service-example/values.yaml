@@ -1,0 +1,22 @@
+platform:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+config:
+  probes:
+    address: :7070
+  log:
+    level: info
+  drain:
+    seconds: 20
+  listen:
+    address: :8080
+  greeting: hello
+images:
+  echo:
+    registry: registry.example
+    repository: example/echo
+    tag: ''
+    digest: ''

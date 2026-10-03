@@ -1,0 +1,36 @@
+/// The defaults `charts/testdata/service-example/values.yaml` ships, checked
+/// against the contract when this module is evaluated:
+///
+///     bin/pkl eval --project-dir examples/url-shortener/contract -f yaml charts/ServiceExampleValues.pkl
+amends "ServiceExample.pkl"
+
+platform {
+  replicas = 2
+  resources {
+    requests {
+      cpu = "50m"
+      memory = "64Mi"
+    }
+  }
+}
+
+config {
+  listen { address = ":8080" }
+  probes { address = ":7070" }
+  log { level = "info" }
+  drain { seconds = 20 }
+  greeting = "hello"
+}
+
+images {
+  echo {
+    registry = "registry.example"
+    repository = "example/echo"
+    tag = ""
+    digest = ""
+  }
+}
+
+output {
+  renderer = new YamlRenderer {}
+}

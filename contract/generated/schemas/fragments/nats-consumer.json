@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/truvity/policy/schemas/fragments/nats-consumer.json",
+  "title": "nats-consumer",
+  "description": "What a consumer binds to: a stream, a durable name, and the subject it filters. Durable by name, because a consumer that forgets its position on restart replays or loses whatever arrived while it was gone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stream",
+    "durable"
+  ],
+  "properties": {
+    "stream": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The stream to consume from. It exists already: a service does not create the stream it reads."
+    },
+    "durable": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The durable consumer name. Shared by every replica of this component, which is what makes them one consumer group rather than several."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Filter the stream to this subject. Unset consumes everything the stream holds."
+    }
+  }
+}

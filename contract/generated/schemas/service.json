@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/truvity/policy/schemas/service.json",
+  "title": "service",
+  "description": "The envelope every service's configuration carries. A service extends this\nmodule and adds its own properties beside it:\n\n    extends \"package://.../contracts.templates@<version>#/ServiceConfig.pkl\"\n\nWhat is in here is what EVERY component has, including a job that exits and\na consumer that answers nothing: somewhere to report health, a log level,\nand a shutdown budget. A listener is not one of those, so it is not here.\n\nThe module is open so that a service can extend it, and its classes are\nclosed, so a key that is not declared is refused: a typo must fail.",
+  "type": "object",
+  "required": [
+    "probes"
+  ],
+  "properties": {
+    "probes": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/probes.json",
+      "description": "The health listener. Required: every component can be probed."
+    },
+    "log": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/log.json",
+      "description": "Structured logging. Absent means the service's own default level."
+    },
+    "drain": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/drain.json",
+      "description": "The shutdown budget. Absent means the service's own default, which is only\ncorrect if nothing external is counting."
+    }
+  }
+}

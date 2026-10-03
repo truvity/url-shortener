@@ -1,0 +1,930 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "url-shortener chart values",
+  "description": "Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "database",
+    "events",
+    "archive",
+    "log",
+    "replicas",
+    "resources",
+    "route",
+    "images"
+  ],
+  "properties": {
+    "service-lib": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "global": {
+          "type": "object"
+        }
+      },
+      "description": "Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl."
+    },
+    "installName": {
+      "type": "string",
+      "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "owner",
+        "app"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clusterDomain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": [
+                "verify-full"
+              ],
+              "description": "Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused."
+            },
+            "rootCA": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "configMapName": {
+                  "type": "string",
+                  "description": "The ConfigMap holding the root the database server certificate chains to. Required."
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "owner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "passwordSecret"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordSecret": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "app": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "passwordSecret"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordSecret": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "audience": {
+              "type": "string"
+            },
+            "expirationSeconds": {
+              "type": "integer"
+            }
+          }
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "serverName": {
+              "type": "string"
+            },
+            "caConfigMap": {
+              "type": "string"
+            },
+            "caKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bucket"
+      ],
+      "properties": {
+        "bucket": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema."
+            },
+            "region": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "ca": {
+              "type": "string"
+            },
+            "pathStyle": {
+              "type": "boolean"
+            },
+            "credentialsSecret": {
+              "type": "string",
+              "description": "The Secret holding static credentials. Empty means the SDK's ambient credentials, which is what a workload identity provides."
+            },
+            "accessKeyIDKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "secretAccessKeyKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "prefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "batch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxRecords": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "description": "Where the request archive goes. The vendor is not in here: an endpoint, a region and a path-style flag reach a cloud service, a store inside the cluster or a test double."
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        }
+      }
+    },
+    "replicas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "redirect": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stat": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "urls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "web": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "redirect": {
+          "type": "object"
+        },
+        "stat": {
+          "type": "object"
+        },
+        "migrate": {
+          "type": "object"
+        },
+        "log": {
+          "type": "object"
+        },
+        "urls": {
+          "type": "object"
+        },
+        "web": {
+          "type": "object"
+        },
+        "verify": {
+          "type": "object"
+        }
+      },
+      "description": "Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "parentRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "sectionName": {
+              "type": "string"
+            },
+            "group": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          }
+        },
+        "ruleName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "faro": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "ruleName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/[^\\s'\"<>;,?#]*$",
+              "not": {
+                "pattern": "\\n"
+              }
+            },
+            "rewritePath": {
+              "type": "string",
+              "pattern": "^(/[^\\s'\"<>;,?#]*)?$",
+              "not": {
+                "pattern": "\\n"
+              }
+            },
+            "requestBufferLimit": {
+              "type": "string",
+              "description": "The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy."
+            },
+            "backend": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "description": "An optional PUBLIC rule that routes the page's telemetry path to a collector Service. Off by default."
+        },
+        "redirectRuleName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver."
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "app": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "migrate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "components": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "redirect": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "not": {
+                    "pattern": "\\n"
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "urls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "not": {
+                    "pattern": "\\n"
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "web": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "not": {
+                    "pattern": "\\n"
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "stat": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "not": {
+                    "pattern": "\\n"
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "log": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "not": {
+                    "pattern": "\\n"
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "description": "Per-component account overrides. Every component always runs as its own account."
+        }
+      }
+    },
+    "web": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "csp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": [
+                "off",
+                "report-only",
+                "enforce"
+              ]
+            },
+            "connectSrc": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$",
+                "not": {
+                  "pattern": "\\n"
+                }
+              }
+            },
+            "reportUri": {
+              "type": "string",
+              "pattern": "^[^\\s;,'\"]*$",
+              "not": {
+                "pattern": "\\n"
+              }
+            }
+          }
+        },
+        "faro": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "collectorUrl": {
+              "type": "string",
+              "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$",
+              "not": {
+                "pattern": "\\n"
+              }
+            },
+            "apiKey": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._~-]*$",
+              "not": {
+                "pattern": "\\n"
+              }
+            },
+            "appName": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "sampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "description": "Browser telemetry. Public by design: every value is shipped to every visitor, so no secret belongs here."
+        }
+      },
+      "description": "The front end's own settings."
+    },
+    "drain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "preStopSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "disruption": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "maxUnavailable": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "off",
+            "permissive",
+            "strict"
+          ],
+          "description": "The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`."
+        },
+        "components": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "urls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "off",
+                    "permissive",
+                    "strict"
+                  ]
+                }
+              }
+            },
+            "redirect": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "off",
+                    "permissive"
+                  ]
+                }
+              },
+              "description": "Never `strict`: the redirect service is fronted by a gateway that terminates TLS and forwards cleartext."
+            }
+          },
+          "description": "Per-component override of tls.mode, for the two components that SERVE an authenticated boundary. `web` and `stat` only call out and have no mode of their own. Unset means tls.mode."
+        },
+        "trustDomain": {
+          "type": "string"
+        },
+        "csiDriver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mountPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grantRequest": {
+          "type": "boolean"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "peers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "redirect": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "namespace",
+                  "serviceAccount"
+                ],
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "serviceAccount": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "urls": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "namespace",
+                  "serviceAccount"
+                ],
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "serviceAccount": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "podSecurity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runAsUser": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fsGroup": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "migrate",
+        "redirect",
+        "urls",
+        "stat",
+        "log",
+        "web"
+      ],
+      "properties": {
+        "migrate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "redirect": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "urls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "stat": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "web": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "pullPolicy": {
+      "enum": [
+        "Always",
+        "IfNotPresent",
+        "Never"
+      ]
+    },
+    "otel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "http/protobuf",
+            "grpc"
+          ]
+        },
+        "tracesSampler": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampleRatio": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceAttributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {}
+}

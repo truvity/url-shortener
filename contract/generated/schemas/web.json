@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/url-shortener/schemas/web.json",
+  "title": "web",
+  "description": "The front end: serve the page, and ask the service that owns the tables. It writes nothing and holds no database credential.",
+  "allOf": [
+    {
+      "$ref": "https://github.com/truvity/policy/schemas/service.json"
+    }
+  ],
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "listen",
+    "urls",
+    "assets"
+  ],
+  "properties": {
+    "listen": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
+    },
+    "tls": {
+      "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json"
+    },
+    "urls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "address"
+      ],
+      "properties": {
+        "address": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is the tls block's business."
+    },
+    "csp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "off",
+            "report-only",
+            "enforce"
+          ],
+          "description": "`report-only` sends Content-Security-Policy-Report-Only: a browser reports a violation to its console (and to reportUri) and blocks nothing. `enforce` sends Content-Security-Policy. `off` sends neither."
+        },
+        "connectSrc": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$",
+            "not": {
+              "pattern": "\\n"
+            }
+          },
+          "description": "Origins the page may connect to besides its own, added to `connect-src 'self'`. Each is a bare origin, scheme and host and optional port, never a path and never a keyword."
+        },
+        "reportUri": {
+          "type": "string",
+          "pattern": "^[^\\s;,'\"]*$",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "Where a browser POSTs violation reports. A path on this origin or an absolute URL; empty or absent adds no report-uri directive."
+        }
+      },
+      "description": "The Content-Security-Policy this server sends with every response. Absent means report-only with no extra origins: the header is sent, nothing is blocked, so turning it on cannot break a page."
+    },
+    "faro": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the page sends telemetry at all."
+        },
+        "collectorUrl": {
+          "type": "string",
+          "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "Where the page POSTs telemetry: a path on its own origin (the default, `/faro/collect`, which the gateway routes to the collector, so connect-src 'self' is enough) or an absolute HTTPS URL, whose origin is then added to connect-src."
+        },
+        "apiKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._~-]*$",
+          "not": {
+            "pattern": "\\n"
+          },
+          "description": "The app's public key at the collector, sent as `x-api-key`. A public identifier, not a secret."
+        },
+        "appName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The app name the collector sees."
+        },
+        "environment": {
+          "type": "string",
+          "description": "A label for where this install runs, for example `devel`."
+        },
+        "sampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The fraction of browser SESSIONS that report anything, 0 to 1."
+        }
+      },
+      "description": "Browser telemetry (Grafana Faro). Absent, or `enabled: false`, means the page sends nothing and the Faro libraries are never downloaded. Every field here is written into the page for every visitor to read: `apiKey` is a PUBLIC identifier of this app at the collector (one key per app, rotatable, paired with the collector's origin allow-list), not a secret, and no credential may be put in this block."
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "directory"
+      ],
+      "properties": {
+        "directory": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Where the built page is. A path rather than an embedded bundle, because the assets are the one thing in this image that a CDN might serve instead."
+    }
+  }
+}

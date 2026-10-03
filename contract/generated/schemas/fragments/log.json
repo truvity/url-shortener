@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/truvity/policy/schemas/fragments/log.json",
+  "title": "log",
+  "description": "Structured logging. One level for the whole service: per-package levels are deliberately not part of the contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "level": {
+      "enum": [
+        "debug",
+        "info",
+        "warn",
+        "error"
+      ],
+      "description": "The lowest level that is written."
+    }
+  }
+}

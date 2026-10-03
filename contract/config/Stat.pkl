@@ -1,0 +1,26 @@
+/// The click counter: consume redirects, and ask the service that owns the table to count them.
+@A.Schema { id = "https://example.com/url-shortener/schemas/stat.json"; title = "stat" }
+module urlshortener.config.Stat
+
+extends "@templates/ServiceConfig.pkl"
+
+import "@fragments/Fragments.pkl" as F
+import "@vocab/Annotations.pkl" as A
+import "@vocab/Vocab.pkl" as V
+
+/// The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is the tls block's business.
+urls: Urls
+
+events: Events
+
+tls: F.Tls?
+
+/// The service that owns the URL tables. An address and nothing else: which protocol the caller speaks is in its code, and whether the connection is authenticated is the tls block's business.
+class Urls {
+  address: V.NonEmptyString
+}
+
+class Events {
+  nats: F.Nats
+  consumer: F.NatsConsumer
+}

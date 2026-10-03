@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/truvity/policy/schemas/fragments/listen.json",
+  "title": "listen",
+  "description": "A TCP listener. `address` is a host:port the service binds; an empty host binds every interface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "address"
+  ],
+  "properties": {
+    "address": {
+      "type": "string",
+      "pattern": "^[^\\s]*:[0-9]{1,5}$",
+      "not": {
+        "pattern": "\\n"
+      },
+      "description": "host:port, for example \":8080\" or \"127.0.0.1:8080\"."
+    }
+  }
+}

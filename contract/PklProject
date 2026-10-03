@@ -1,0 +1,24 @@
+// The url-shortener's data contracts, written once in Pkl (decision 0010).
+// SHADOW PHASE: what this project generates sits beside the hand-written
+// schemas and is compared with them; the hand-written ones stay authoritative
+// (docs/guides/pkl-shadow.md).
+//
+// Every package is pinned at the exact version of the contracts repository's
+// release; `bin/pkl project resolve` records the checksums in
+// PklProject.deps.json, which is committed.
+amends "pkl:Project"
+
+dependencies {
+  ["vocab"] {
+    uri =
+      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.0/contracts.vocab@0.2.0"
+  }
+  ["fragments"] {
+    uri =
+      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.0/contracts.fragments@0.2.0"
+  }
+  ["templates"] {
+    uri =
+      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.0/contracts.templates@0.2.0"
+  }
+}
