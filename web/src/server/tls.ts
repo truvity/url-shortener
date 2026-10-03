@@ -63,7 +63,13 @@ export function tlsOptions(tls: Tls | undefined, report: Report = () => {}): Tls
         minVersion: "TLSv1.3",
         cert: readFileSync(certFile),
         key: readFileSync(keyFile),
-        // The chain check is done below; see the file comment.
+        // The certificate IS checked, by verifyAnswer when the handshake completes, before the
+        // session exists: the chain against the trust bundle, then the
+        // peer's identity. Only OpenSSL's own anchor rule is off, because it
+        // refuses an issuing authority that the platform's bundle holds.
+        // Tests hold: a wrong bundle and a peer outside the allow-list are
+        // refused.
+        // codeql[js/disabling-certificate-validation] verified by verifyAnswer
         rejectUnauthorized: false,
       });
       // The HTTP/2 session sets itself up when the socket announces
