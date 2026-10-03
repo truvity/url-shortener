@@ -13,7 +13,8 @@
         "warn",
         "error"
       ],
-      "description": "The lowest level that is written."
+      "description": "The lowest level that is written.",
+      "default": "info"
     }
   }
 }

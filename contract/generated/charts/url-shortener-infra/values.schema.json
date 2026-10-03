@@ -10,50 +10,61 @@
   "properties": {
     "installName": {
       "type": "string",
-      "description": "The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."
+      "description": "The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.",
+      "default": ""
     },
     "tier": {
       "enum": [
         "test",
         "primary"
       ],
-      "description": "Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns."
+      "description": "Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns.",
+      "default": "test"
     },
     "cloud": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "bucket": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "iamName": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "clusterName": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "accountID": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "region": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "serviceAccount": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "permissionsBoundary": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "project": {
           "type": "string",
-          "description": "The project this install belongs to, tagged as `project` beside `cluster` on every AWS resource this chart creates. Empty means this release's own namespace — the platforms this chart targets already treat a namespace as a project."
+          "description": "The project this install belongs to, tagged as `project` beside `cluster` on every AWS resource this chart creates. Empty means this release's own namespace — the platforms this chart targets already treat a namespace as a project.",
+          "default": ""
         },
         "tags": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here."
+          "description": "Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here.",
+          "default": {}
         }
       },
       "description": "The objects a primary install owns. Every name is given, never derived. Unused on a test install."
@@ -64,40 +75,49 @@
       "properties": {
         "instances": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "default": 1
         },
         "storage": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "1Gi"
         },
         "database": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "url_shortener"
         },
         "ownerRole": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "url_shortener_owner"
         },
         "runtimeRole": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "url_shortener_app"
         },
         "runtimePasswordSecret": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "tenantScopedNames": {
           "type": "boolean",
-          "description": "Off by default, so every existing consumer keeps the fixed database and role names byte-for-byte. When true, `database`, `ownerRole` and `runtimeRole` are derived from this install's tenant scope instead, for whichever of the three a caller left at its own chart default; an explicit value always wins regardless of this flag."
+          "description": "Off by default, so every existing consumer keeps the fixed database and role names byte-for-byte. When true, `database`, `ownerRole` and `runtimeRole` are derived from this install's tenant scope instead, for whichever of the three a caller left at its own chart default; an explicit value always wins regardless of this flag.",
+          "default": false
         },
         "runtimePassword": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "generate": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             },
             "length": {
-              "type": "integer"
+              "type": "integer",
+              "default": 32
             }
           },
           "description": "Have the chart mint the runtime role's password via the ExternalSecrets Password generator, instead of taking the name of a secret someone else made."
@@ -106,16 +126,19 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "default": {}
         },
         "platformOwned": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         },
         "annotations": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "default": {}
         },
         "scheduling": {
           "type": "object",
@@ -125,13 +148,15 @@
               "type": "object",
               "additionalProperties": {
                 "type": "string"
-              }
+              },
+              "default": {}
             },
             "tolerations": {
               "type": "array",
               "items": {
                 "type": "object"
-              }
+              },
+              "default": []
             }
           }
         },
@@ -140,10 +165,12 @@
           "additionalProperties": false,
           "properties": {
             "objectStoreName": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "serverName": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -152,10 +179,12 @@
           "additionalProperties": false,
           "properties": {
             "secretName": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "caSecretName": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         }
@@ -169,21 +198,26 @@
           "enum": [
             "memory",
             "file"
-          ]
+          ],
+          "default": "memory"
         },
         "url": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "nats://nats.nats.svc:4222"
         },
         "account": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "replicas": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "default": 1
         },
         "maxAge": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         }
       }
     }

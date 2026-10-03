@@ -22,10 +22,12 @@
       "enum": [
         "full",
         "tenant"
-      ]
+      ],
+      "default": "full"
     },
     "rolloutTimeout": {
-      "type": "string"
+      "type": "string",
+      "default": ""
     },
     "database": {
       "type": "object",
@@ -76,7 +78,8 @@
             },
             "passwordKey": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "password"
             }
           }
         }
@@ -127,21 +130,26 @@
           "minLength": 1
         },
         "region": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "endpoint": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "credentialsSecret": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "accessKeyIDKey": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "accessKeyID"
         },
         "secretAccessKeyKey": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "secretAccessKey"
         }
       }
     },
@@ -150,34 +158,41 @@
       "additionalProperties": false,
       "properties": {
         "url": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "tokenExchange": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "tokenURL": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "client": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "audience": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "access-issuer"
             },
             "expirationSeconds": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "default": 3600
             }
           }
         },
         "caConfigMap": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "caConfigMapKey": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "ca-certificates.crt"
         }
       }
     },
@@ -194,17 +209,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/e2e"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -214,17 +233,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/prober"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         }
@@ -235,7 +258,8 @@
         "Always",
         "IfNotPresent",
         "Never"
-      ]
+      ],
+      "default": "IfNotPresent"
     },
     "job": {
       "type": "object",
@@ -247,25 +271,29 @@
         },
         "backoffLimit": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 0
         },
         "activeDeadlineSeconds": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "default": 300
         },
         "annotations": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Rendered on the Job's own metadata, never the pod template's — for a GitOps controller that must replace, not patch, an immutable Job when this chart's values change at the same version, e.g. a force/replace sync option."
+          "description": "Rendered on the Job's own metadata, never the pod template's — for a GitOps controller that must replace, not patch, an immutable Job when this chart's values change at the same version, e.g. a force/replace sync option.",
+          "default": {}
         },
         "tls": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
           "description": "The e2e Job's own switch for presenting a workload identity, on top of the release-wide tls block. Needs tls.mode (or a target's override) not off."
@@ -281,10 +309,12 @@
       "additionalProperties": false,
       "properties": {
         "create": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         }
       }
     },
@@ -294,15 +324,18 @@
       "properties": {
         "runAsUser": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 65532
         },
         "runAsGroup": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 65532
         },
         "fsGroup": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 65532
         }
       }
     },
@@ -311,29 +344,34 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         },
         "interval": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "10s"
         },
         "keyPrefix": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "probe-"
         },
         "statSettle": {
           "type": "string",
           "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
           "not": {
             "pattern": "\\n"
-          }
+          },
+          "default": "60s"
         },
         "pullPolicy": {
           "enum": [
             "Always",
             "IfNotPresent",
             "Never"
-          ]
+          ],
+          "default": "IfNotPresent"
         },
         "resources": {
           "type": "object",
@@ -349,7 +387,8 @@
                 "info",
                 "warn",
                 "error"
-              ]
+              ],
+              "default": "info"
             }
           }
         },
@@ -359,7 +398,8 @@
           "properties": {
             "seconds": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "default": 5
             }
           }
         },
@@ -369,15 +409,18 @@
           "properties": {
             "runAsUser": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "default": 65532
             },
             "runAsGroup": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "default": 65532
             },
             "fsGroup": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "default": 65532
             }
           }
         },
@@ -386,10 +429,12 @@
           "additionalProperties": false,
           "properties": {
             "create": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": true
             },
             "name": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         }
@@ -404,7 +449,8 @@
             "off",
             "permissive",
             "strict"
-          ]
+          ],
+          "default": "off"
         },
         "components": {
           "type": "object",
@@ -440,23 +486,28 @@
           "description": "Per-target override of tls.mode: the mode the APPLICATION RELEASE runs `urls` and `redirect` in, which decides the port and scheme this chart's callers dial. Same meaning as charts/url-shortener's own tls.components. Unset means tls.mode."
         },
         "trustDomain": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "csiDriver": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "spiffe.csi.cert-manager.io"
         },
         "mountPath": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "/var/run/identity"
         },
         "grantRequest": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         },
         "port": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 65535
+          "maximum": 65535,
+          "default": 8443
         },
         "peers": {
           "type": "array",
@@ -477,7 +528,8 @@
                 "minLength": 1
               }
             }
-          }
+          },
+          "default": []
         }
       }
     },
@@ -486,27 +538,32 @@
       "additionalProperties": false,
       "properties": {
         "endpoint": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "protocol": {
           "enum": [
             "http/protobuf",
             "grpc"
-          ]
+          ],
+          "default": "http/protobuf"
         },
         "tracesSampler": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "parentbased_traceidratio"
         },
         "sampleRatio": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "0.1"
         },
         "resourceAttributes": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "default": {}
         }
       }
     }

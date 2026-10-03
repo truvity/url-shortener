@@ -9,7 +9,8 @@
     "seconds": {
       "type": "integer",
       "minimum": 1,
-      "description": "Seconds to finish in-flight work. Unset means the service's own default, which is only correct if nothing external is counting."
+      "description": "Seconds to finish in-flight work. Unset means the service's own default, which is only correct if nothing external is counting.",
+      "default": 20
     }
   }
 }

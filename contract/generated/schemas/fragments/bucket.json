@@ -31,7 +31,8 @@
     },
     "pathStyle": {
       "type": "boolean",
-      "description": "Address the bucket as a path rather than as a host. Required by most non-cloud implementations."
+      "description": "Address the bucket as a path rather than as a host. Required by most non-cloud implementations.",
+      "default": false
     },
     "credentialsEnv": {
       "type": "object",

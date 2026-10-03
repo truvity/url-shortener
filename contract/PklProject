@@ -11,14 +11,14 @@ amends "pkl:Project"
 dependencies {
   ["vocab"] {
     uri =
-      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.0/contracts.vocab@0.2.0"
+      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.vocab@0.2.1"
   }
   ["fragments"] {
     uri =
-      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.0/contracts.fragments@0.2.0"
+      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.fragments@0.2.1"
   }
   ["templates"] {
     uri =
-      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.0/contracts.templates@0.2.0"
+      "package://github.com/truvity/pkl-contracts/releases/download/v0.2.1/contracts.templates@0.2.1"
   }
 }

@@ -564,7 +564,8 @@
             "permissive",
             "strict"
           ],
-          "description": "'off' serves cleartext only. 'permissive' serves BOTH, on two ports, so that an edge can migrate one side at a time without a coordinated window. 'strict' serves only the authenticated port. One listener cannot be both in every runtime, which is why permissive is two ports rather than one that sniffs."
+          "description": "'off' serves cleartext only. 'permissive' serves BOTH, on two ports, so that an edge can migrate one side at a time without a coordinated window. 'strict' serves only the authenticated port. One listener cannot be both in every runtime, which is why permissive is two ports rather than one that sniffs.",
+          "default": "off"
         },
         "address": {
           "type": "string",
@@ -674,7 +675,8 @@
             "warn",
             "error"
           ],
-          "description": "The lowest level that is written."
+          "description": "The lowest level that is written.",
+          "default": "info"
         }
       }
     },
@@ -688,7 +690,8 @@
         "seconds": {
           "type": "integer",
           "minimum": 1,
-          "description": "Seconds to finish in-flight work. Unset means the service's own default, which is only correct if nothing external is counting."
+          "description": "Seconds to finish in-flight work. Unset means the service's own default, which is only correct if nothing external is counting.",
+          "default": 20
         }
       }
     }

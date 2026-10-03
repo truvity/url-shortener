@@ -25,7 +25,8 @@
     "maxConnections": {
       "type": "integer",
       "minimum": 1,
-      "description": "Pool size for this instance. Sized against the server's limit divided by the number of instances, not guessed."
+      "description": "Pool size for this instance. Sized against the server's limit divided by the number of instances, not guessed.",
+      "default": 10
     }
   }
 }

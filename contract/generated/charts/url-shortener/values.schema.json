@@ -27,7 +27,8 @@
     },
     "installName": {
       "type": "string",
-      "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."
+      "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.",
+      "default": ""
     },
     "database": {
       "type": "object",
@@ -44,11 +45,13 @@
         },
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "url_shortener"
         },
         "clusterDomain": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "cluster.local"
         },
         "tls": {
           "type": "object",
@@ -58,7 +61,8 @@
               "enum": [
                 "verify-full"
               ],
-              "description": "Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused."
+              "description": "Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused.",
+              "default": "verify-full"
             },
             "rootCA": {
               "type": "object",
@@ -66,11 +70,13 @@
               "properties": {
                 "configMapName": {
                   "type": "string",
-                  "description": "The ConfigMap holding the root the database server certificate chains to. Required."
+                  "description": "The ConfigMap holding the root the database server certificate chains to. Required.",
+                  "default": ""
                 },
                 "key": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "default": "ca-certificates.crt"
                 }
               }
             }
@@ -85,7 +91,8 @@
           "properties": {
             "role": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "url_shortener_owner"
             },
             "passwordSecret": {
               "type": "string",
@@ -93,7 +100,8 @@
             },
             "passwordKey": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "password"
             }
           }
         },
@@ -106,7 +114,8 @@
           "properties": {
             "role": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "url_shortener_app"
             },
             "passwordSecret": {
               "type": "string",
@@ -114,7 +123,8 @@
             },
             "passwordKey": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "password"
             }
           }
         }
@@ -136,10 +146,12 @@
           "additionalProperties": false,
           "properties": {
             "audience": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "expirationSeconds": {
-              "type": "integer"
+              "type": "integer",
+              "default": 3600
             }
           }
         },
@@ -148,17 +160,21 @@
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             },
             "serverName": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "caConfigMap": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "caKey": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ca-certificates.crt"
             }
           }
         }
@@ -177,37 +193,46 @@
           "properties": {
             "name": {
               "type": "string",
-              "description": "The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema."
+              "description": "The bucket, which exists already. Required at install time, not here: an empty default is what makes the refusal name the value rather than the schema.",
+              "default": ""
             },
             "region": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "endpoint": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "ca": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "pathStyle": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             },
             "credentialsSecret": {
               "type": "string",
-              "description": "The Secret holding static credentials. Empty means the SDK's ambient credentials, which is what a workload identity provides."
+              "description": "The Secret holding static credentials. Empty means the SDK's ambient credentials, which is what a workload identity provides.",
+              "default": ""
             },
             "accessKeyIDKey": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "accessKeyID"
             },
             "secretAccessKeyKey": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "secretAccessKey"
             }
           }
         },
         "prefix": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "url-shortener/requests"
         },
         "batch": {
           "type": "object",
@@ -215,11 +240,13 @@
           "properties": {
             "maxRecords": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "default": 500
             },
             "maxSeconds": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "default": 60
             }
           }
         }
@@ -236,7 +263,8 @@
             "info",
             "warn",
             "error"
-          ]
+          ],
+          "default": "info"
         }
       }
     },
@@ -246,23 +274,28 @@
       "properties": {
         "redirect": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 2
         },
         "stat": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 2
         },
         "log": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 2
         },
         "urls": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 2
         },
         "web": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 2
         }
       }
     },
@@ -299,77 +332,93 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         },
         "hostname": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "parentRef": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "name": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "namespace": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "sectionName": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "group": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "kind": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
         "ruleName": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "app"
         },
         "faro": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             },
             "ruleName": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "faro"
             },
             "path": {
               "type": "string",
               "pattern": "^/[^\\s'\"<>;,?#]*$",
               "not": {
                 "pattern": "\\n"
-              }
+              },
+              "default": "/faro/collect"
             },
             "rewritePath": {
               "type": "string",
               "pattern": "^(/[^\\s'\"<>;,?#]*)?$",
               "not": {
                 "pattern": "\\n"
-              }
+              },
+              "default": ""
             },
             "requestBufferLimit": {
               "type": "string",
-              "description": "The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy."
+              "description": "The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy.",
+              "default": ""
             },
             "backend": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "name": {
-                  "type": "string"
+                  "type": "string",
+                  "default": ""
                 },
                 "namespace": {
-                  "type": "string"
+                  "type": "string",
+                  "default": ""
                 },
                 "port": {
-                  "type": "integer"
+                  "type": "integer",
+                  "default": 0
                 }
               }
             }
@@ -379,7 +428,8 @@
         "redirectRuleName": {
           "type": "string",
           "minLength": 1,
-          "description": "The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver."
+          "description": "The rule that resolves short links. Separate from ruleName so a policy can protect the site without locking the public resolver.",
+          "default": "redirect"
         }
       }
     },
@@ -388,20 +438,23 @@
       "additionalProperties": false,
       "properties": {
         "create": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         },
         "app": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "name": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "annotations": {
               "type": "object",
               "additionalProperties": {
                 "type": "string"
-              }
+              },
+              "default": {}
             }
           }
         },
@@ -410,13 +463,15 @@
           "additionalProperties": false,
           "properties": {
             "name": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "annotations": {
               "type": "object",
               "additionalProperties": {
                 "type": "string"
-              }
+              },
+              "default": {}
             }
           }
         },
@@ -537,7 +592,8 @@
                 "off",
                 "report-only",
                 "enforce"
-              ]
+              ],
+              "default": "report-only"
             },
             "connectSrc": {
               "type": "array",
@@ -547,14 +603,16 @@
                 "not": {
                   "pattern": "\\n"
                 }
-              }
+              },
+              "default": []
             },
             "reportUri": {
               "type": "string",
               "pattern": "^[^\\s;,'\"]*$",
               "not": {
                 "pattern": "\\n"
-              }
+              },
+              "default": ""
             }
           }
         },
@@ -563,32 +621,38 @@
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             },
             "collectorUrl": {
               "type": "string",
               "pattern": "^(https://[^\\s'\"<>;,]+|/[^\\s'\"<>;,?#]*)$",
               "not": {
                 "pattern": "\\n"
-              }
+              },
+              "default": "/faro/collect"
             },
             "apiKey": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._~-]*$",
               "not": {
                 "pattern": "\\n"
-              }
+              },
+              "default": ""
             },
             "appName": {
-              "type": "string"
+              "type": "string",
+              "default": "url-shortener-web"
             },
             "environment": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "sampleRate": {
               "type": "number",
               "minimum": 0,
-              "maximum": 1
+              "maximum": 1,
+              "default": 1
             }
           },
           "description": "Browser telemetry. Public by design: every value is shipped to every visitor, so no secret belongs here."
@@ -602,11 +666,13 @@
       "properties": {
         "seconds": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "default": 20
         },
         "preStopSeconds": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 5
         }
       }
     },
@@ -615,11 +681,13 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         },
         "maxUnavailable": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 1
         }
       }
     },
@@ -633,7 +701,8 @@
             "permissive",
             "strict"
           ],
-          "description": "The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`."
+          "description": "The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`.",
+          "default": "off"
         },
         "components": {
           "type": "object",
@@ -669,23 +738,28 @@
           "description": "Per-component override of tls.mode, for the two components that SERVE an authenticated boundary. `web` and `stat` only call out and have no mode of their own. Unset means tls.mode."
         },
         "trustDomain": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "csiDriver": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "spiffe.csi.cert-manager.io"
         },
         "mountPath": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "/var/run/identity"
         },
         "grantRequest": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         },
         "port": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 65535
+          "maximum": 65535,
+          "default": 8443
         },
         "peers": {
           "type": "object",
@@ -710,7 +784,8 @@
                     "minLength": 1
                   }
                 }
-              }
+              },
+              "default": []
             },
             "urls": {
               "type": "array",
@@ -731,7 +806,8 @@
                     "minLength": 1
                   }
                 }
-              }
+              },
+              "default": []
             }
           }
         }
@@ -743,15 +819,18 @@
       "properties": {
         "runAsUser": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 65532
         },
         "runAsGroup": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 65532
         },
         "fsGroup": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "default": 65532
         }
       }
     },
@@ -773,17 +852,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/migrate"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -793,17 +876,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/redirect"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -813,17 +900,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/urls"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -833,17 +924,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/stat"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -853,17 +948,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/log"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         },
@@ -873,17 +972,21 @@
           "properties": {
             "registry": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "ghcr.io"
             },
             "repository": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/web"
             },
             "tag": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "digest": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             }
           }
         }
@@ -894,34 +997,40 @@
         "Always",
         "IfNotPresent",
         "Never"
-      ]
+      ],
+      "default": "IfNotPresent"
     },
     "otel": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "endpoint": {
-          "type": "string"
+          "type": "string",
+          "default": ""
         },
         "protocol": {
           "enum": [
             "http/protobuf",
             "grpc"
-          ]
+          ],
+          "default": "http/protobuf"
         },
         "tracesSampler": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "parentbased_traceidratio"
         },
         "sampleRatio": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "0.1"
         },
         "resourceAttributes": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "default": {}
         }
       }
     }
