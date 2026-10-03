@@ -9,17 +9,14 @@
  * by its IDENTITY (a SPIFFE URI in the trust domain naming one of the
  * configured peer accounts) rather than by its name.
  *
- * A trust bundle is a set of certificates the platform trusts, and Go treats
- * every one of them as an anchor, including an issuing authority that is not
- * self-signed. OpenSSL by default accepts only a self-signed root, so against
- * such a bundle it fails with "unable to get issuer certificate". The secure
- * context option `allowPartialTrustChain` (OpenSSL's partial-chain flag) gives
- * Go's rule: any certificate in `ca` is an anchor. The chain is still checked
- * by OpenSSL, and certificate validation stays on.
+ * Node's own chain verification is left on (`rejectUnauthorized` at its
+ * default), and it is OpenSSL's: the bundle must hold a self-signed root the
+ * answer chains to. A bundle that holds only an issuing authority is refused
+ * with "unable to get issuer certificate", which the log carries.
  */
 import { readFileSync } from "node:fs";
 import type { SecureClientSessionOptions } from "node:http2";
-import { type ConnectionOptions, connect as tlsConnect, type PeerCertificate, type TLSSocket } from "node:tls";
+import { connect as tlsConnect, type PeerCertificate, type TLSSocket } from "node:tls";
 
 import type { Tls } from "./config.ts";
 
@@ -54,12 +51,10 @@ export function tlsOptions(tls: Tls | undefined, report: Report = () => {}): Tls
         cert: readFileSync(certFile),
         key: readFileSync(keyFile),
         ca: readFileSync(caFile),
-        // Any certificate in the bundle is a trust anchor, as in Go.
-        allowPartialTrustChain: true,
         // Runs after OpenSSL has verified the chain: the answer must be a
         // workload identity admitted by the allow-list.
         checkServerIdentity: (_host, cert) => verifyPeer(cert, tls),
-      } as ConnectionOptions);
+      });
       // A refused answer (chain or identity) destroys the socket with the
       // reason; log it so a 502 is never silent.
       socket.once("error", (error) => report(error.message));

@@ -102,7 +102,7 @@ beforeAll(async () => {
   leaf("urls", `spiffe://${DOMAIN}/ns/ns/sa/urls`, "ca");
   leaf("web", `spiffe://${DOMAIN}/ns/ns/sa/web`, "ca");
   // The bundles a platform may distribute: the root, the issuing authority
-  // alone (not self-signed), and both.
+  // alone (not self-signed, refused by Node), and both.
   copyFileSync(join(dir, "root.crt"), join(dir, "bundle-root.crt"));
   copyFileSync(join(dir, "ca.crt"), join(dir, "bundle-issuer.crt"));
   writeFileSync(
@@ -168,14 +168,28 @@ describe("the call to the URL service", () => {
     await expect(call({ ...client, trustDomain: "elsewhere.invalid" })).rejects.toThrow(/trust domain/);
   });
 
-  // The regression: a platform bundle that holds the ISSUING authority and no
-  // self-signed root. Go accepts it as an anchor; Node's own check does not.
-  it("accepts a bundle that holds only the issuing authority", async () => {
-    await expect(call({ ...client, caFile: join(dir, "bundle-issuer.crt") })).resolves.toBe("ok");
+  it("accepts a bundle that holds only the root", async () => {
+    await expect(call({ ...client, caFile: join(dir, "bundle-root.crt") })).resolves.toBe("ok");
   });
 
   it("accepts a bundle that holds the root and the issuing authority", async () => {
     await expect(call({ ...client, caFile: join(dir, "bundle-both.crt") })).resolves.toBe("ok");
+  });
+
+  // Documents why the platform's bundle must carry a self-signed root: Node
+  // (OpenSSL) accepts no other anchor, and the log says so.
+  it("refuses a bundle that holds only the issuing authority, and logs the reason", async () => {
+    const reasons: string[] = [];
+    const options = tlsOptions({ ...client, caFile: join(dir, "bundle-issuer.crt") }, (r) => reasons.push(r));
+    const session = connect(`https://localhost:${port}`, options);
+    await expect(
+      new Promise((_, reject) => {
+        session.on("error", reject);
+        session.request({ ":path": "/" }).on("error", reject);
+      }),
+    ).rejects.toThrow(/unable to get issuer certificate/);
+    expect(reasons).toEqual([expect.stringMatching(/unable to get issuer certificate/)]);
+    session.destroy();
   });
 
   it("refuses a server whose chain is not the trust bundle's, and reports why", async () => {
@@ -209,10 +223,10 @@ describe("the front end's own client", () => {
   // Through the real gRPC client the front end builds, not a bare HTTP/2
   // session: the server here is no gRPC server, so the call fails, but it must
   // fail PAST the handshake (a protocol answer), and never on trust.
-  it("gets through the handshake against a platform-shaped bundle", async () => {
+  it("gets through the handshake against a bundle that holds the root", async () => {
     const client = urlsClient(`https://localhost:${port}`, {
       ...tls0(),
-      caFile: join(dir, "bundle-issuer.crt"),
+      caFile: join(dir, "bundle-both.crt"),
     });
     const error = await client.get({ key: "k" }).then(
       () => undefined,
