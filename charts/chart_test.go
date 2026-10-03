@@ -1955,6 +1955,70 @@ func TestTheTelemetryRouteRuleIsOptionalAndNarrow(t *testing.T) {
 	}
 }
 
+// The body limit in front of the telemetry rule is the chart's, not the
+// platform's: a gateway policy that targets the rule BY NAME and nothing else
+// (buffering is incompatible with streaming, which the site and the resolver
+// keep), named after the route so a platform that rendered it first sees the
+// same object. Off unless a limit is given, and never without the rule.
+func TestTheTelemetryRuleCarriesItsOwnBodyLimit(t *testing.T) {
+	faro := []string{"--set", "images.web.tag=dev", "--set", "route.enabled=true", "--set", "route.parentRef.name=gw",
+		"--set", "route.faro.enabled=true", "--set", "route.faro.backend.name=collector",
+		"--set", "route.faro.backend.port=12347"}
+
+	out, err := render(t, defaults(faro...)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "BackendTrafficPolicy") {
+		t.Errorf("a telemetry rule with no limit renders a policy")
+	}
+
+	out, err = render(t, defaults(append(faro, "--set", "route.faro.requestBufferLimit=256Ki")...)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	for _, want := range []string{"kind: BackendTrafficPolicy", "name: example-faro", "sectionName: faro",
+		"kind: HTTPRoute", "limit: 256Ki", "requestBuffer:"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q", want)
+		}
+	}
+	if strings.Count(out, "kind: BackendTrafficPolicy") != 1 {
+		t.Errorf("want exactly one policy:\n%s", out)
+	}
+
+	// The name is the interface: a platform that renders the policy itself
+	// today names it `<release>-faro` and targets the route of the release's
+	// own name, so the release a platform names `url-shortener` must give
+	// exactly those.
+	named := exec.Command("helm", append([]string{"template", "url-shortener", chartDir(t, "url-shortener")},
+		defaults(append(faro[:len(faro):len(faro)], "--set", "route.faro.requestBufferLimit=256Ki")...)...)...)
+	raw, err := named.CombinedOutput()
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, raw)
+	}
+	for _, want := range []string{"name: url-shortener-faro", "name: url-shortener\n      sectionName: faro"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("a release named url-shortener lacks %q", want)
+		}
+	}
+
+	// A limit with no rule to bound is not a policy: it would report
+	// TargetNotFound and bound nothing.
+	out, err = render(t, defaults("--set", "images.web.tag=dev", "--set", "route.enabled=true",
+		"--set", "route.parentRef.name=gw", "--set", "route.faro.requestBufferLimit=256Ki")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "BackendTrafficPolicy") {
+		t.Errorf("a limit without the telemetry rule renders a policy")
+	}
+
+	if out, err := render(t, defaults(append(faro, "--set", "route.faro.requestBufferLimit=big")...)...); err == nil {
+		t.Fatalf("a limit that is not a quantity rendered:\n%s", out)
+	}
+}
+
 // A component that CALLS the URL service over the authenticated transport
 // holds everything it needs to trust the answer: the identity volume is
 // mounted, and the trust bundle (`caFile`) it verifies the answer against, its

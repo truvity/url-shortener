@@ -137,4 +137,38 @@ spec:
           name: {{ include "url-shortener.name" . }}-web
           port: 8080
           weight: 1
+{{- with .Values.route.faro }}
+{{- if and .enabled .requestBufferLimit }}
+---
+{{/*
+The request body limit in front of the telemetry rule, as the gateway's own
+policy. A platform that fronts a PUBLIC write endpoint needs one: the receiver
+reads and decodes a body before it compares its size with any limit, and a
+chunked upload is not limited by it at all, so the bound that counts is the
+one the gateway enforces before it forwards anything.
+
+It targets the telemetry RULE by name, never the route: buffering a request
+is incompatible with streaming and upgrades, and the site and the resolver
+must keep streaming unbuffered. Its name is the route's own, suffixed, and a
+platform that already renders a policy of the same name during a hand-over
+must see the same name here: the name is part of the interface.
+
+Off unless a limit is given. The kind is Envoy Gateway's; a platform whose
+gateway has no such policy leaves the key empty.
+*/}}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ include "url-shortener.name" $ }}-faro
+  labels: {{- include "url-shortener.labels" $ | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ include "url-shortener.name" $ }}
+      sectionName: {{ .ruleName }}
+  requestBuffer:
+    limit: {{ .requestBufferLimit }}
+{{- end }}
+{{- end }}
 {{- end }}

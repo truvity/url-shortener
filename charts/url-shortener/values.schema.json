@@ -346,6 +346,7 @@
             "ruleName": { "type": "string", "minLength": 1 },
             "path": { "type": "string", "pattern": "^/[^\\s'\"<>;,?#]*$" },
             "rewritePath": { "type": "string", "pattern": "^(/[^\\s'\"<>;,?#]*)?$" },
+            "requestBufferLimit": { "type": "string", "pattern": "^([0-9]+(Ki|Mi|Gi|k|M|G)?)?$", "description": "The largest request body the gateway accepts on the telemetry rule, as a quantity such as 256Ki. Empty renders no policy." },
             "backend": {
               "type": "object",
               "additionalProperties": false,

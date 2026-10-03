@@ -489,6 +489,13 @@ route:
     path: /faro/collect
     # The path the collector expects; empty sends the request unchanged.
     rewritePath: ""
+    # The largest request body the gateway accepts on this rule, a Kubernetes
+    # quantity such as `256Ki`. Set, it renders a BackendTrafficPolicy
+    # (gateway.envoyproxy.io) named `<release name>-faro` that targets this
+    # rule alone and buffers the request before forwarding it, answering 413
+    # above the limit. Empty renders no policy. A public write endpoint should
+    # have one, and the collector's own check happens too late to bound it.
+    requestBufferLimit: ""
     backend:
       name: ""
       namespace: ""

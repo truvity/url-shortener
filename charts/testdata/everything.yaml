@@ -128,6 +128,14 @@ route:
     namespace: gateways
     sectionName: https
   hostname: shortener.example.invalid
+  faro:
+    enabled: true
+    rewritePath: /collect
+    requestBufferLimit: 256Ki
+    backend:
+      name: example-collector
+      namespace: telemetry
+      port: 12347
 
 otel:
   endpoint: http://collector.example.invalid:4318

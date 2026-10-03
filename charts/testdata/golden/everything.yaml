@@ -1136,6 +1136,26 @@ spec:
 
 ---
 # Source: url-shortener/templates/route.yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: example-faro
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: example
+      sectionName: faro
+  requestBuffer:
+    limit: 256Ki
+
+---
+# Source: url-shortener/templates/route.yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -1163,6 +1183,25 @@ spec:
           kind: Service
           name: example-redirect
           port: 8080
+          weight: 1
+    - name: faro
+      matches:
+        - path:
+            type: Exact
+            value: /faro/collect
+          method: POST
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /collect
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: example-collector
+          namespace: telemetry
+          port: 12347
           weight: 1
     - name: example-rule
       matches:
