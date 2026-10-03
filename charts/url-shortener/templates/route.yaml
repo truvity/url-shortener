@@ -1,3 +1,4 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
 {{- if .Values.route.enabled }}
 {{/*
 The route. One route, two rules, and both facts matter.
@@ -169,6 +170,7 @@ spec:
       sectionName: {{ .ruleName }}
   requestBuffer:
     limit: {{ .requestBufferLimit }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

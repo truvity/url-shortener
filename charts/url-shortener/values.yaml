@@ -500,3 +500,69 @@ route:
       name: ""
       namespace: ""
       port: 0
+
+# Product alerts, as a VMRule (operator.victoriametrics.com). Off by default.
+#
+# The rules read what the product pushes over OTLP, as a Prometheus-compatible
+# store names it:
+#   probe_journey_total{journey,result}                end-to-end prober (result is success or failure)
+#   rpc_server_call_duration_seconds_*                 urls, per RPC (rpc_method, rpc_response_status_code)
+#   http_server_request_duration_seconds_*             redirect and web (http_route, http_response_status_code,
+#                                                      url_shortener_component)
+# and nothing is scraped. Every rule selects the install's namespace (and,
+# remotely, its cluster) and aggregates `by (k8s_cluster_name, ...)`, so a store
+# that holds many clusters never mixes them. The prober's rules need the
+# end-to-end chart's prober on, with telemetry enabled, in the same namespace
+# unless `prober.namespace` says otherwise; the HTTP rules need a release that
+# carries the request metrics (the same release as these rules, or later).
+alerts:
+  enabled: false
+  # Labels on the VMRule object, e.g. what a rule selector matches.
+  ruleLabels: {}
+  # Labels added to EVERY alert, e.g. what an Alertmanager routes by.
+  alertLabels: {}
+  # Evaluation interval of the group; empty takes the evaluator's default.
+  interval: ""
+  # Render ONLY the rule object, for an install that runs on ANOTHER cluster
+  # and is evaluated where the shared store's evaluator runs (a platform
+  # installs this chart there as a second source). Nothing else renders: no
+  # workload, route or database object, and none of the required values above
+  # is needed. It implies `alerts.enabled`. The selectors gain
+  # `k8s_cluster_name="<clusterName>"` and every alert carries the same label;
+  # `namespace` is the one the install runs in on that cluster (the release
+  # namespace here is the evaluator's). The rule object is named
+  # `<release>-alerts-<clusterName>`.
+  remote:
+    enabled: false
+    clusterName: ""
+    namespace: ""
+  # The prober's own namespace when it is not the install's.
+  prober:
+    namespace: ""
+  # Thresholds. Each alert can be switched off by setting `enabled: false`.
+  #
+  # Share of the prober's journeys that did not succeed, per journey, over
+  # `window`.
+  journeyFailing: {enabled: true, ratio: 0.5, window: 15m, for: 10m}
+  # The prober sends nothing (down, or telemetry broken). Switch it off where
+  # no prober runs.
+  proberAbsent: {enabled: true, for: 15m}
+  # 99th percentile of the URL service's RPC duration, in seconds.
+  urlsRpcLatency: {enabled: true, seconds: 1, for: 15m}
+  # Share of the URL service's RPCs that end in one of `codes` (a regular
+  # expression over the status; the caller's own refusals -- not found,
+  # invalid argument, already exists -- are an answer, not a fault), once
+  # there is traffic.
+  urlsRpcErrors:
+    enabled: true
+    ratio: 0.05
+    minCallsPerSecond: 0.05
+    codes: "INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"
+    for: 10m
+  # Share of redirect's / web's HTTP responses that are 5xx, once there is
+  # traffic.
+  redirectHttp5xx: {enabled: true, ratio: 0.05, minRequestsPerSecond: 0.05, for: 10m}
+  webHttp5xx: {enabled: true, ratio: 0.05, minRequestsPerSecond: 0.05, for: 10m}
+  # 99th percentile of redirect's / web's request duration, in seconds.
+  redirectLatency: {enabled: true, seconds: 0.5, for: 15m}
+  webLatency: {enabled: true, seconds: 2, for: 15m}

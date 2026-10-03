@@ -1,3 +1,4 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
 {{/*
 The five long-running components, each rendered by service-lib from the
 `platform` and `config` dicts _components.tpl builds: a ConfigMap holding
@@ -46,4 +47,5 @@ hook. See that file for why.
 {{ . }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}

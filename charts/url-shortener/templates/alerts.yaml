@@ -1,0 +1,147 @@
+{{- /*
+Product alerts as a VMRule, for the cluster's rule evaluator. Off by default.
+
+What the rules read is what the product PUSHES over OTLP, under the names a
+Prometheus-compatible store gives it (the dots become underscores and the unit
+and `_total` are appended): nothing here is scraped, and there is no /metrics.
+
+  probe_journey_total{journey,result}          the end-to-end prober
+  rpc_server_call_duration_seconds_*           the URL service, per RPC
+  http_server_request_duration_seconds_*       redirect and web (HTTP semantic
+                                               conventions); the component
+                                               attribute tells the two apart
+
+Every expression aggregates `by (k8s_cluster_name, ...)`: the shared store of a
+platform holds many clusters, and a ratio over all of them says nothing about
+one. The two rules that cannot (absent() keeps no label of its own) carry the
+cluster in their matcher when it is known.
+
+Locally the rules select the release namespace; with alerts.remote they select
+the install's namespace and cluster, and nothing else renders.
+*/ -}}
+{{- if or .Values.alerts.enabled (include "url-shortener.alertsRemote" .) }}
+{{- $a := .Values.alerts }}
+{{- $remote := include "url-shortener.alertsRemote" . }}
+{{- if $remote }}
+{{- $_ := required "alerts.remote.clusterName is required with alerts.remote.enabled" $a.remote.clusterName }}
+{{- $_ := required "alerts.remote.namespace is required with alerts.remote.enabled" $a.remote.namespace }}
+{{- end }}
+{{- $ns := ternary $a.remote.namespace .Release.Namespace (not (empty $remote)) }}
+{{- $sel := include "url-shortener.alertSelector" (dict "root" . "namespace" $ns) }}
+{{- $pns := $a.prober.namespace | default $ns }}
+{{- $psel := include "url-shortener.alertSelector" (dict "root" . "namespace" $pns) }}
+{{- $name := ternary (printf "%s-alerts-%s" (include "url-shortener.name" .) $a.remote.clusterName) (printf "%s-alerts" (include "url-shortener.name" .)) (not (empty $remote)) }}
+{{- $cluster := ternary $a.remote.clusterName "" (not (empty $remote)) }}
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+    {{- with $a.ruleLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ $name }}
+      {{- with $a.interval }}
+      interval: {{ . }}
+      {{- end }}
+      rules:
+        {{- with $a.journeyFailing }}
+        {{- if .enabled }}
+        - alert: UrlShortenerJourneyFailing
+          # The prober's journeys (create, redirect, click count) are what a
+          # user does. A journey that mostly fails is an outage whichever
+          # component caused it.
+          expr: |
+            sum by (k8s_cluster_name, journey) (rate(probe_journey_total{ {{- $psel }}, result!="success"}[{{ .window }}]))
+              / sum by (k8s_cluster_name, journey) (rate(probe_journey_total{ {{- $psel }}}[{{ .window }}]))
+            > {{ .ratio }}
+          for: {{ .for }}
+          labels:
+            {{- include "url-shortener.alertLabels" (dict "severity" "critical" "cluster" $cluster "extra" $a.alertLabels) | nindent 12 }}
+          annotations:
+            summary: {{ `"URL shortener journey {{ $labels.journey }} is failing"` }}
+            description: {{ `"{{ $value | humanizePercentage }} of the {{ $labels.journey }} journeys the prober ran over the last ` }}{{ .window }}{{ ` did not succeed. Look at the component the journey names, then the prober's own log."` }}
+        {{- end }}
+        {{- end }}
+        {{- with $a.proberAbsent }}
+        {{- if .enabled }}
+        - alert: UrlShortenerProberAbsent
+          # absent() keeps no label of its own: the matchers above give it the
+          # namespace and, remotely, the cluster.
+          expr: absent(probe_journey_total{ {{- $psel }}})
+          for: {{ .for }}
+          labels:
+            {{- include "url-shortener.alertLabels" (dict "severity" "warning" "cluster" $cluster "extra" $a.alertLabels) | nindent 12 }}
+          annotations:
+            summary: "The URL shortener prober sends no journeys"
+            description: "No probe_journey_total series from the prober in namespace {{ $pns }}. The prober is down or its telemetry is broken, and the journey alerts are blind until it is back."
+        {{- end }}
+        {{- end }}
+        {{- with $a.urlsRpcLatency }}
+        {{- if .enabled }}
+        - alert: UrlsRpcLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (k8s_cluster_name, le) (rate(rpc_server_call_duration_seconds_bucket{ {{- $sel }}}[5m])))
+            > {{ .seconds }}
+          for: {{ .for }}
+          labels:
+            {{- include "url-shortener.alertLabels" (dict "severity" "warning" "cluster" $cluster "extra" $a.alertLabels) | nindent 12 }}
+          annotations:
+            summary: "The URL service is slow"
+            description: {{ `"The 99th percentile of the URL service's RPC duration is {{ $value | humanizeDuration }} (threshold ` }}{{ .seconds }}{{ `s). Look at the database and at what the URL service waits for."` }}
+        {{- end }}
+        {{- end }}
+        {{- with $a.urlsRpcErrors }}
+        {{- if .enabled }}
+        - alert: UrlsRpcErrorRatio
+          # The caller's own refusals (not found, invalid argument, already
+          # exists) are an answer, not a fault: only `codes` count.
+          expr: |
+            sum by (k8s_cluster_name) (rate(rpc_server_call_duration_seconds_count{ {{- $sel }}, rpc_response_status_code=~"{{ .codes }}"}[5m]))
+              / sum by (k8s_cluster_name) (rate(rpc_server_call_duration_seconds_count{ {{- $sel }}}[5m]))
+            > {{ .ratio }}
+            and
+            sum by (k8s_cluster_name) (rate(rpc_server_call_duration_seconds_count{ {{- $sel }}}[5m])) > {{ .minCallsPerSecond }}
+          for: {{ .for }}
+          labels:
+            {{- include "url-shortener.alertLabels" (dict "severity" "warning" "cluster" $cluster "extra" $a.alertLabels) | nindent 12 }}
+          annotations:
+            summary: "The URL service answers with server errors"
+            description: {{ `"{{ $value | humanizePercentage }} of the URL service's RPCs over the last 5 minutes ended in one of the server-fault codes (` }}{{ .codes | replace "|" ", " }}{{ `). Look at the database and the URL service's log."` }}
+        {{- end }}
+        {{- end }}
+        {{- range $component := list "redirect" "web" }}
+        {{- $c := get $a (printf "%sHttp5xx" $component) }}
+        {{- if $c.enabled }}
+        - alert: {{ $component | title }}Http5xxRatio
+          expr: |
+            sum by (k8s_cluster_name) (rate(http_server_request_duration_seconds_count{ {{- $sel }}, url_shortener_component="{{ $component }}", http_response_status_code=~"5.."}[5m]))
+              / sum by (k8s_cluster_name) (rate(http_server_request_duration_seconds_count{ {{- $sel }}, url_shortener_component="{{ $component }}"}[5m]))
+            > {{ $c.ratio }}
+            and
+            sum by (k8s_cluster_name) (rate(http_server_request_duration_seconds_count{ {{- $sel }}, url_shortener_component="{{ $component }}"}[5m])) > {{ $c.minRequestsPerSecond }}
+          for: {{ $c.for }}
+          labels:
+            {{- include "url-shortener.alertLabels" (dict "severity" "warning" "cluster" $cluster "extra" $a.alertLabels) | nindent 12 }}
+          annotations:
+            summary: {{ printf "The URL shortener %s answers with 5xx" $component | quote }}
+            description: {{ printf "{{ $value | humanizePercentage }} of the %s component's HTTP responses over the last 5 minutes were 5xx. Look at the component's log and at what it depends on." $component | quote }}
+        {{- end }}
+        {{- $l := get $a (printf "%sLatency" $component) }}
+        {{- if $l.enabled }}
+        - alert: {{ $component | title }}HttpLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (k8s_cluster_name, le) (rate(http_server_request_duration_seconds_bucket{ {{- $sel }}, url_shortener_component="{{ $component }}"}[5m])))
+            > {{ $l.seconds }}
+          for: {{ $l.for }}
+          labels:
+            {{- include "url-shortener.alertLabels" (dict "severity" "warning" "cluster" $cluster "extra" $a.alertLabels) | nindent 12 }}
+          annotations:
+            summary: {{ printf "The URL shortener %s is slow" $component | quote }}
+            description: {{ printf "The 99th percentile of the %s component's request duration is {{ $value | humanizeDuration }} (threshold %vs)." $component $l.seconds | quote }}
+        {{- end }}
+        {{- end }}
+{{- end }}

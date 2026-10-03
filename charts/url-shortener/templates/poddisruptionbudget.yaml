@@ -1,3 +1,4 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
 {{/*
 Voluntary disruption, which is a different event from a rollout.
 
@@ -25,5 +26,6 @@ spec:
       app.kubernetes.io/instance: {{ $.Release.Name }}
       app.kubernetes.io/component: {{ $component }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

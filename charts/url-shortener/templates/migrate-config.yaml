@@ -1,3 +1,4 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
 {{/*
 The migration's configuration, and it is a HOOK resource like the job that
 reads it.
@@ -19,3 +20,4 @@ being installed rather than the one before it.
   "helm.sh/hook-weight" "-5"
   "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded")) }}
 {{ include "service-lib.configMap" (dict "context" $ "name" "migrate" "platform" $platform "config" $config) }}
+{{- end }}

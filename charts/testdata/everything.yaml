@@ -157,3 +157,18 @@ web:
     appName: example-web
     environment: example
     sampleRate: 0.25
+
+alerts:
+  enabled: true
+  ruleLabels: {release: platform}
+  alertLabels: {team: example-team}
+  interval: 45s
+  prober: {namespace: prober-ns}
+  journeyFailing: {enabled: true, ratio: 0.4, window: 20m, for: 7m}
+  proberAbsent: {enabled: true, for: 11m}
+  urlsRpcLatency: {enabled: true, seconds: 3, for: 12m}
+  urlsRpcErrors: {enabled: true, ratio: 0.07, minCallsPerSecond: 0.2, codes: "INTERNAL|UNAVAILABLE", for: 9m}
+  redirectHttp5xx: {enabled: true, ratio: 0.03, minRequestsPerSecond: 0.3, for: 6m}
+  webHttp5xx: {enabled: false, ratio: 0.02, minRequestsPerSecond: 0.4, for: 8m}
+  redirectLatency: {enabled: true, seconds: 0.75, for: 14m}
+  webLatency: {enabled: true, seconds: 4, for: 16m}

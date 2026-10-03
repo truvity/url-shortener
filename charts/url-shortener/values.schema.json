@@ -4,16 +4,43 @@
   "description": "Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "database",
-    "events",
-    "log",
-    "replicas",
-    "resources",
-    "route",
-    "archive",
-    "images"
-  ],
+  "if": {
+    "required": ["alerts"],
+    "properties": {
+      "alerts": {
+        "required": ["remote"],
+        "properties": {
+          "remote": {
+            "required": ["enabled"],
+            "properties": { "enabled": { "const": true } }
+          }
+        }
+      }
+    }
+  },
+  "else": {
+    "$comment": "What a render of the workloads must be given. Not required of a render of the alert rules alone (alerts.remote.enabled), which has no use for them.",
+    "properties": {
+      "database": {
+        "properties": {
+          "host": { "minLength": 1 },
+          "owner": { "properties": { "passwordSecret": { "minLength": 1 } } },
+          "app": { "properties": { "passwordSecret": { "minLength": 1 } } }
+        }
+      },
+      "events": { "properties": { "url": { "minLength": 1 } } }
+    },
+    "required": [
+      "database",
+      "events",
+      "log",
+      "replicas",
+      "resources",
+      "route",
+      "archive",
+      "images"
+    ]
+  },
   "properties": {
     "service-lib": {
       "type": "object",
@@ -29,6 +56,111 @@
       "type": "string",
       "description": "The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters."
     },
+    "alerts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Product alerts as a VMRule. Off by default; `remote` renders only the rule object, for an install evaluated on another cluster (no other value is then required).",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ruleLabels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "alertLabels": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 },
+          "propertyNames": { "not": { "enum": ["severity", "k8s_cluster_name"] } }
+        },
+        "interval": { "type": "string", "pattern": "^([0-9]+(s|m|h))?$" },
+        "remote": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "clusterName": { "type": "string", "pattern": "^([A-Za-z0-9][A-Za-z0-9._-]*)?$" },
+            "namespace": { "type": "string", "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$" }
+          }
+        },
+        "prober": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "namespace": { "type": "string", "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$" } }
+        },
+        "journeyFailing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "window": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
+          }
+        },
+        "proberAbsent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
+          }
+        },
+        "urlsRpcLatency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "seconds": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "urlsRpcErrors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "minCallsPerSecond": { "type": "number", "minimum": 0 },
+            "codes": { "type": "string", "pattern": "^[A-Z_]+(\\|[A-Z_]+)*$" }
+          }
+        },
+        "redirectHttp5xx": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "minRequestsPerSecond": { "type": "number", "minimum": 0 }
+          }
+        },
+        "webHttp5xx": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "minRequestsPerSecond": { "type": "number", "minimum": 0 }
+          }
+        },
+        "redirectLatency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "seconds": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "webLatency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "for": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+            "seconds": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      }
+    },
     "database": {
       "type": "object",
       "additionalProperties": false,
@@ -40,8 +172,7 @@
       ],
       "properties": {
         "host": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
         },
         "name": {
           "type": "string",
@@ -91,8 +222,7 @@
               "minLength": 1
             },
             "passwordSecret": {
-              "type": "string",
-              "minLength": 1
+              "type": "string"
             },
             "passwordKey": {
               "type": "string",
@@ -113,8 +243,7 @@
               "minLength": 1
             },
             "passwordSecret": {
-              "type": "string",
-              "minLength": 1
+              "type": "string"
             },
             "passwordKey": {
               "type": "string",
@@ -132,8 +261,7 @@
       ],
       "properties": {
         "url": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
         },
         "auth": {
           "type": "object",

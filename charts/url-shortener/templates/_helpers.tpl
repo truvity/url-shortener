@@ -407,3 +407,39 @@ renders no consumer, so there is nothing on its side to match.
 {{- define "url-shortener.logConsumer" -}}
 {{- printf "%s-log" (include "url-shortener.eventsScope" .) -}}
 {{- end -}}
+
+{{/*
+Whether this render is the alert rules ALONE (alerts.remote.enabled): an install
+that runs on another cluster and is evaluated where the shared store's
+evaluator runs needs the rules and nothing else, so every other template here
+renders nothing under it. Empty when off.
+*/}}
+{{- define "url-shortener.alertsRemote" -}}
+{{- if and .Values.alerts .Values.alerts.remote .Values.alerts.remote.enabled -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+The label matchers every alert expression starts with: the install's
+namespace on the cluster that runs it and, remotely, the cluster itself (the
+shared store holds many). Takes (dict "root" $ "namespace" <the namespace>).
+*/}}
+{{- define "url-shortener.alertSelector" -}}
+{{- if include "url-shortener.alertsRemote" .root -}}
+k8s_cluster_name="{{ .root.Values.alerts.remote.clusterName }}", {{ end -}}
+k8s_namespace_name="{{ .namespace }}"
+{{- end -}}
+
+{{/*
+What every alert carries: the severity it sets, the cluster when the rule is
+evaluated away from it, and the platform's own labels (alerts.alertLabels).
+Takes (dict "severity" "cluster" "extra").
+*/}}
+{{- define "url-shortener.alertLabels" -}}
+severity: {{ .severity }}
+{{- if .cluster }}
+k8s_cluster_name: {{ .cluster | quote }}
+{{- end }}
+{{- range $k, $v := .extra }}
+{{ $k }}: {{ $v | quote }}
+{{- end }}
+{{- end -}}

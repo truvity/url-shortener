@@ -1,3 +1,4 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
 {{/*
 Permission for this release's workloads to ASK for their own identity.
 
@@ -40,4 +41,5 @@ subjects:
     name: {{ include "url-shortener.componentServiceAccountName" (dict "root" $ "component" .) }}
     namespace: {{ $.Release.Namespace }}
   {{- end }}
+{{- end }}
 {{- end }}

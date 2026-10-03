@@ -1,3 +1,4 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
 {{/*
 The migration, as a hook that runs BEFORE the components that read the
 schema, and again before every upgrade.
@@ -59,3 +60,4 @@ spec:
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-migrate-config
+{{- end }}

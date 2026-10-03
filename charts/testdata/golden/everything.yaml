@@ -1214,6 +1214,113 @@ spec:
           name: example-web
           port: 8080
           weight: 1
+
+---
+# Source: url-shortener/templates/alerts.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: example-alerts
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    release: platform
+spec:
+  groups:
+    - name: example-alerts
+      interval: 45s
+      rules:
+        - alert: UrlShortenerJourneyFailing
+          # The prober's journeys (create, redirect, click count) are what a
+          # user does. A journey that mostly fails is an outage whichever
+          # component caused it.
+          expr: |
+            sum by (k8s_cluster_name, journey) (rate(probe_journey_total{k8s_namespace_name="prober-ns", result!="success"}[20m]))
+              / sum by (k8s_cluster_name, journey) (rate(probe_journey_total{k8s_namespace_name="prober-ns"}[20m]))
+            > 0.4
+          for: 7m
+          labels:
+            severity: critical
+            team: "example-team"
+          annotations:
+            summary: "URL shortener journey {{ $labels.journey }} is failing"
+            description: "{{ $value | humanizePercentage }} of the {{ $labels.journey }} journeys the prober ran over the last 20m did not succeed. Look at the component the journey names, then the prober's own log."
+        - alert: UrlShortenerProberAbsent
+          # absent() keeps no label of its own: the matchers above give it the
+          # namespace and, remotely, the cluster.
+          expr: absent(probe_journey_total{k8s_namespace_name="prober-ns"})
+          for: 11m
+          labels:
+            severity: warning
+            team: "example-team"
+          annotations:
+            summary: "The URL shortener prober sends no journeys"
+            description: "No probe_journey_total series from the prober in namespace prober-ns. The prober is down or its telemetry is broken, and the journey alerts are blind until it is back."
+        - alert: UrlsRpcLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (k8s_cluster_name, le) (rate(rpc_server_call_duration_seconds_bucket{k8s_namespace_name="default"}[5m])))
+            > 3
+          for: 12m
+          labels:
+            severity: warning
+            team: "example-team"
+          annotations:
+            summary: "The URL service is slow"
+            description: "The 99th percentile of the URL service's RPC duration is {{ $value | humanizeDuration }} (threshold 3s). Look at the database and at what the URL service waits for."
+        - alert: UrlsRpcErrorRatio
+          # The caller's own refusals (not found, invalid argument, already
+          # exists) are an answer, not a fault: only `codes` count.
+          expr: |
+            sum by (k8s_cluster_name) (rate(rpc_server_call_duration_seconds_count{k8s_namespace_name="default", rpc_response_status_code=~"INTERNAL|UNAVAILABLE"}[5m]))
+              / sum by (k8s_cluster_name) (rate(rpc_server_call_duration_seconds_count{k8s_namespace_name="default"}[5m]))
+            > 0.07
+            and
+            sum by (k8s_cluster_name) (rate(rpc_server_call_duration_seconds_count{k8s_namespace_name="default"}[5m])) > 0.2
+          for: 9m
+          labels:
+            severity: warning
+            team: "example-team"
+          annotations:
+            summary: "The URL service answers with server errors"
+            description: "{{ $value | humanizePercentage }} of the URL service's RPCs over the last 5 minutes ended in one of the server-fault codes (INTERNAL, UNAVAILABLE). Look at the database and the URL service's log."
+        - alert: RedirectHttp5xxRatio
+          expr: |
+            sum by (k8s_cluster_name) (rate(http_server_request_duration_seconds_count{k8s_namespace_name="default", url_shortener_component="redirect", http_response_status_code=~"5.."}[5m]))
+              / sum by (k8s_cluster_name) (rate(http_server_request_duration_seconds_count{k8s_namespace_name="default", url_shortener_component="redirect"}[5m]))
+            > 0.03
+            and
+            sum by (k8s_cluster_name) (rate(http_server_request_duration_seconds_count{k8s_namespace_name="default", url_shortener_component="redirect"}[5m])) > 0.3
+          for: 6m
+          labels:
+            severity: warning
+            team: "example-team"
+          annotations:
+            summary: "The URL shortener redirect answers with 5xx"
+            description: "{{ $value | humanizePercentage }} of the redirect component's HTTP responses over the last 5 minutes were 5xx. Look at the component's log and at what it depends on."
+        - alert: RedirectHttpLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (k8s_cluster_name, le) (rate(http_server_request_duration_seconds_bucket{k8s_namespace_name="default", url_shortener_component="redirect"}[5m])))
+            > 0.75
+          for: 14m
+          labels:
+            severity: warning
+            team: "example-team"
+          annotations:
+            summary: "The URL shortener redirect is slow"
+            description: "The 99th percentile of the redirect component's request duration is {{ $value | humanizeDuration }} (threshold 0.75s)."
+        - alert: WebHttpLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (k8s_cluster_name, le) (rate(http_server_request_duration_seconds_bucket{k8s_namespace_name="default", url_shortener_component="web"}[5m])))
+            > 4
+          for: 16m
+          labels:
+            severity: warning
+            team: "example-team"
+          annotations:
+            summary: "The URL shortener web is slow"
+            description: "The 99th percentile of the web component's request duration is {{ $value | humanizeDuration }} (threshold 4s)."
 ---
 # Source: url-shortener/templates/serviceaccount.yaml
 apiVersion: v1

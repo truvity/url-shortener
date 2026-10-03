@@ -2019,6 +2019,201 @@ func TestTheTelemetryRuleCarriesItsOwnBodyLimit(t *testing.T) {
 	}
 }
 
+// alertRules renders the chart with the given values and returns the rules of
+// its VMRule by alert name, each as {expr, labels}.
+func alertRules(t *testing.T, args ...string) (map[string]struct {
+	Expr   string            `yaml:"expr"`
+	For    string            `yaml:"for"`
+	Labels map[string]string `yaml:"labels"`
+}, string) {
+	t.Helper()
+
+	out, err := render(t, args...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	rules := map[string]struct {
+		Expr   string            `yaml:"expr"`
+		For    string            `yaml:"for"`
+		Labels map[string]string `yaml:"labels"`
+	}{}
+	name := ""
+	for _, doc := range strings.Split(out, "\n---\n") {
+		var rule struct {
+			Kind     string `yaml:"kind"`
+			Metadata struct {
+				Name string `yaml:"name"`
+			} `yaml:"metadata"`
+			Spec struct {
+				Groups []struct {
+					Rules []struct {
+						Alert  string            `yaml:"alert"`
+						Expr   string            `yaml:"expr"`
+						For    string            `yaml:"for"`
+						Labels map[string]string `yaml:"labels"`
+					} `yaml:"rules"`
+				} `yaml:"groups"`
+			} `yaml:"spec"`
+		}
+		if err := yaml.Unmarshal([]byte(doc), &rule); err != nil || rule.Kind != "VMRule" {
+			continue
+		}
+		name = rule.Metadata.Name
+		for _, group := range rule.Spec.Groups {
+			for _, r := range group.Rules {
+				rules[r.Alert] = struct {
+					Expr   string            `yaml:"expr"`
+					For    string            `yaml:"for"`
+					Labels map[string]string `yaml:"labels"`
+				}{r.Expr, r.For, r.Labels}
+			}
+		}
+	}
+
+	return rules, name
+}
+
+// The product's alerts are the chart's own, off by default, and every one
+// reads the series the product pushes under the names a Prometheus-compatible
+// store gives them. A rule that selected a metric the services do not export
+// would never fire and look healthy, so the names are asserted here against
+// what the services' instruments are called (see internal/api/metrics.go, the
+// urls service's otelconnect interceptor and the prober's counter).
+func TestTheChartRendersItsAlertsOnlyWhenAsked(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "VMRule") {
+		t.Errorf("a chart with alerts off renders a rule")
+	}
+
+	rules, name := alertRules(t, defaults("--set", "images.web.tag=dev", "--set", "alerts.enabled=true",
+		"--set", "alerts.prober.namespace=")...)
+	if name != "example-alerts" {
+		t.Errorf("the rule object is named %q, want example-alerts", name)
+	}
+
+	want := map[string]struct {
+		severity string
+		metrics  []string
+	}{
+		"UrlShortenerJourneyFailing": {"critical", []string{"probe_journey_total{", `result!="success"`}},
+		"UrlShortenerProberAbsent":   {"warning", []string{"absent(probe_journey_total{"}},
+		"UrlsRpcLatencyHigh":         {"warning", []string{"rpc_server_call_duration_seconds_bucket", "histogram_quantile(0.99"}},
+		"UrlsRpcErrorRatio":          {"warning", []string{"rpc_server_call_duration_seconds_count", "rpc_response_status_code=~"}},
+		"RedirectHttp5xxRatio":       {"warning", []string{"http_server_request_duration_seconds_count", `url_shortener_component="redirect"`, `http_response_status_code=~"5.."`}},
+		"RedirectHttpLatencyHigh":    {"warning", []string{"http_server_request_duration_seconds_bucket", `url_shortener_component="redirect"`}},
+		"WebHttp5xxRatio":            {"warning", []string{"http_server_request_duration_seconds_count", `url_shortener_component="web"`, `http_response_status_code=~"5.."`}},
+		"WebHttpLatencyHigh":         {"warning", []string{"http_server_request_duration_seconds_bucket", `url_shortener_component="web"`}},
+	}
+	if len(rules) != len(want) {
+		t.Errorf("the chart renders %d alerts, want %d: %v", len(rules), len(want), rules)
+	}
+	for alert, w := range want {
+		rule, ok := rules[alert]
+		if !ok {
+			t.Errorf("no alert %s", alert)
+
+			continue
+		}
+		if rule.Labels["severity"] != w.severity {
+			t.Errorf("%s: severity %q, want %q", alert, rule.Labels["severity"], w.severity)
+		}
+		for _, m := range w.metrics {
+			if !strings.Contains(rule.Expr, m) {
+				t.Errorf("%s: the expression lacks %q:\n%s", alert, m, rule.Expr)
+			}
+		}
+		// The namespace of the release, and the cluster never mixed: every
+		// aggregation keeps k8s_cluster_name (absent() has no aggregation).
+		if !strings.Contains(rule.Expr, `k8s_namespace_name="`+"default"+`"`) {
+			t.Errorf("%s: the expression does not select the release namespace:\n%s", alert, rule.Expr)
+		}
+		if strings.Contains(rule.Expr, "sum by (") != strings.Contains(rule.Expr, "sum by (k8s_cluster_name") ||
+			strings.Contains(rule.Expr, "by (le") {
+			t.Errorf("%s: an aggregation drops k8s_cluster_name:\n%s", alert, rule.Expr)
+		}
+		if _, ok := rule.Labels["k8s_cluster_name"]; ok {
+			t.Errorf("%s: a local rule claims a cluster", alert)
+		}
+	}
+}
+
+// With alerts.remote the chart renders the rules ALONE for an install that is
+// evaluated on another cluster: nothing else, none of the values the
+// workloads need, the cluster in every selector and on every alert, and a
+// name that tells two clusters' rules apart. A render that left a Deployment
+// in would create the product a second time on the evaluator's cluster.
+func TestTheRemoteAlertsRenderTheRulesAlone(t *testing.T) {
+	remote := []string{"--set", "alerts.remote.enabled=true", "--set", "alerts.remote.clusterName=stage",
+		"--set", "alerts.remote.namespace=url-shortener", "--set", "alerts.alertLabels.team=example-team"}
+
+	out, err := render(t, remote...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if got := strings.Count(out, "\nkind: "); got != 1 {
+		t.Errorf("a remote render has %d objects, want only the rule:\n%s", got, out)
+	}
+
+	rules, name := alertRules(t, remote...)
+	if name != "example-alerts-stage" {
+		t.Errorf("the remote rule object is named %q, want example-alerts-stage", name)
+	}
+	if len(rules) == 0 {
+		t.Fatalf("no rules")
+	}
+	for alert, rule := range rules {
+		for _, want := range []string{`k8s_cluster_name="stage"`, `k8s_namespace_name="url-shortener"`} {
+			if !strings.Contains(rule.Expr, want) {
+				t.Errorf("%s: the expression lacks %s:\n%s", alert, want, rule.Expr)
+			}
+		}
+		if rule.Labels["k8s_cluster_name"] != "stage" || rule.Labels["team"] != "example-team" {
+			t.Errorf("%s: labels %v", alert, rule.Labels)
+		}
+	}
+
+	// A remote render needs to know where it is.
+	for _, missing := range [][]string{
+		{"--set", "alerts.remote.enabled=true", "--set", "alerts.remote.namespace=url-shortener"},
+		{"--set", "alerts.remote.enabled=true", "--set", "alerts.remote.clusterName=stage"},
+	} {
+		if out, err := render(t, missing...); err == nil {
+			t.Errorf("a remote render without its cluster or namespace rendered:\n%s", out)
+		}
+	}
+
+	// Without remote the workloads' own values are still required.
+	if out, err := render(t, "--set", "alerts.enabled=true"); err == nil {
+		t.Errorf("a local render without a database rendered:\n%s", out)
+	}
+}
+
+// A threshold is a value, a rule can be switched off, and a code list that is
+// not a status refuses to render (it would sit inside a regular expression).
+func TestTheAlertThresholdsAreValues(t *testing.T) {
+	rules, _ := alertRules(t, defaults("--set", "images.web.tag=dev", "--set", "alerts.enabled=true",
+		"--set", "alerts.urlsRpcLatency.seconds=7", "--set", "alerts.urlsRpcLatency.for=3m",
+		"--set", "alerts.webHttp5xx.enabled=false", "--set", "alerts.urlsRpcErrors.codes=INTERNAL|UNAVAILABLE")...)
+
+	if r := rules["UrlsRpcLatencyHigh"]; !strings.Contains(r.Expr, "> 7") || r.For != "3m" {
+		t.Errorf("the latency threshold did not move: %+v", r)
+	}
+	if _, ok := rules["WebHttp5xxRatio"]; ok {
+		t.Errorf("a switched-off alert still renders")
+	}
+	if r := rules["UrlsRpcErrorRatio"]; !strings.Contains(r.Expr, `=~"INTERNAL|UNAVAILABLE"`) {
+		t.Errorf("the error codes did not move: %+v", r)
+	}
+
+	if out, err := render(t, defaults("--set", "images.web.tag=dev", "--set", `alerts.urlsRpcErrors.codes=a"b`)...); err == nil {
+		t.Errorf("a code list that is not statuses rendered:\n%s", out)
+	}
+}
+
 // A component that CALLS the URL service over the authenticated transport
 // holds everything it needs to trust the answer: the identity volume is
 // mounted, and the trust bundle (`caFile`) it verifies the answer against, its
