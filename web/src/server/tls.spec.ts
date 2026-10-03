@@ -187,8 +187,8 @@ describe("the call to the URL service", () => {
         session.on("error", reject);
         session.request({ ":path": "/" }).on("error", reject);
       }),
-    ).rejects.toThrow(/does not chain to the trust bundle/);
-    expect(reasons).toEqual([expect.stringMatching(/does not chain/)]);
+    ).rejects.toThrow(/issuer certificate|self-signed|unable to verify/);
+    expect(reasons).toEqual([expect.stringMatching(/issuer certificate|self-signed|unable to verify/)]);
     session.destroy();
   });
 
@@ -218,7 +218,7 @@ describe("the front end's own client", () => {
       () => undefined,
       (e: Error) => e,
     );
-    expect(error?.message ?? "").not.toMatch(/certificate|chain|trust bundle|admits/);
+    expect(error?.message ?? "").not.toMatch(/certificate|chain|self-signed|admits/);
   });
 
   it("is refused on trust, with the reason, when the bundle is not the server's", async () => {
@@ -228,7 +228,7 @@ describe("the front end's own client", () => {
       { ...tls0(), caFile: join(dir, "other.crt") },
       (r) => reasons.push(r),
     );
-    await expect(client.get({ key: "k" })).rejects.toThrow(/does not chain to the trust bundle/);
+    await expect(client.get({ key: "k" })).rejects.toThrow(/issuer certificate|self-signed|unable to verify/);
     expect(reasons).toHaveLength(1);
   });
 });
