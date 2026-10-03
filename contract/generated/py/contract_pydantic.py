@@ -29,6 +29,25 @@ def _integral(value: Any) -> Any:
     return value
 
 
+def _at(value: Any, path: list[str]) -> Any:
+    # The value at a path through blocks; absent on the way is absent.
+    for key in path:
+        if value is None:
+            return None
+        value = getattr(value, key, None)
+    return value
+
+
+def _deny_keys(keys: list[str]):
+    def check(value: dict[str, Any]) -> dict[str, Any]:
+        found = [k for k in keys if k in value]
+        if found:
+            raise ValueError(f"must not have the key {found}")
+        return value
+
+    return check
+
+
 def _has_keys(keys: list[str]):
     def check(value: dict[str, Any]) -> dict[str, Any]:
         missing = [k for k in keys if k not in value]
@@ -64,7 +83,7 @@ NonNegativeInt = Annotated[int, BeforeValidator(_integral), Field(ge=0)]
 OpenObject = dict[str, Any]
 RootedPath = Annotated[str, StringConstraints(pattern=r"^/"), AfterValidator(_no_line_break)]
 AbsPath = Annotated[str, StringConstraints(pattern=r"^/[^\n]+"), AfterValidator(_no_line_break)]
-OtelProtocol = Literal["grpc", "http/protobuf", "http/json"]
+OtelProtocol = Literal["grpc", "http/protobuf"]
 Named = Annotated[dict[str, Any], AfterValidator(_has_keys(["name"]))]
 Mounted = Annotated[dict[str, Any], AfterValidator(_has_keys(["name", "mountPath"]))]
 PostgresUrl = Annotated[str, StringConstraints(pattern=r"^postgres(ql)?://"), AfterValidator(_no_line_break)]
@@ -566,12 +585,13 @@ class WebAssets(_Closed):
 
 
 class Tls(TlsFields):
+
     @model_validator(mode="after")
-    def _conditional(self) -> "Tls":
-        if self.mode in ["permissive", "strict"]:
-            missing = [k for k in ["certFile", "keyFile", "caFile", "trustDomain"] if getattr(self, k) is None]
+    def _conditional_Tls(self) -> "Tls":
+        if _at(self, ["mode"]) in ["permissive", "strict"]:
+            missing = [".".join(p) for p in [["certFile"], ["keyFile"], ["caFile"], ["trustDomain"]] if _at(self, p) is None]
             if missing:
-                raise ValueError(f"{missing} required when mode is permissive or strict")
+                raise ValueError("when `mode` is `permissive` or `strict`, `certFile`, `keyFile`, `caFile`, `trustDomain` are required: missing " + ", ".join(missing))
         return self
 
 

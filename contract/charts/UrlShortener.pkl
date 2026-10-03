@@ -1,5 +1,16 @@
 /// Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.
 @A.Chart { title = "url-shortener chart values" }
+@A.RequiredUnless {
+  property = "alerts.remote.enabled"
+  `in` { true }
+  require {
+    "database.host"
+    "database.owner.passwordSecret"
+    "database.app.passwordSecret"
+    "events.url"
+    "archive.bucket.name"
+  }
+}
 module urlshortener.charts.UrlShortener
 
 import "@fragments/Fragments.pkl" as F
@@ -54,60 +65,61 @@ otel: Otel?
 class AlertsRemote {
   enabled: Boolean = false
 
-  clusterName: String = ""
+  clusterName: V.DnsLabel?
 
-  namespace: String = ""
+  namespace: V.DnsLabel?
 }
 
 class AlertsProber {
-  namespace: String = ""
+  namespace: V.DnsLabel?
 }
 
 class AlertsJourneyFailing {
   enabled: Boolean = true
 
-  `for`: String = "10m"
+  `for`: V.PromDuration = "10m"
 
-  @A.Range { max = 1 }
+  @A.Range { exclusiveMin = 0; max = 1 }
   ratio: Number = 0.5
 
-  window: String = "15m"
+  window: V.PromDuration = "15m"
 }
 
 class AlertsProberAbsent {
   enabled: Boolean = true
 
-  `for`: String = "15m"
+  `for`: V.PromDuration = "15m"
 }
 
 class AlertsUrlsRpcLatency {
   enabled: Boolean = true
 
-  `for`: String = "15m"
+  `for`: V.PromDuration = "15m"
 
+  @A.Range { exclusiveMin = 0 }
   seconds: Number = 1
 }
 
 class AlertsUrlsRpcErrors {
   enabled: Boolean = true
 
-  `for`: String = "10m"
+  `for`: V.PromDuration = "10m"
 
-  @A.Range { max = 1 }
+  @A.Range { exclusiveMin = 0; max = 1 }
   ratio: Number = 0.05
 
   @A.Range { min = 0 }
   minCallsPerSecond: Number = 0.05
 
-  codes: String = "INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"
+  codes: V.StatusCodeList = "INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"
 }
 
 class AlertsHttp5xx {
   enabled: Boolean = true
 
-  `for`: String = "10m"
+  `for`: V.PromDuration = "10m"
 
-  @A.Range { max = 1 }
+  @A.Range { exclusiveMin = 0; max = 1 }
   ratio: Number = 0.05
 
   @A.Range { min = 0 }
@@ -117,16 +129,18 @@ class AlertsHttp5xx {
 class AlertsRedirectLatency {
   enabled: Boolean = true
 
-  `for`: String = "15m"
+  `for`: V.PromDuration = "15m"
 
+  @A.Range { exclusiveMin = 0 }
   seconds: Number = 0.5
 }
 
 class AlertsWebLatency {
   enabled: Boolean = true
 
-  `for`: String = "15m"
+  `for`: V.PromDuration = "15m"
 
+  @A.Range { exclusiveMin = 0 }
   seconds: Number = 2
 }
 
@@ -136,9 +150,10 @@ class Alerts {
 
   ruleLabels: Mapping<String, String> = new Mapping {}
 
+  @A.DenyKeys { keys { "severity"; "k8s_cluster_name" } }
   alertLabels: Mapping<String, V.NonEmptyString> = new Mapping {}
 
-  interval: String = ""
+  interval: V.PromDuration?
 
   remote: AlertsRemote?
 
@@ -179,7 +194,6 @@ class DatabaseOwner {
   role: V.NonEmptyString = "url_shortener_owner"
 
   /// The Secret holding the role's password. Every install names its own.
-  @A.SetAtInstall
   passwordSecret: V.NonEmptyString?
 
   passwordKey: V.NonEmptyString = "password"
@@ -189,7 +203,6 @@ class DatabaseApp {
   role: V.NonEmptyString = "url_shortener_app"
 
   /// The Secret holding the role's password. Every install names its own.
-  @A.SetAtInstall
   passwordSecret: V.NonEmptyString?
 
   passwordKey: V.NonEmptyString = "password"
@@ -197,7 +210,6 @@ class DatabaseApp {
 
 class Database {
   /// The database host. Every install names its own.
-  @A.SetAtInstall
   host: V.NonEmptyString?
 
   name: V.NonEmptyString = "url_shortener"
@@ -230,7 +242,6 @@ class EventsTls {
 
 class Events {
   /// The events server's URL. Every install names its own.
-  @A.SetAtInstall
   url: V.NonEmptyString?
 
   auth: EventsAuth?
@@ -240,7 +251,6 @@ class Events {
 
 class ArchiveBucket {
   /// The bucket, which exists already. Every install names its own.
-  @A.SetAtInstall
   name: V.NonEmptyString?
 
   region: String = ""
@@ -447,7 +457,7 @@ class TlsComponentsUrls {
 
 /// Never `strict`: the redirect service is fronted by a gateway that terminates TLS and forwards cleartext.
 class TlsComponentsRedirect {
-  mode: ("off" | "permissive")?
+  mode: V.GatewayTlsMode?
 }
 
 /// Per-component override of tls.mode, for the two components that SERVE an authenticated boundary. `web` and `stat` only call out and have no mode of their own. Unset means tls.mode.

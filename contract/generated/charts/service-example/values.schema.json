@@ -274,8 +274,7 @@
             "protocol": {
               "enum": [
                 "grpc",
-                "http/protobuf",
-                "http/json"
+                "http/protobuf"
               ],
               "description": "The protocol to export over."
             },

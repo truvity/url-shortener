@@ -45,7 +45,7 @@ The constrained types the fields use. A pattern is a search, and never matches a
 | `OpenObject` | open |  | Kubernetes' own object shape, passed through unchanged. |
 | `RootedPath` | string | matches `^/`, never a line break | A path that starts at the root, the root itself included. |
 | `AbsPath` | string | matches `^/[^\n]+`, never a line break | An absolute path that is not the root. |
-| `OtelProtocol` | one of `grpc`, `http/protobuf`, `http/json` |  | The protocol OpenTelemetry exports over. |
+| `OtelProtocol` | one of `grpc`, `http/protobuf` |  | The protocol OpenTelemetry exports over. `http/json` is absent on purpose: it is in the OpenTelemetry specification, but the Go SDK's exporter selection (`autoexport`) refuses it at startup and its HTTP exporter always sends protobuf, and the Python and TypeScript exporters are fixed to HTTP/protobuf, so a contract that admitted it would admit a value that stops a service from starting. |
 | `Named` | open | has the keys `name` | An open object that must carry `name`. |
 | `Mounted` | open | has the keys `name`, `mountPath` | An open object that must carry `name` and `mountPath`. |
 | `PostgresUrl` | string | matches `^postgres(ql)?://`, never a line break | A PostgreSQL connection URL, by its scheme. |
@@ -115,7 +115,11 @@ Document `https://github.com/truvity/policy/schemas/fragments/listen.json`.
 
 Mutually authenticated transport, where the platform provides the identity. A workload presents a certificate it did not mint, reloads it without restarting, and admits peers by the account they run as rather than by the address they call from. Absent, or mode 'off', means cleartext: a service must be installable on a platform that provides none of this.
 
-Document `https://github.com/truvity/policy/schemas/fragments/tls.json`. When `mode` is `permissive` or `strict`, `certFile`, `keyFile`, `caFile`, `trustDomain` are required.
+Document `https://github.com/truvity/policy/schemas/fragments/tls.json`.
+
+Rules across fields:
+
+- When `mode` is `permissive` or `strict`, `certFile`, `keyFile`, `caFile`, `trustDomain` are required.
 
 | Field | Type | Required | Default | Constraints | Description | Set at install |
 |---|---|---|---|---|---|---|

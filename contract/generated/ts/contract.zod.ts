@@ -3,6 +3,16 @@ import { z } from "zod";
 
 const noLineBreak = (s: string): boolean => !/[\n\r\f\v\u0085\u2028\u2029]/.test(s);
 
+// The value at a path through blocks; absent on the way is absent.
+const at = (o: unknown, path: string[]): unknown => {
+  let v: unknown = o;
+  for (const k of path) {
+    if (v === null || v === undefined) return undefined;
+    v = (v as Record<string, unknown>)[k];
+  }
+  return v;
+};
+
 /** host:port as the configuration contract spells it today. It does NOT bound the port at 65535, because the hand-written pattern does not; `Port` is the stricter vocabulary a contract may move to. */
 export const HostPort = z.string().regex(/^[^\t \xA0  -   　]*:[0-9]{1,5}$/).refine(noLineBreak);
 export type HostPort = z.infer<typeof HostPort>;
@@ -42,8 +52,8 @@ export type RootedPath = z.infer<typeof RootedPath>;
 /** An absolute path that is not the root. */
 export const AbsPath = z.string().regex(/^\/[^\n]+/).refine(noLineBreak);
 export type AbsPath = z.infer<typeof AbsPath>;
-/** The protocol OpenTelemetry exports over. */
-export const OtelProtocol = z.enum(["grpc", "http/protobuf", "http/json"]);
+/** The protocol OpenTelemetry exports over. `http/json` is absent on purpose: it is in the OpenTelemetry specification, but the Go SDK's exporter selection (`autoexport`) refuses it at startup and its HTTP exporter always sends protobuf, and the Python and TypeScript exporters are fixed to HTTP/protobuf, so a contract that admitted it would admit a value that stops a service from starting. */
+export const OtelProtocol = z.enum(["grpc", "http/protobuf"]);
 export type OtelProtocol = z.infer<typeof OtelProtocol>;
 /** An open object that must carry `name`. */
 export const Named = z.looseObject({}).refine((o) => ["name"].every((k) => k in o));
@@ -646,7 +656,13 @@ export const WebAssets = z.strictObject(WebAssets_shape);
 export type WebAssets = z.infer<typeof WebAssets>;
 
 /** Mutually authenticated transport, where the platform provides the identity. A workload presents a certificate it did not mint, reloads it without restarting, and admits peers by the account they run as rather than by the address they call from. Absent, or mode 'off', means cleartext: a service must be installable on a platform that provides none of this. */
-export const Tls = TlsFields.refine((o) => !["permissive", "strict"].includes(o.mode) || ["certFile", "keyFile", "caFile", "trustDomain"].every((k) => (o as Record<string, unknown>)[k] !== undefined), { message: "certFile, keyFile, caFile, trustDomain required when mode is permissive or strict" });
+export const Tls = TlsFields.superRefine((o, ctx) => {
+    if ((["permissive", "strict"] as unknown[]).includes(at(o, ["mode"]))) {
+      for (const p of [["certFile"], ["keyFile"], ["caFile"], ["trustDomain"]]) {
+        if (at(o, p) === undefined) ctx.addIssue({ code: "custom", path: p, message: "when `mode` is `permissive` or `strict`, `certFile`, `keyFile`, `caFile`, `trustDomain` are required" });
+      }
+    }
+  });
 export type Tls = z.infer<typeof Tls>;
 
 export const schemas = {

@@ -522,10 +522,8 @@
                 "mode": {
                   "enum": [
                     "off",
-                    "permissive",
-                    "strict"
-                  ],
-                  "description": "`strict` is refused by the hand-written schema and accepted here: the vocabulary has no enum of `off` and `permissive` (a literal union in two modules must be one)."
+                    "permissive"
+                  ]
                 }
               },
               "description": "Never `strict`: the application chart runs redirect behind a gateway that terminates TLS."
@@ -592,8 +590,7 @@
         "protocol": {
           "enum": [
             "grpc",
-            "http/protobuf",
-            "http/json"
+            "http/protobuf"
           ],
           "default": "http/protobuf"
         },

@@ -225,8 +225,7 @@ class TlsComponentsUrls {
 
 /// Never `strict`: the application chart runs redirect behind a gateway that terminates TLS.
 class TlsComponentsRedirect {
-  /// `strict` is refused by the hand-written schema and accepted here: the vocabulary has no enum of `off` and `permissive` (a literal union in two modules must be one).
-  mode: V.TlsMode?
+  mode: V.GatewayTlsMode?
 }
 
 /// Per-target override of tls.mode: the mode the APPLICATION RELEASE runs `urls` and `redirect` in, which decides the port and scheme this chart's callers dial. Same meaning as charts/url-shortener's own tls.components. Unset means tls.mode.

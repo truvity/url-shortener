@@ -66,7 +66,7 @@
 | `prober.serviceAccount.name` | string | `""` |  |
 | `tls.mode` | TlsMode | `"off"` |  |
 | `tls.components.urls.mode` | TlsMode |  |  |
-| `tls.components.redirect.mode` | TlsMode |  | `strict` is refused by the hand-written schema and accepted here: the vocabulary has no enum of `off` and `permissive` (a literal union in two modules must be one). |
+| `tls.components.redirect.mode` | GatewayTlsMode |  |  |
 | `tls.trustDomain` | string | `""` |  |
 | `tls.csiDriver` | NonEmptyString | `"spiffe.csi.cert-manager.io"` |  |
 | `tls.mountPath` | NonEmptyString | `"/var/run/identity"` |  |

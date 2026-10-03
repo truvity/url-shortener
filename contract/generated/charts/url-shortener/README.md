@@ -9,59 +9,59 @@
 | `alerts.enabled` | boolean | `false` |  |
 | `alerts.ruleLabels` | map of string | `{}` |  |
 | `alerts.alertLabels` | map of NonEmptyString | `{}` |  |
-| `alerts.interval` | string | `""` |  |
+| `alerts.interval` | PromDuration |  |  |
 | `alerts.remote.enabled` | boolean | `false` |  |
-| `alerts.remote.clusterName` | string | `""` |  |
-| `alerts.remote.namespace` | string | `""` |  |
-| `alerts.prober.namespace` | string | `""` |  |
+| `alerts.remote.clusterName` | DnsLabel |  |  |
+| `alerts.remote.namespace` | DnsLabel |  |  |
+| `alerts.prober.namespace` | DnsLabel |  |  |
 | `alerts.journeyFailing.enabled` | boolean | `true` |  |
-| `alerts.journeyFailing.for` | string | `"10m"` |  |
+| `alerts.journeyFailing.for` | PromDuration | `"10m"` |  |
 | `alerts.journeyFailing.ratio` | number | `0.5` |  |
-| `alerts.journeyFailing.window` | string | `"15m"` |  |
+| `alerts.journeyFailing.window` | PromDuration | `"15m"` |  |
 | `alerts.proberAbsent.enabled` | boolean | `true` |  |
-| `alerts.proberAbsent.for` | string | `"15m"` |  |
+| `alerts.proberAbsent.for` | PromDuration | `"15m"` |  |
 | `alerts.urlsRpcLatency.enabled` | boolean | `true` |  |
-| `alerts.urlsRpcLatency.for` | string | `"15m"` |  |
+| `alerts.urlsRpcLatency.for` | PromDuration | `"15m"` |  |
 | `alerts.urlsRpcLatency.seconds` | number | `1` |  |
 | `alerts.urlsRpcErrors.enabled` | boolean | `true` |  |
-| `alerts.urlsRpcErrors.for` | string | `"10m"` |  |
+| `alerts.urlsRpcErrors.for` | PromDuration | `"10m"` |  |
 | `alerts.urlsRpcErrors.ratio` | number | `0.05` |  |
 | `alerts.urlsRpcErrors.minCallsPerSecond` | number | `0.05` |  |
-| `alerts.urlsRpcErrors.codes` | string | `"INTERNAL\|UNKNOWN\|UNAVAILABLE\|DATA_LOSS\|DEADLINE_EXCEEDED"` |  |
+| `alerts.urlsRpcErrors.codes` | StatusCodeList | `"INTERNAL\|UNKNOWN\|UNAVAILABLE\|DATA_LOSS\|DEADLINE_EXCEEDED"` |  |
 | `alerts.redirectHttp5xx.enabled` | boolean | `true` |  |
-| `alerts.redirectHttp5xx.for` | string | `"10m"` |  |
+| `alerts.redirectHttp5xx.for` | PromDuration | `"10m"` |  |
 | `alerts.redirectHttp5xx.ratio` | number | `0.05` |  |
 | `alerts.redirectHttp5xx.minRequestsPerSecond` | number | `0.05` |  |
 | `alerts.webHttp5xx.enabled` | boolean | `true` |  |
-| `alerts.webHttp5xx.for` | string | `"10m"` |  |
+| `alerts.webHttp5xx.for` | PromDuration | `"10m"` |  |
 | `alerts.webHttp5xx.ratio` | number | `0.05` |  |
 | `alerts.webHttp5xx.minRequestsPerSecond` | number | `0.05` |  |
 | `alerts.redirectLatency.enabled` | boolean | `true` |  |
-| `alerts.redirectLatency.for` | string | `"15m"` |  |
+| `alerts.redirectLatency.for` | PromDuration | `"15m"` |  |
 | `alerts.redirectLatency.seconds` | number | `0.5` |  |
 | `alerts.webLatency.enabled` | boolean | `true` |  |
-| `alerts.webLatency.for` | string | `"15m"` |  |
+| `alerts.webLatency.for` | PromDuration | `"15m"` |  |
 | `alerts.webLatency.seconds` | number | `2` |  |
-| `database.host` | NonEmptyString |  | **Set at install.** The database host. Every install names its own. |
+| `database.host` | NonEmptyString |  | The database host. Every install names its own. |
 | `database.name` | NonEmptyString | `"url_shortener"` |  |
 | `database.clusterDomain` | NonEmptyString | `"cluster.local"` |  |
 | `database.tls.mode` | "verify-full" | `"verify-full"` | Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused. |
 | `database.tls.rootCA.configMapName` | string | `""` | The ConfigMap holding the root the database server certificate chains to. Required. |
 | `database.tls.rootCA.key` | NonEmptyString | `"ca-certificates.crt"` |  |
 | `database.owner.role` | NonEmptyString | `"url_shortener_owner"` |  |
-| `database.owner.passwordSecret` | NonEmptyString |  | **Set at install.** The Secret holding the role's password. Every install names its own. |
+| `database.owner.passwordSecret` | NonEmptyString |  | The Secret holding the role's password. Every install names its own. |
 | `database.owner.passwordKey` | NonEmptyString | `"password"` |  |
 | `database.app.role` | NonEmptyString | `"url_shortener_app"` |  |
-| `database.app.passwordSecret` | NonEmptyString |  | **Set at install.** The Secret holding the role's password. Every install names its own. |
+| `database.app.passwordSecret` | NonEmptyString |  | The Secret holding the role's password. Every install names its own. |
 | `database.app.passwordKey` | NonEmptyString | `"password"` |  |
-| `events.url` | NonEmptyString |  | **Set at install.** The events server's URL. Every install names its own. |
+| `events.url` | NonEmptyString |  | The events server's URL. Every install names its own. |
 | `events.auth.audience` | string | `""` |  |
 | `events.auth.expirationSeconds` | PositiveInt | `3600` |  |
 | `events.tls.enabled` | boolean | `false` |  |
 | `events.tls.serverName` | string | `""` |  |
 | `events.tls.caConfigMap` | string | `""` |  |
 | `events.tls.caKey` | NonEmptyString | `"ca-certificates.crt"` |  |
-| `archive.bucket.name` | NonEmptyString |  | **Set at install.** The bucket, which exists already. Every install names its own. |
+| `archive.bucket.name` | NonEmptyString |  | The bucket, which exists already. Every install names its own. |
 | `archive.bucket.region` | string | `""` |  |
 | `archive.bucket.endpoint` | string | `""` |  |
 | `archive.bucket.ca` | string | `""` |  |
@@ -132,7 +132,7 @@
 | `disruption.maxUnavailable` | NonNegativeInt | `1` |  |
 | `tls.mode` | TlsMode | `"off"` | The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`. |
 | `tls.components.urls.mode` | TlsMode |  |  |
-| `tls.components.redirect.mode` | "off" \| "permissive" |  |  |
+| `tls.components.redirect.mode` | GatewayTlsMode |  |  |
 | `tls.trustDomain` | string | `""` |  |
 | `tls.csiDriver` | NonEmptyString | `"spiffe.csi.cert-manager.io"` |  |
 | `tls.mountPath` | NonEmptyString | `"/var/run/identity"` |  |

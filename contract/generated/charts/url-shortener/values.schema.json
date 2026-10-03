@@ -4,11 +4,6 @@
   "description": "Strict everywhere this chart defines something: a typo must fail the render rather than be ignored.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "database",
-    "events",
-    "archive"
-  ],
   "properties": {
     "service-lib": {
       "type": "object",
@@ -43,6 +38,14 @@
         },
         "alertLabels": {
           "type": "object",
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "severity",
+                "k8s_cluster_name"
+              ]
+            }
+          },
           "additionalProperties": {
             "type": "string",
             "minLength": 1
@@ -51,7 +54,10 @@
         },
         "interval": {
           "type": "string",
-          "default": ""
+          "pattern": "^[0-9]+(s|m|h)$",
+          "not": {
+            "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+          }
         },
         "remote": {
           "type": "object",
@@ -63,11 +69,19 @@
             },
             "clusterName": {
               "type": "string",
-              "default": ""
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              }
             },
             "namespace": {
               "type": "string",
-              "default": ""
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              }
             }
           }
         },
@@ -77,7 +91,11 @@
           "properties": {
             "namespace": {
               "type": "string",
-              "default": ""
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              }
             }
           }
         },
@@ -91,15 +109,24 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "10m"
             },
             "ratio": {
               "type": "number",
               "maximum": 1,
+              "exclusiveMinimum": 0,
               "default": 0.5
             },
             "window": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "15m"
             }
           }
@@ -114,6 +141,10 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "15m"
             }
           }
@@ -128,10 +159,15 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "15m"
             },
             "seconds": {
               "type": "number",
+              "exclusiveMinimum": 0,
               "default": 1
             }
           }
@@ -146,11 +182,16 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "10m"
             },
             "ratio": {
               "type": "number",
               "maximum": 1,
+              "exclusiveMinimum": 0,
               "default": 0.05
             },
             "minCallsPerSecond": {
@@ -160,6 +201,10 @@
             },
             "codes": {
               "type": "string",
+              "pattern": "^[A-Z_]+(\\|[A-Z_]+)*$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "INTERNAL|UNKNOWN|UNAVAILABLE|DATA_LOSS|DEADLINE_EXCEEDED"
             }
           }
@@ -174,11 +219,16 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "10m"
             },
             "ratio": {
               "type": "number",
               "maximum": 1,
+              "exclusiveMinimum": 0,
               "default": 0.05
             },
             "minRequestsPerSecond": {
@@ -198,11 +248,16 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "10m"
             },
             "ratio": {
               "type": "number",
               "maximum": 1,
+              "exclusiveMinimum": 0,
               "default": 0.05
             },
             "minRequestsPerSecond": {
@@ -222,10 +277,15 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "15m"
             },
             "seconds": {
               "type": "number",
+              "exclusiveMinimum": 0,
               "default": 0.5
             }
           }
@@ -240,10 +300,15 @@
             },
             "for": {
               "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$",
+              "not": {
+                "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
+              },
               "default": "15m"
             },
             "seconds": {
               "type": "number",
+              "exclusiveMinimum": 0,
               "default": 2
             }
           }
@@ -254,17 +319,11 @@
     "database": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "host",
-        "owner",
-        "app"
-      ],
       "properties": {
         "host": {
           "type": "string",
           "minLength": 1,
-          "description": "The database host. Every install names its own.",
-          "x-set-at-install": true
+          "description": "The database host. Every install names its own."
         },
         "name": {
           "type": "string",
@@ -308,9 +367,6 @@
         "owner": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "passwordSecret"
-          ],
           "properties": {
             "role": {
               "type": "string",
@@ -320,22 +376,22 @@
             "passwordSecret": {
               "type": "string",
               "minLength": 1,
-              "description": "The Secret holding the role's password. Every install names its own.",
-              "x-set-at-install": true
+              "description": "The Secret holding the role's password. Every install names its own."
             },
             "passwordKey": {
               "type": "string",
               "minLength": 1,
               "default": "password"
             }
+          },
+          "default": {
+            "role": "url_shortener_owner",
+            "passwordKey": "password"
           }
         },
         "app": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "passwordSecret"
-          ],
           "properties": {
             "role": {
               "type": "string",
@@ -345,30 +401,41 @@
             "passwordSecret": {
               "type": "string",
               "minLength": 1,
-              "description": "The Secret holding the role's password. Every install names its own.",
-              "x-set-at-install": true
+              "description": "The Secret holding the role's password. Every install names its own."
             },
             "passwordKey": {
               "type": "string",
               "minLength": 1,
               "default": "password"
             }
+          },
+          "default": {
+            "role": "url_shortener_app",
+            "passwordKey": "password"
           }
+        }
+      },
+      "default": {
+        "name": "url_shortener",
+        "clusterDomain": "cluster.local",
+        "owner": {
+          "role": "url_shortener_owner",
+          "passwordKey": "password"
+        },
+        "app": {
+          "role": "url_shortener_app",
+          "passwordKey": "password"
         }
       }
     },
     "events": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "url"
-      ],
       "properties": {
         "url": {
           "type": "string",
           "minLength": 1,
-          "description": "The events server's URL. Every install names its own.",
-          "x-set-at-install": true
+          "description": "The events server's URL. Every install names its own."
         },
         "auth": {
           "type": "object",
@@ -408,27 +475,21 @@
             }
           }
         }
-      }
+      },
+      "default": {}
     },
     "archive": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "bucket"
-      ],
       "properties": {
         "bucket": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "name"
-          ],
           "properties": {
             "name": {
               "type": "string",
               "minLength": 1,
-              "description": "The bucket, which exists already. Every install names its own.",
-              "x-set-at-install": true
+              "description": "The bucket, which exists already. Every install names its own."
             },
             "region": {
               "type": "string",
@@ -461,6 +522,15 @@
               "minLength": 1,
               "default": "secretAccessKey"
             }
+          },
+          "default": {
+            "region": "",
+            "endpoint": "",
+            "ca": "",
+            "pathStyle": false,
+            "credentialsSecret": "",
+            "accessKeyIDKey": "accessKeyID",
+            "secretAccessKeyKey": "secretAccessKey"
           }
         },
         "prefix": {
@@ -485,7 +555,19 @@
           }
         }
       },
-      "description": "Where the request archive goes. The vendor is not in here: an endpoint, a region and a path-style flag reach a cloud service, a store inside the cluster or a test double."
+      "description": "Where the request archive goes. The vendor is not in here: an endpoint, a region and a path-style flag reach a cloud service, a store inside the cluster or a test double.",
+      "default": {
+        "bucket": {
+          "region": "",
+          "endpoint": "",
+          "ca": "",
+          "pathStyle": false,
+          "credentialsSecret": "",
+          "accessKeyIDKey": "accessKeyID",
+          "secretAccessKeyKey": "secretAccessKey"
+        },
+        "prefix": "url-shortener/requests"
+      }
     },
     "log": {
       "type": "object",
@@ -1423,8 +1505,7 @@
         "protocol": {
           "enum": [
             "grpc",
-            "http/protobuf",
-            "http/json"
+            "http/protobuf"
           ],
           "default": "http/protobuf"
         },
@@ -1448,5 +1529,80 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "alerts": {
+            "properties": {
+              "remote": {
+                "properties": {
+                  "enabled": {
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              }
+            },
+            "required": [
+              "remote"
+            ]
+          }
+        },
+        "required": [
+          "alerts"
+        ]
+      },
+      "else": {
+        "properties": {
+          "database": {
+            "properties": {
+              "owner": {
+                "required": [
+                  "passwordSecret"
+                ]
+              },
+              "app": {
+                "required": [
+                  "passwordSecret"
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "owner",
+              "app"
+            ]
+          },
+          "events": {
+            "required": [
+              "url"
+            ]
+          },
+          "archive": {
+            "properties": {
+              "bucket": {
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "bucket"
+            ]
+          }
+        },
+        "required": [
+          "database",
+          "events",
+          "archive"
+        ]
+      }
+    }
+  ],
   "$defs": {}
 }
