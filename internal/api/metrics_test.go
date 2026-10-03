@@ -67,7 +67,7 @@ func TestRequestMetricsRecordsTheRouteTemplateAndStatus(t *testing.T) {
 		require.Equal(t, "GET", method.AsString())
 		route, _ := dp.Attributes.Value("http.route")
 		status, _ := dp.Attributes.Value("http.response.status_code")
-		got[route.AsString()+"|"+status.Emit()] = int(dp.Count)
+		got[route.AsString()+"|"+status.String()] = int(dp.Count)
 		component, _ := dp.Attributes.Value("url_shortener.component")
 		require.Equal(t, "redirect", component.AsString())
 		// Exactly four attributes: nothing that carries a key or a path.
