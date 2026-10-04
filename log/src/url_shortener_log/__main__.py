@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import nats
+from nats.errors import ConnectionClosedError
 from nats.js.api import AckPolicy, ConsumerConfig
 from opentelemetry import trace
 from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
@@ -26,7 +27,7 @@ from opentelemetry.trace import Span, SpanKind, StatusCode
 from truvity_policy import ConfigError, telemetry
 
 from . import archive, config, runtime, tracing
-from .pull import pull_or_reconnect
+from .pull import ack_all, pull_or_reconnect
 
 if TYPE_CHECKING:
     from nats.aio.client import Client as NATSClient
@@ -263,8 +264,17 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
             if key is not None:
                 span.set_attribute("archive.key", key)
             written = time.time_ns()
-            for message in held:
-                await message.ack()
+            acknowledged = await ack_all(held)
+            if acknowledged < len(held):
+                # Not a fault: the records are archived, the broker will
+                # redeliver the rest, and the next fetch re-dials.
+                log.warning(
+                    "nats connection closed before every message was acknowledged; "
+                    "unacknowledged messages will be redelivered",
+                    component=COMPONENT,
+                    acknowledged=acknowledged,
+                    records=len(held),
+                )
             # Ended NOW, not when the message arrived: each span covers the
             # time the record spent waiting for its batch, which is the
             # part of the archive's latency a trace should show.
@@ -322,6 +332,15 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
             log.error(  # noqa: TRY400
                 "drain did not finish in time", held=len(held), seconds=seconds
             )
+    except ConnectionClosedError:
+        # Dialed again and still closed (see `pull.pull_or_reconnect`): the
+        # credential did not rotate, something else is wrong. Say so in one
+        # line and let the orchestrator restart, rather than a traceback.
+        log.error(  # noqa: TRY400
+            "nats connection closed and could not be re-established; exiting",
+            component=COMPONENT,
+        )
+        return 1
     finally:
         probes.stop()
         with contextlib.suppress(Exception):

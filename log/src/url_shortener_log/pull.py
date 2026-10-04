@@ -74,3 +74,29 @@ async def pull_or_reconnect(
     except ConnectionClosedError:
         subscription = await reconnect()
         return subscription, await pull(subscription, batch=batch, timeout=timeout)
+
+
+async def ack_all(messages: list[Msg]) -> int:
+    """Acknowledge what was written; return how many were, stopping at a closed connection.
+
+    The archive object is already in the store when this runs, so an
+    acknowledgement is bookkeeping, not the write. When the broker has closed
+    the connection (a rotated credential does that, and `nats-py` then raises
+    `ConnectionClosedError` from `ack` and from every call after it) the
+    unacknowledged messages are redelivered once their acknowledgement
+    deadline passes: at-least-once, which is the delivery guarantee the
+    consumer is configured for. That is a duplicate record in the archive at
+    worst, and a crash loop is a far worse answer to it.
+
+    So the error is not raised: the rest are not tried (each would fail the
+    same way), and the caller carries on. The next `fetch` raises the same
+    error and `pull_or_reconnect` dials again, with a fresh credential.
+    """
+    acknowledged = 0
+    for message in messages:
+        try:
+            await message.ack()
+        except ConnectionClosedError:
+            break
+        acknowledged += 1
+    return acknowledged
