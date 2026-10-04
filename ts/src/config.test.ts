@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { ConfigError, load, secret, validate } from "./config.js";
+import { ConfigError, configPath, type Kind, load, loadKind, secret, validate } from "./config.js";
 
 const fixtures = fileURLToPath(new URL("../../config/testdata/", import.meta.url));
 const schema = JSON.parse(readFileSync(`${fixtures}shortener.schema.json`, "utf8")) as object;
@@ -81,6 +81,162 @@ describe("load", () => {
     }
     expect(message).toContain("databse: not a key this service reads");
   });
+});
+
+// The database URL is the other place a password hides: in the user
+// information, or as a query parameter the driver reads like any other. The
+// fragment refuses both, and the error names the key and never the value.
+describe("a password in the database URL", () => {
+  for (const name of ["password-in-url-query.yaml", "password-in-url-userinfo.yaml"]) {
+    it(`is refused and not echoed: ${name}`, () => {
+      let message = "";
+      try {
+        load(fixture(name), schema);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain("database.url: is in a form the schema forbids here");
+      expect(message).not.toMatch(/hunter2/);
+    });
+  }
+
+  // passfile names a file, which is how the contract says a secret may
+  // arrive.
+  it("is not a password file, which is accepted", () => {
+    expect(() => load(fixture("passfile-in-url.yaml"), schema)).not.toThrow();
+  });
+});
+
+interface VersionCase {
+  name: string;
+  file: string;
+  reads: "both" | "current" | "load";
+  schema?: string;
+  upgrade?: "drops-retry" | "fails";
+  want?: Record<string, unknown>;
+  refused?: string[];
+}
+
+// The table every loader that reads versions runs (config/testdata/versions/
+// cases.json, whose $comment says what each field means), with the same
+// upgrade the Go test writes: v1's `retries` becomes v2's `retry.attempts`.
+describe("the shared version cases", () => {
+  const versions = `${fixtures}versions/`;
+  const readJSON = (name: string) => JSON.parse(readFileSync(`${versions}${name}`, "utf8")) as object;
+  const table = readJSON("cases.json") as { kind: string; cases: VersionCase[] };
+  const v1 = readJSON("notifier.v1.schema.json");
+  const v2 = readJSON("notifier.v2.schema.json");
+
+  const upgradeV1 = (doc: Record<string, unknown>) => {
+    const { retries = 3, ...rest } = doc;
+    return { ...rest, retry: { attempts: retries } };
+  };
+
+  it("is not empty", () => {
+    // A table that failed to read would pass every case it does not have.
+    expect(table.cases.length).toBeGreaterThan(0);
+  });
+
+  for (const c of table.cases) {
+    it(c.name, () => {
+      let upgrade: Kind["upgrade"] = upgradeV1;
+      if (c.upgrade === "drops-retry") {
+        upgrade = ({ retries: _, ...rest }) => rest;
+      } else if (c.upgrade === "fails") {
+        upgrade = () => {
+          throw new Error("retries cannot be converted");
+        };
+      }
+
+      const run = (): unknown => {
+        switch (c.reads) {
+          case "both":
+            return loadKind(`${versions}${c.file}`, {
+              name: table.kind,
+              version: 2,
+              schema: v2,
+              previous: v1,
+              upgrade,
+            });
+          case "current":
+            return loadKind(`${versions}${c.file}`, { name: table.kind, version: 2, schema: v2 });
+          case "load":
+            return load(`${versions}${c.file}`, readJSON(c.schema as string));
+        }
+      };
+
+      if (c.refused) {
+        let message = "";
+        try {
+          run();
+        } catch (error) {
+          expect(error).toBeInstanceOf(ConfigError);
+          message = (error as Error).message;
+        }
+        for (const want of c.refused) expect(message).toContain(want);
+        expect(message).not.toContain("https://example.com/hook");
+        return;
+      }
+
+      const got = run() as Record<string, unknown>;
+      for (const [path, want] of Object.entries(c.want ?? {})) {
+        const value = path
+          .split(".")
+          .reduce<unknown>((cur, part) => (cur as Record<string, unknown>)?.[part], got);
+        expect(value, path).toEqual(want);
+      }
+    });
+  }
+
+  it("refuses a declaration that cannot work, saying whose mistake it is", () => {
+    const declarations: Kind[] = [
+      { name: "", version: 2, schema: v2 },
+      { name: "example.com/notifier/v2", version: 2, schema: v2 },
+      { name: "example.com/notifier", version: 1, schema: v1, previous: v1, upgrade: upgradeV1 },
+      { name: "example.com/notifier", version: 2, schema: v2, previous: v1 },
+      { name: "example.com/notifier", version: 2, schema: v2, upgrade: upgradeV1 },
+    ];
+    for (const kind of declarations) {
+      expect(() => loadKind(`${versions}v2.yaml`, kind)).toThrow(/the binary declares/);
+    }
+  });
+});
+
+interface PathCase {
+  name: string;
+  args: string[];
+  env: Record<string, string>;
+  want?: string;
+  refused?: string[];
+}
+
+// The table every loader that resolves the path runs
+// (config/testdata/path-from.json).
+describe("configPath, the shared cases", () => {
+  const table = JSON.parse(readFileSync(`${fixtures}path-from.json`, "utf8")) as {
+    env: string;
+    cases: PathCase[];
+  };
+
+  it("is not empty", () => {
+    expect(table.cases.length).toBeGreaterThan(0);
+  });
+
+  for (const c of table.cases) {
+    it(c.name, () => {
+      if (c.refused) {
+        let message = "";
+        try {
+          configPath(c.args, table.env, c.env);
+        } catch (error) {
+          message = (error as Error).message;
+        }
+        for (const want of c.refused) expect(message).toContain(want);
+        return;
+      }
+      expect(configPath(c.args, table.env, c.env)).toBe(c.want);
+    });
+  }
 });
 
 describe("validate", () => {

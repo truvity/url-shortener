@@ -557,7 +557,27 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
             "url": {
                 "type": "string",
                 "pattern": "^postgres(ql)?://",
-                "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require."
+                "allOf": [
+                    {
+                        "description": "No password in the user information: postgres://user:password@host is refused, postgres://user@host is not.",
+                        "not": {
+                            "pattern": "^postgres(ql)?://[^/?#@]*:[^/?#@]*@"
+                        }
+                    },
+                    {
+                        "description": "No password as a query parameter: password= and sslpassword= are refused. passfile= is allowed, because it names a file rather than carrying a secret.",
+                        "not": {
+                            "pattern": "[?&](password|sslpassword)="
+                        }
+                    },
+                    {
+                        "description": "No percent-encoded parameter name: a driver decodes the name before it reads it, so %70assword= is password= by another spelling.",
+                        "not": {
+                            "pattern": "[?&][^=&#]*%[^=&#]*="
+                        }
+                    }
+                ],
+                "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require. A password in the user information or in a password or sslpassword parameter is refused: the file is rendered into objects people read, and the password belongs to passwordEnv."
             },
             "passwordEnv": {
                 "type": "string",
@@ -685,9 +705,14 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://github.com/truvity/policy/schemas/service.json",
         "title": "service",
-        "description": "The envelope every service's configuration carries. A service references this from its own schema with allOf, and adds its own properties beside it. What is in here is what EVERY component has, including a job that exits and a consumer that answers nothing: somewhere to report health, a log level, and a shutdown budget. A listener is not one of those — see docs/contracts/config.md.",
+        "description": "The envelope every service's configuration carries. A service references this from its own schema with allOf, and adds its own properties beside it. What is in here is what EVERY component has, including a job that exits and a consumer that answers nothing: somewhere to report health, a log level, a shutdown budget, and which version of its document it is. A listener is not one of those — see docs/contracts/config.md.",
         "type": "object",
         "properties": {
+            "apiVersion": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?/[a-z0-9]([a-z0-9-]*[a-z0-9])?/v[1-9][0-9]*$",
+                "description": "Which version of which kind of document this is: <group>/<kind>/v<N>. Absent means v1. The loader reads the version before it validates anything, picks that version's schema, and refuses a version this binary does not read (a binary reads N and N-1) — see docs/contracts/config.md. A service may narrow it to its own kind with a const."
+            },
             "probes": {
                 "$ref": "https://github.com/truvity/policy/schemas/fragments/probes.json"
             },

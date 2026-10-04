@@ -51,6 +51,12 @@ class ConfigError(message: String, cause: Throwable? = null) : Exception(message
  *
  * Any `$ref` to a shape this repository publishes resolves from the copies
  * carried in this jar; nothing is fetched.
+ *
+ * It reads version 1 of a document and nothing else: a document whose
+ * `apiVersion` names a later version is refused before it is validated,
+ * rather than checked against a schema it was not written for. Reading N and
+ * N-1 (docs/contracts/config.md, rule 7) is in the Go and TypeScript loaders
+ * and not yet here.
  */
 fun load(path: String, schema: String): JsonNode {
     val raw =
@@ -75,6 +81,8 @@ fun load(path: String, schema: String): JsonNode {
     if (document == null || document.isNull || document.isMissingNode) {
         throw ConfigError("configuration $path is empty")
     }
+
+    versionFailure(document)?.let { throw ConfigError("configuration $path is not valid:\n  $it") }
 
     val failures = check(document, schema)
     if (failures.isNotEmpty()) {
@@ -116,6 +124,24 @@ fun secret(name: String): String {
         throw ConfigError("environment variable $name is empty")
     }
     return value
+}
+
+/** The form of an apiVersion, the same pattern the envelope schema holds. */
+private val apiVersionForm =
+    Regex("([a-z0-9]([a-z0-9.-]*[a-z0-9])?/[a-z0-9]([a-z0-9-]*[a-z0-9])?)/v([1-9][0-9]*)")
+
+/**
+ * Why [document] is not a version 1 document, or null. Worded as the Go
+ * loader words it, and never quoting the value unless it is of the form.
+ */
+private fun versionFailure(document: JsonNode): String? {
+    if (!document.isObject || !document.has("apiVersion")) return null
+    val raw = document.get("apiVersion")
+    val match =
+        (if (raw.isTextual) apiVersionForm.matchEntire(raw.asText()) else null)
+            ?: return "apiVersion: not of the form <group>/<kind>/v<N>"
+    val got = match.groupValues[4].toInt()
+    return if (got > 1) "apiVersion: v$got is newer than this binary reads (v1)" else null
 }
 
 private val yaml = ObjectMapper(YAMLFactory()).registerKotlinModule()
@@ -164,6 +190,10 @@ private fun describe(message: ValidationMessage): String {
             val key = message.property ?: message.arguments?.firstOrNull()?.toString()
             "$path: missing property '$key'"
         }
+        // A `not` in a schema here is a form a value must not take (a
+        // password in a database URL); the schema's description of it says
+        // which and why. The other loaders' words.
+        "not" -> "$path: is in a form the schema forbids here (its description says why)"
         else -> "$path: ${message.message.substringAfter(": ", message.message)}"
     }
 }

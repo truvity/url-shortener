@@ -106,6 +106,43 @@ class ConfigTest {
     }
 
     @Test
+    fun `a password in the database URL is refused, and the refusal does not repeat it`() {
+        // The other place a password hides: in the user information, or as a
+        // query parameter the driver reads like any other.
+        for (name in listOf("password-in-url-query.yaml", "password-in-url-userinfo.yaml")) {
+            val refusal = assertFailsWith<ConfigError> { load(fixture(name), schema()) }
+
+            assertContains(refusal.message!!, "url: is in a form the schema forbids here")
+            assertTrue(
+                !refusal.message!!.contains("hunter2"),
+                "the error quoted the value it refused:\n${refusal.message}",
+            )
+        }
+    }
+
+    @Test
+    fun `a password file in the database URL is accepted`() {
+        load(fixture("passfile-in-url.yaml"), schema())
+    }
+
+    @Test
+    fun `the plain loader reads v1 and refuses a later version`() {
+        // The same case the shared table (versions/cases.json) holds for the
+        // Go and TypeScript loaders.
+        val versions = FIXTURES.resolve("versions")
+        val v1 = Files.readString(versions.resolve("notifier.v1.schema.json"))
+        val v2 = Files.readString(versions.resolve("notifier.v2.schema.json"))
+
+        val refusal = assertFailsWith<ConfigError> { load(versions.resolve("v2.yaml").toString(), v2) }
+        assertContains(refusal.message!!, "apiVersion: v2 is newer than this binary reads (v1)")
+
+        val malformed = assertFailsWith<ConfigError> { load(versions.resolve("malformed.yaml").toString(), v1) }
+        assertContains(malformed.message!!, "apiVersion: not of the form")
+
+        assertEquals(4, load(versions.resolve("v1.yaml").toString(), v1).at("/retries").asInt())
+    }
+
+    @Test
     fun `a reference to a published shape resolves without the network`() {
         // The fixture's schema references the shared envelope by an
         // identifier that looks like a URL. Nothing fetches it: the shapes

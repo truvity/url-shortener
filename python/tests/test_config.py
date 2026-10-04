@@ -103,6 +103,56 @@ def test_the_error_names_the_key_and_never_the_value(schema: dict[str, Any]) -> 
     assert "is not valid" in message
 
 
+@pytest.mark.parametrize("name", ["password-in-url-query.yaml", "password-in-url-userinfo.yaml"])
+def test_a_password_in_the_database_url_is_refused_and_not_echoed(
+    schema: dict[str, Any],
+    name: str,
+) -> None:
+    """The database URL is the other place a password hides.
+
+    In the user information, or as a query parameter the driver reads like
+    any other. The library's own message for a failed pattern or ``not``
+    quotes the value, which here is the password.
+    """
+    with pytest.raises(ConfigError) as caught:
+        load(fixture(name), schema)
+
+    message = str(caught.value)
+    assert "hunter2" not in message, "the refusal repeated the value it refused"
+    assert "database/url" in message
+
+
+def test_a_password_file_in_the_database_url_is_accepted(schema: dict[str, Any]) -> None:
+    load(fixture("passfile-in-url.yaml"), schema)
+
+
+def test_a_wrong_type_does_not_echo_the_value(schema: dict[str, Any]) -> None:
+    with pytest.raises(ConfigError) as caught:
+        load(fixture("wrong-type.yaml"), schema)
+
+    assert "twenty" not in str(caught.value)
+
+
+def test_a_later_version_is_refused_by_the_plain_loader() -> None:
+    """The plain loader reads v1, as the Go and TypeScript ones do.
+
+    The shared case table (versions/cases.json) holds the same case: a v2
+    document is refused before it is checked against a schema it was not
+    written for.
+    """
+    versions = FIXTURES / "versions"
+    v2 = json.loads((versions / "notifier.v2.schema.json").read_text(encoding="utf-8"))
+    v1 = json.loads((versions / "notifier.v1.schema.json").read_text(encoding="utf-8"))
+
+    with pytest.raises(ConfigError, match=r"apiVersion: v2 is newer than this binary reads \(v1\)"):
+        load(versions / "v2.yaml", v2)
+
+    with pytest.raises(ConfigError, match="apiVersion: not of the form"):
+        load(versions / "malformed.yaml", v1)
+
+    assert load(versions / "v1.yaml", v1)["retries"] == 4
+
+
 def test_validate_checks_a_document_that_was_never_a_file(schema: dict[str, Any]) -> None:
     """What a chart's tests call: the render is a document, not a path.
 

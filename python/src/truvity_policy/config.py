@@ -12,7 +12,9 @@ same fixtures.
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +66,12 @@ def load(path: str | Path, schema: dict[str, Any]) -> Any:  # noqa: ANN401
 
     Any reference to a shape this repository publishes resolves from the
     copies compiled into this package; nothing is fetched.
+
+    It reads version 1 of a document and nothing else: a document whose
+    ``apiVersion`` names a later version is refused before it is validated,
+    rather than checked against a schema it was not written for. Reading N
+    and N-1 (``docs/contracts/config.md``, rule 7) is in the Go and
+    TypeScript loaders and not yet here.
     """
     name = str(path)
 
@@ -79,6 +87,10 @@ def load(path: str | Path, schema: dict[str, Any]) -> Any:  # noqa: ANN401
 
     if doc is None:
         raise ConfigError("is empty", file=name)
+
+    version = _version_failure(doc)
+    if version:
+        raise ConfigError("is not valid", file=name, failures=[version])
 
     failures = _check(doc, schema)
     if failures:
@@ -122,6 +134,30 @@ def secret(name: str) -> str:
     return value
 
 
+# The form of an apiVersion, the same pattern the envelope schema holds.
+_API_VERSION_FORM = re.compile(
+    r"([a-z0-9]([a-z0-9.-]*[a-z0-9])?/[a-z0-9]([a-z0-9-]*[a-z0-9])?)/v([1-9][0-9]*)",
+)
+
+
+def _version_failure(doc: Any) -> str | None:  # noqa: ANN401
+    """Say why *doc* is not a version 1 document, or return None.
+
+    Worded as the Go loader words it. Never the value, unless it is of the
+    form: a value that is not could be anything.
+    """
+    if not isinstance(doc, dict) or "apiVersion" not in doc:
+        return None
+    raw = doc["apiVersion"]
+    match = _API_VERSION_FORM.fullmatch(raw) if isinstance(raw, str) else None
+    if match is None:
+        return "apiVersion: not of the form <group>/<kind>/v<N>"
+    got = int(match.group(4))
+    if got > 1:
+        return f"apiVersion: v{got} is newer than this binary reads (v1)"
+    return None
+
+
 def _registry() -> Registry:
     """Every shape this repository publishes, by the identifier it carries.
 
@@ -159,12 +195,21 @@ def _check(doc: Any, schema: dict[str, Any]) -> list[str]:  # noqa: ANN401
     return sorted(failures)
 
 
+# What a failed `not` reads as, in every loader. A `not` in a schema here is a
+# form a value must not take (a password in a database URL); the schema's
+# description of it says which and why.
+_NOT_ALLOWED_FORM = "is in a form the schema forbids here (its description says why)"
+
+
 def _describe(error: Any) -> str:  # noqa: ANN401
     """Name the failing key and what is wrong with it, and nothing else.
 
     Never the value. A message that quotes what it refused puts the refused
     value into every log that records the refusal, and the one kind of value
-    most likely to be refused is the one most likely to be a secret.
+    most likely to be refused is the one most likely to be a secret. The
+    library's own messages for ``pattern``, ``not``, ``type``, ``const`` and
+    ``enum`` quote it, so each of those is named by its rule instead — and the
+    value a pattern most often refuses is a URL with a password in it.
     """
     where = "/".join(str(part) for part in error.absolute_path)
 
@@ -172,7 +217,12 @@ def _describe(error: Any) -> str:  # noqa: ANN401
         missing = error.message.split("'")[1] if "'" in error.message else "a key"
         return f"{where}/{missing}: is required" if where else f"{missing}: is required"
 
-    if error.validator in {"additionalProperties", "unevaluatedProperties"}:
-        return f"{where or '(root)'}: {error.message}"
+    rule = {
+        "pattern": f"does not match pattern {json.dumps(error.validator_value)}",
+        "not": _NOT_ALLOWED_FORM,
+        "type": f"want {error.validator_value}",
+        "const": "is not a value this key takes",
+        "enum": "is not a value this key takes",
+    }.get(error.validator, error.message)
 
-    return f"{where or '(root)'}: {error.message}"
+    return f"{where or '(root)'}: {rule}"
