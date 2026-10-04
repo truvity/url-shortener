@@ -122,21 +122,29 @@ type (
 	// is on the answering end of one. It publishes nothing and consumes
 	// nothing.
 	Urls struct {
-		Listen Listen `json:"listen"`
-		Probes Listen `json:"probes"`
-		Log    Log    `json:"log"`
-		Drain  Drain  `json:"drain"`
-		TLS    TLS    `json:"tls"`
+		// APIVersion is the envelope's: which version of this document the
+		// file is (docs/contracts/config.md, rule 7). Absent is v1, the
+		// only version this binary reads, and config.Load refuses any other.
+		APIVersion string `json:"apiVersion"`
+		Listen     Listen `json:"listen"`
+		Probes     Listen `json:"probes"`
+		Log        Log    `json:"log"`
+		Drain      Drain  `json:"drain"`
+		TLS        TLS    `json:"tls"`
 	}
 
 	// Redirect resolves short keys and says what happened.
 	Redirect struct {
-		Listen Listen `json:"listen"`
-		Probes Listen `json:"probes"`
-		Log    Log    `json:"log"`
-		Drain  Drain  `json:"drain"`
-		TLS    TLS    `json:"tls"`
-		Events struct {
+		// APIVersion is the envelope's: which version of this document the
+		// file is (docs/contracts/config.md, rule 7). Absent is v1, the
+		// only version this binary reads, and config.Load refuses any other.
+		APIVersion string `json:"apiVersion"`
+		Listen     Listen `json:"listen"`
+		Probes     Listen `json:"probes"`
+		Log        Log    `json:"log"`
+		Drain      Drain  `json:"drain"`
+		TLS        TLS    `json:"tls"`
+		Events     struct {
 			NATS            NATS   `json:"nats"`
 			RedirectSubject string `json:"redirectSubject"`
 			RequestSubject  string `json:"requestSubject"`
@@ -163,11 +171,15 @@ type (
 	// only when both are the SAME release, which this pair of charts never
 	// is.
 	Prober struct {
-		Probes    Listen `json:"probes"`
-		Log       Log    `json:"log"`
-		Drain     Drain  `json:"drain"`
-		Interval  string `json:"interval"`
-		KeyPrefix string `json:"keyPrefix"`
+		// APIVersion is the envelope's: which version of this document the
+		// file is (docs/contracts/config.md, rule 7). Absent is v1, the
+		// only version this binary reads, and config.Load refuses any other.
+		APIVersion string `json:"apiVersion"`
+		Probes     Listen `json:"probes"`
+		Log        Log    `json:"log"`
+		Drain      Drain  `json:"drain"`
+		Interval   string `json:"interval"`
+		KeyPrefix  string `json:"keyPrefix"`
 		// StatSettle is how long the "stat" journey keeps watching a
 		// counter that has reached its expected value; "" means the
 		// prober's own default.
