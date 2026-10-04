@@ -13,7 +13,7 @@ appVersion: "0.0.0"
 # charts of the product (docs/contracts/delivery-interface.md). A platform
 # renders the keys of every step up to it and compares no version.
 annotations:
-  delivery.truvity.io/interface: "12"
+  delivery.truvity.io/interface: "13"
 # The platform pieces of every component come from the library chart at the
 # repository root, charts/service-lib. It is resolved, never copied:
 # `helm dependency build` (which `helmctl package` runs itself when a declared

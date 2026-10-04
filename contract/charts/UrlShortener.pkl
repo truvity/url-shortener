@@ -18,11 +18,16 @@ import "@vocab/Annotations.pkl" as A
 import "@vocab/Check.pkl"
 import "@vocab/Vocab.pkl" as V
 
+import "Tier.pkl"
+
 /// Not a value: Helm puts a key named for every sub-chart into the values it validates, and the library chart this chart renders its components with is one. It takes no values of its own; each component's `platform` and `config` are built in templates/_components.tpl.
 `service-lib`: F.ServiceLib?
 
 /// The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
 installName: String = ""
+
+/// Which kind of install this is, as url-shortener-infra's `tier`. `primary`: the identity ServiceAccount is rendered by url-shortener-infra, not here. `test`: this chart renders every account.
+tier: Tier.Tier = "test"
 
 /// Product alerts as a VMRule. Off by default; `remote` renders only the rule object, for an install evaluated on another cluster (no other value is then required).
 alerts: Alerts?

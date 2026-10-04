@@ -65,6 +65,15 @@ cloud:
   region: ""
   # The account the workloads run as, which the association binds.
   serviceAccount: ""
+  # On a primary install this chart ALSO renders that account, after the
+  # association is synced (sync-wave 2; the role is 0 and the association 1),
+  # so a pod cannot be admitted before the identity it needs exists (delivery
+  # interface step 13). There is no switch.
+  #
+  # Annotations on it beside the ones this chart always puts there (the
+  # prune/delete guard, the sync-wave). Mirror the application chart's
+  # `serviceAccount.app.annotations`.
+  serviceAccountAnnotations: {}
   # The boundary the platform requires on roles it allows to exist.
   permissionsBoundary: ""
 

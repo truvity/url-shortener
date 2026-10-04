@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -561,5 +562,117 @@ func TestThePlatformOwnedInfraChartRendersNoCluster(t *testing.T) {
 
 	if strings.Contains(out, "kind: Database\n") {
 		t.Errorf("a Database was rendered; the platform's chart declares the bootstrap database and a second object would be refused:\n%s", out)
+	}
+}
+
+// The identity account is the one object two charts can render, and moving it
+// must change nothing live: Argo CD applies both charts with one field
+// manager, so an account the infra chart renders differently from the
+// application chart's is an edit to the running object, not a move.
+//
+// This renders it from BOTH charts for the same release and compares what the object is: name, labels and annotations.
+// The application chart renders it only on the test tier now, which is what the
+// comparison uses. The
+// annotations the infra copy has that the application's does not are the
+// sync-wave and the guard, which are the point of moving it.
+func TestTheInfraAccountIsTheOneTheApplicationRenders(t *testing.T) {
+	app, err := render(t, defaults(
+		"--set", "images.web.tag=dev",
+		"--set", "serviceAccount.app.name=example-account",
+		"--set", `serviceAccount.app.annotations.example\.io/role=archive`,
+	)...)
+	if err != nil {
+		t.Fatalf("the application chart does not render: %v\n%s", err, app)
+	}
+
+	var fromApp map[string]any
+	for _, m := range documents(t, app) {
+		if m["kind"] == "ServiceAccount" && m["metadata"].(map[string]any)["name"] == "example-account" {
+			fromApp = m
+		}
+	}
+	if fromApp == nil {
+		t.Fatalf("the application chart rendered no account named example-account:\n%s", app)
+	}
+
+	infra, err := renderInfra(t, infraDefaults(
+		"--set", "tier=primary",
+		"--set", "cloud.bucket=b", "--set", "cloud.iamName=i", "--set", "cloud.clusterName=c",
+		"--set", "cloud.accountID=acct", "--set", "cloud.region=r",
+		"--set", "cloud.serviceAccount=example-account",
+		"--set", `cloud.serviceAccountAnnotations.example\.io/role=archive`,
+	)...)
+	if err != nil {
+		t.Fatalf("the infra chart does not render: %v\n%s", err, infra)
+	}
+	fromInfra := docOfKind(t, infra, "ServiceAccount")
+
+	am, im := fromApp["metadata"].(map[string]any), fromInfra["metadata"].(map[string]any)
+	if am["name"] != im["name"] {
+		t.Errorf("name: application %v, infra %v", am["name"], im["name"])
+	}
+	if !reflect.DeepEqual(am["labels"], im["labels"]) {
+		t.Errorf("labels differ, so moving the account edits it:\napplication %v\ninfra       %v", am["labels"], im["labels"])
+	}
+
+	aa, ia := am["annotations"].(map[string]any), im["annotations"].(map[string]any)
+	if ia["argocd.argoproj.io/sync-options"] != "Prune=false,Delete=false" {
+		t.Errorf("the infra account lost the guard, and an apply from there would take it off the live object: %v", ia)
+	}
+	for k, v := range aa {
+		if ia[k] != v {
+			t.Errorf("annotation %s: application %v, infra %v", k, v, ia[k])
+		}
+	}
+	for k := range ia {
+		if _, ok := aa[k]; !ok && k != "argocd.argoproj.io/sync-wave" && k != "argocd.argoproj.io/sync-options" {
+			t.Errorf("the infra account has an annotation the application's does not: %s", k)
+		}
+	}
+	if ia["argocd.argoproj.io/sync-wave"] != "2" {
+		t.Errorf("the account is not in wave 2, after the association: %v", ia)
+	}
+}
+
+// Hard-wired, primary only, and ordered: the role, then the association, then
+// the account. A test install renders none of the three.
+func TestTheInfraAccountFollowsTheAssociationOnAPrimaryInstall(t *testing.T) {
+	primary := []string{
+		"--set", "tier=primary",
+		"--set", "cloud.bucket=b", "--set", "cloud.iamName=i", "--set", "cloud.clusterName=c",
+		"--set", "cloud.accountID=acct", "--set", "cloud.region=r", "--set", "cloud.serviceAccount=a",
+	}
+
+	out, err := renderInfra(t, infraDefaults(primary...)...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	annotation := func(out, kind, key string) any {
+		a, _ := docOfKind(t, out, kind)["metadata"].(map[string]any)["annotations"].(map[string]any)
+		return a[key]
+	}
+	const wave = "argocd.argoproj.io/sync-wave"
+	if annotation(out, "Role", wave) != "0" || annotation(out, "PodIdentityAssociation", wave) != "1" || annotation(out, "ServiceAccount", wave) != "2" {
+		t.Errorf("the role is wave %v, the association %v and the account %v, want 0, 1 and 2",
+			annotation(out, "Role", wave), annotation(out, "PodIdentityAssociation", wave), annotation(out, "ServiceAccount", wave))
+	}
+	if annotation(out, "ServiceAccount", "argocd.argoproj.io/sync-options") != "Prune=false,Delete=false" {
+		t.Error("the identity account does not carry the prune/delete guard")
+	}
+	if got := docOfKind(t, out, "ServiceAccount")["metadata"].(map[string]any)["name"]; got != "a" {
+		t.Errorf("the account is named %v, want the one the association binds (a)", got)
+	}
+
+	// No key switches it, and a test install renders none of the cloud kinds.
+	out, err = renderInfra(t, infraDefaults()...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "kind: ServiceAccount") {
+		t.Errorf("a test install rendered an account:\n%s", out)
+	}
+	if out, err := renderInfra(t, infraDefaults("--set", "cloud.serviceAccountManaged=true")...); err == nil {
+		t.Errorf("cloud.serviceAccountManaged is accepted; the convention has no switch:\n%s", out)
 	}
 }

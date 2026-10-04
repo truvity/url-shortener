@@ -2313,3 +2313,50 @@ func TestTheCallersOfTheURLServiceTrustItsAnswers(t *testing.T) {
 		}
 	}
 }
+
+// Delivery interface step 13: the identity account (the one `serviceAccount.app.name`
+// names, `log`'s) is rendered by url-shortener-infra on a primary install, after
+// the Pod Identity association, and not by this chart. The platform hands this
+// chart the same `tier` it hands the infra chart.
+func TestTheIdentityAccountIsLeftToTheInfraChartOnAPrimaryInstall(t *testing.T) {
+	accounts := func(out string) map[string]bool {
+		got := map[string]bool{}
+		for _, m := range documents(t, out) {
+			if m["kind"] == "ServiceAccount" {
+				got[m["metadata"].(map[string]any)["name"].(string)] = true
+			}
+		}
+		return got
+	}
+	base := []string{"--set", "images.web.tag=dev", "--set", "serviceAccount.app.name=identity"}
+
+	primary, err := render(t, defaults(append(base, "--set", "tier=primary")...)...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, primary)
+	}
+	if got := accounts(primary); got["identity"] || len(got) != 5 {
+		t.Errorf("a primary install should render the four other components' accounts and the migration's, not the identity account: %v", got)
+	}
+	// The Deployment still names it: it must exist before the pods are admitted.
+	if !strings.Contains(primary, "serviceAccountName: identity") {
+		t.Error("log's workload no longer names its account")
+	}
+
+	// The test tier, and the default, render every account as they always did.
+	for _, extra := range [][]string{{"--set", "tier=test"}, nil} {
+		out, err := render(t, defaults(append(append([]string{}, base...), extra...)...)...)
+		if err != nil {
+			t.Fatalf("render: %v\n%s", err, out)
+		}
+		if got := accounts(out); !got["identity"] || len(got) != 6 {
+			t.Errorf("%v: a test install should render all five accounts and the migration's: %v", extra, got)
+		}
+	}
+
+	if out, err := render(t, defaults("--set", "tier=staging")...); err == nil {
+		t.Errorf("an unknown tier is accepted:\n%s", out)
+	}
+	if out, err := render(t, defaults("--set", "serviceAccount.components.log.create=false")...); err == nil {
+		t.Errorf("serviceAccount.components.log.create is accepted; the convention has no switch:\n%s", out)
+	}
+}

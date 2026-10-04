@@ -5,13 +5,14 @@
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `installName` | string | `""` | The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters. |
-| `tier` | "test" \| "primary" | `"test"` | Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns. |
+| `tier` | Tier | `"test"` | Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns. |
 | `cloud.bucket` | string | `""` |  |
 | `cloud.iamName` | string | `""` |  |
 | `cloud.clusterName` | string | `""` |  |
 | `cloud.accountID` | string | `""` |  |
 | `cloud.region` | string | `""` |  |
 | `cloud.serviceAccount` | string | `""` |  |
+| `cloud.serviceAccountAnnotations` | map of string | `{}` | Annotations on the identity account this chart renders beside the prune/delete guard and the sync-wave it always sets. Mirror the application chart's serviceAccount.app.annotations. |
 | `cloud.permissionsBoundary` | string | `""` |  |
 | `cloud.project` | string | `""` | The project this install belongs to, tagged as `project` beside `cluster` on every AWS resource this chart creates. Empty means this release's own namespace — the platforms this chart targets already treat a namespace as a project. |
 | `cloud.tags` | map of string | `{}` | Extra tags folded into every AWS resource this chart creates, beside `cluster` and `project`. Neither of those two can be overridden from here. |

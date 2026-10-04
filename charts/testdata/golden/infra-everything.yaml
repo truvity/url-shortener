@@ -1,9 +1,28 @@
 ---
 # Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-account
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example-install
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: log
+  annotations:
+    "argocd.argoproj.io/sync-options": "Prune=false,Delete=false"
+    "argocd.argoproj.io/sync-wave": "2"
+    "example.io/role": "archive"
+
+---
+# Source: url-shortener-infra/templates/cloud.yaml
 apiVersion: iam.services.k8s.aws/v1alpha1
 kind: Role
 metadata:
   name: example-identity
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: example
@@ -144,6 +163,8 @@ metadata:
   labels:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: example
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   clusterName: "example-cluster"
   namespace: "default"

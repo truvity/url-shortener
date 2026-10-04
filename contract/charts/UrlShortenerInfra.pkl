@@ -5,11 +5,13 @@ import "@vocab/Annotations.pkl" as A
 import "@vocab/Check.pkl"
 import "@vocab/Vocab.pkl" as V
 
+import "Tier.pkl"
+
 /// The name this install is known by, folded into the JetStream stream and subject names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters.
 installName: String = ""
 
 /// Which kind of install this is. `test` provisions nothing of its own; `primary` provisions the objects this install owns.
-tier: "test" | "primary" = "test"
+tier: Tier.Tier = "test"
 
 /// The objects a primary install owns. Every name is given, never derived. Unused on a test install.
 cloud: Cloud?
@@ -31,6 +33,9 @@ class Cloud {
   region: String = ""
 
   serviceAccount: String = ""
+
+  /// Annotations on the identity account this chart renders beside the prune/delete guard and the sync-wave it always sets. Mirror the application chart's serviceAccount.app.annotations.
+  serviceAccountAnnotations: Mapping<String, String> = new Mapping {}
 
   permissionsBoundary: String = ""
 

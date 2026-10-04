@@ -1,0 +1,4 @@
+/// The two kinds of install a delivery platform asks for, shared by the application and infrastructure charts so one concept has one name.
+module urlshortener.charts.Tier
+
+typealias Tier = "test" | "primary"

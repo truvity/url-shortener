@@ -10,6 +10,16 @@
 # own name; then it must be that release's own installName, exactly.
 installName: ""
 
+# Which kind of install this is: the same key, values and meaning as
+# url-shortener-infra's `tier`, and the platform passes both charts the same
+# one (delivery interface step 13).
+#
+#   test     renders every ServiceAccount, the identity account included.
+#   primary  does NOT render the identity account (`log`'s): url-shortener-infra
+#            renders it after the Pod Identity association, so no pod is
+#            admitted before its identity exists. This chart only names it.
+tier: test
+
 # Where this service's database and stream are.
 #
 # It does not create them: url-shortener-infra does, as a separate release

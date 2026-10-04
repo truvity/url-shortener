@@ -114,6 +114,8 @@ apiVersion: iam.services.k8s.aws/v1alpha1
 kind: Role
 metadata:
   name: {{ $iam }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -154,6 +156,8 @@ metadata:
   labels:
     app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   clusterName: {{ $c.clusterName | quote }}
   namespace: {{ .Release.Namespace | quote }}
@@ -162,6 +166,45 @@ spec:
   tags:
     {{- range $k, $v := $tags }}
     {{ $k }}: {{ $v | quote }}
+    {{- end }}
+---
+{{/*
+The account the association binds, created only AFTER it: wave 2, and an
+ACK resource is Healthy to the waves that follow only once it reports
+ResourceSynced. Kubernetes refuses a pod whose account does not exist, so
+the application's pods wait for the identity instead of starting without it.
+Waves order one Application's objects; they do not order two Applications,
+which is why this is the chart that creates the account and the application
+chart that does not (delivery interface step 13), whenever this chart renders
+the association at all. There is no switch: the convention is the same on every
+primary install.
+
+It is the object the application chart used to render, so that moving it
+between the two charts changed nothing live: the same name, and the same
+labels — `name` is the APPLICATION chart's name (this chart's own is
+url-shortener-infra), `instance` the install's (installName: it must be the
+application release's name, which is what that value is for), `version` the
+appVersion all three charts are stamped with, `component` log. The
+`Prune=false,Delete=false` guard stays on it for good: Argo CD applies both
+charts with one field manager, so an apply from here that left it out would
+remove it from the live object, and a deleted account is a new uid, which
+invalidates the token a running pod holds. Nothing prunes or deletes it
+afterwards either, from either chart's Application.
+*/}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $account }}
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: {{ include "url-shortener-infra.installName" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/component: log
+  annotations:
+    {{- $annotations := merge (dict "argocd.argoproj.io/sync-options" "Prune=false,Delete=false" "argocd.argoproj.io/sync-wave" "2") (deepCopy ($c.serviceAccountAnnotations | default dict)) }}
+    {{- range $k, $v := $annotations }}
+    {{ $k | quote }}: {{ $v | quote }}
     {{- end }}
 ---
 {{/*

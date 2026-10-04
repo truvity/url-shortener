@@ -192,6 +192,24 @@ Takes the root context and the component name.
 {{- end -}}
 
 {{/*
+Whether `log`'s account is the IDENTITY account, which url-shortener-infra
+renders on a primary install (delivery interface step 13) and this chart
+therefore does not.
+
+`tier` is the one url-shortener-infra reads, with the same two values and the
+same meaning, and the platform hands both charts the same one. A `test`
+install has no Pod Identity association to wait for, so this chart renders its
+account as it always did.
+
+Renders "true" or nothing.
+*/}}
+{{- define "url-shortener.identityInInfra" -}}
+{{- if eq .Values.tier "primary" -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
 Refuses two workloads sharing an account: an identity must name ONE
 component, and a shared name quietly turns an allow-list for `web` into one
 for `stat` too. The migration counts, so its rights stay off the request path.

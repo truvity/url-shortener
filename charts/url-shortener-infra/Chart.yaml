@@ -11,4 +11,4 @@ appVersion: "0.0.0"
 # charts of the product (docs/contracts/delivery-interface.md). A platform
 # renders the keys of every step up to it and compares no version.
 annotations:
-  delivery.truvity.io/interface: "12"
+  delivery.truvity.io/interface: "13"

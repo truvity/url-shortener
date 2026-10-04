@@ -17,6 +17,8 @@ cloud:
   accountID: example-account-id
   region: example-region
   serviceAccount: example-account
+  serviceAccountAnnotations:
+    example.io/role: archive
   permissionsBoundary: arn:aws:iam::example-account-id:policy/example-boundary
 
 postgres:

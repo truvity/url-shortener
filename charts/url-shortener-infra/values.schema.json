@@ -43,6 +43,13 @@
         "serviceAccount": {
           "type": "string"
         },
+        "serviceAccountAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations on the identity account this chart renders beside the prune/delete guard and the sync-wave it always sets. Mirror the application chart's serviceAccount.app.annotations."
+        },
         "permissionsBoundary": {
           "type": "string"
         },

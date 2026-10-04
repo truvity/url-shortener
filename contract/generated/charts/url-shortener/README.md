@@ -6,6 +6,7 @@
 |---|---|---|---|
 | `service-lib.global` | OpenObject |  | Helm's own `global` block, passed through unchanged. |
 | `installName` | string | `""` | The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters. |
+| `tier` | Tier | `"test"` | Which kind of install this is, as url-shortener-infra's `tier`. `primary`: the identity ServiceAccount is rendered by url-shortener-infra, not here. `test`: this chart renders every account. |
 | `alerts.enabled` | boolean | `false` |  |
 | `alerts.ruleLabels` | map of string | `{}` |  |
 | `alerts.alertLabels` | map of NonEmptyString | `{}` |  |
