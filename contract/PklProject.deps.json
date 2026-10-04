@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
   "resolvedDependencies": {
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.0/contracts.templates@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.templates@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.0/contracts.templates@0.4.0",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.templates@0.4.1",
       "checksums": {
-        "sha256": "1bbc82eb68ce9c3326f47023413ed36a38685196d5b9280ea2dbce74054115bc"
+        "sha256": "508c762c719e6d967502e0012c5b010f3d01bfe32f15d25c963a375dc7a0c996"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.0/contracts.vocab@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.vocab@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.0/contracts.vocab@0.4.0",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.vocab@0.4.1",
       "checksums": {
-        "sha256": "75d81c3091d18c8688c3672b8cc4b2a895c0c71c0257b673782172d9b11aec16"
+        "sha256": "89461b59624df02cd04be40e46978185398a5d0957274398678605be275881c4"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.0/contracts.fragments@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.fragments@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.0/contracts.fragments@0.4.0",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.fragments@0.4.1",
       "checksums": {
-        "sha256": "60b850fce8c20e7ff363038affe037c3681f187fb2a0fdfaabb897f35d971bac"
+        "sha256": "21ab4d02de93bf8417dffe82c47f74cf63d2edb99fd9fdcde5886397e24b31c3"
       }
     }
   }

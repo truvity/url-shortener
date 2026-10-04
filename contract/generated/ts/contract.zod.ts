@@ -52,7 +52,7 @@ export type RootedPath = z.infer<typeof RootedPath>;
 /** An absolute path that is not the root. */
 export const AbsPath = z.string().regex(/^\/[^\n]+/).refine(noLineBreak);
 export type AbsPath = z.infer<typeof AbsPath>;
-/** The protocol OpenTelemetry exports over. `http/json` is absent on purpose: it is in the OpenTelemetry specification, but the Go SDK's exporter selection (`autoexport`) refuses it at startup and its HTTP exporter always sends protobuf, and the Python and TypeScript exporters are fixed to HTTP/protobuf, so a contract that admitted it would admit a value that stops a service from starting. */
+/** The protocol OpenTelemetry exports over: what EVERY runtime that consumes this vocabulary accepts. `http/json` is absent on purpose. It is in the OpenTelemetry specification, and the Go SDK's own HTTP exporters (`otlptracehttp`, `otlpmetrichttp`) can send it, but the Go exporter selection most services use (`autoexport`) refuses it at startup, and the Python and TypeScript exporters are fixed to HTTP/protobuf. A contract that admitted it would admit a value that stops some services from starting. A component whose runtime does honour `http/json` (one that builds the Go HTTP exporters directly) declares its own wider type instead of widening this one. */
 export const OtelProtocol = z.enum(["grpc", "http/protobuf"]);
 export type OtelProtocol = z.infer<typeof OtelProtocol>;
 /** An open object that must carry `name`. */
