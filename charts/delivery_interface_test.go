@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/truvity/policy/conformance"
 	"github.com/truvity/policy/examples/url-shortener/charts"
 
 	yaml "go.yaml.in/yaml/v3"
@@ -108,4 +109,36 @@ func TestEveryChartDeclaresTheSameDeliveryInterface(t *testing.T) {
 			t.Errorf("%s declares interface %d but another chart of the product declares %d: the three are released and pinned together, so they carry one number", chart, n, first)
 		}
 	}
+}
+
+// TestMigrationSecretIsOnlyMountedByJobs is delivery-interface step 15's
+// check: a chart that reads interface 15 or higher references the owner's
+// credential (`database.migration.passwordSecret`) only from a Job. It has
+// nothing to render while the product's charts are below 15, and starts
+// checking the render the day the annotation moves.
+func TestMigrationSecretIsOnlyMountedByJobs(t *testing.T) {
+	raw, err := charts.Files.ReadFile("url-shortener/Chart.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var meta struct {
+		Annotations map[string]string `yaml:"annotations"`
+	}
+	if err := yaml.Unmarshal(raw, &meta); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, _ := strconv.Atoi(meta.Annotations[annotation]); n < 15 {
+		t.Skipf("the chart declares interface %d, below the step that introduces database.migration", n)
+	}
+
+	const sentinel = "migration-secret-sentinel"
+
+	out, err := render(t, defaults("--set", "database.migration.passwordSecret="+sentinel)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+
+	conformance.MigrationSecretOnlyInJobs(t, []byte(out), sentinel)
 }
