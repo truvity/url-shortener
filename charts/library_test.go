@@ -187,12 +187,13 @@ func TestAFollowingChartRendersItsConfigurationVerbatim(t *testing.T) {
 			conformance.PortsEqualConfig(t, []byte(out), "r-echo", config)
 			conformance.ChecksumFollowsConfig(t, []byte(out), "r-echo", "r-echo-config", "echo.yaml")
 
-			var secrets, allowed []string
+			var allowed []string
 			if name == "everything" {
-				secrets = []string{"STORE_TOKEN"}
 				allowed = []string{"CONFIG_FILE", "EXAMPLE_CLIENT_HOST"}
 			}
-			conformance.EnvIsDeclared(t, []byte(out), "r-echo", secrets, allowed...)
+			conformance.EnvIsDeclared(t, []byte(out), "r-echo", allowed...)
+			conformance.SecretsAreFiles(t, []byte(out), "r-echo")
+			conformance.NoEnvSecretFields(t, conformance.ConfigMapData(t, []byte(out), "echo.yaml"))
 		})
 	}
 }
@@ -410,12 +411,15 @@ platform:
 platform:
   tls: {csiDriver: example.csi.invalid}
 `, "config.tls.address"},
-		"the default account":             {"platform: {serviceAccount: {name: default}}\n", `"default" is refused`},
-		"a secret with no key":            {"platform: {secrets: {TOKEN: {secretName: s}}}\n", "key"},
-		"a key the service does not know": {"config: {greting: hello}\n", "greting"},
-		"a platform key nobody reads":     {"platform: {replcas: 2}\n", "replcas"},
-		"a negative replica count":        {"platform: {replicas: -1}\n", "replicas"},
-		"a configuration with no probes":  {"config: {probes: null}\n", "probes"},
+		"the default account":                   {"platform: {serviceAccount: {name: default}}\n", `"default" is refused`},
+		"a secret with no key":                  {"platform: {secretFiles: {TOKEN: {secretName: s}}}\n", "key"},
+		"a secret file without the file source": {"platform: {secretFiles: {TOKEN: {secretName: s, key: k}}}\n", "config.secrets.source"},
+		"the retired platform.secrets":          {"platform: {secrets: {TOKEN: {secretName: s, key: k}}}\n", "secrets"},
+		"the env source":                        {"config: {secrets: {source: env}}\n", "env"},
+		"a key the service does not know":       {"config: {greting: hello}\n", "greting"},
+		"a platform key nobody reads":           {"platform: {replcas: 2}\n", "replcas"},
+		"a negative replica count":              {"platform: {replicas: -1}\n", "replicas"},
+		"a configuration with no probes":        {"config: {probes: null}\n", "probes"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			out, err := exampleRenderYAML(t, tc.values)
@@ -578,14 +582,13 @@ func TestEveryUrlShortenerComponentFollowsItsOwnFile(t *testing.T) {
 				conformance.PortsEqualConfig(t, []byte(out), workload, config)
 				conformance.ChecksumFollowsConfig(t, []byte(out), workload, configMap, component+".yaml")
 
-				var secrets, allowed []string
-				if component == "log" && values == "everything" {
-					secrets = []string{"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"}
-				}
+				var allowed []string
 				if component == "redirect" || component == "urls" {
 					allowed = client
 				}
-				conformance.EnvIsDeclared(t, []byte(out), workload, secrets, allowed...)
+				conformance.EnvIsDeclared(t, []byte(out), workload, allowed...)
+				conformance.SecretsAreFiles(t, []byte(out), workload)
+				conformance.NoEnvSecretFields(t, conformance.ConfigMapData(t, []byte(out), component+".yaml"))
 			}
 		})
 	}

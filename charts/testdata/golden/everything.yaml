@@ -284,9 +284,9 @@ data:
         maxSeconds: 11
       bucket:
         ca: /var/run/store/ca.crt
-        credentialsEnv:
-          accessKeyID: S3_ACCESS_KEY_ID
-          secretAccessKey: S3_SECRET_ACCESS_KEY
+        credentialsSecret:
+          accessKeyID: s3/accessKeyID
+          secretAccessKey: s3/secretAccessKey
         endpoint: https://s3.example.invalid
         name: example-archive
         pathStyle: true
@@ -305,6 +305,9 @@ data:
       level: debug
     probes:
       address: :7070
+    secrets:
+      root: /var/run/secrets/log
+      source: file
 
 ---
 # Source: url-shortener/templates/identity-rbac.yaml
@@ -525,7 +528,6 @@ spec:
               value: example-redirect
             - name: CNPG_CLIENT_POOL_MAX
               value: "10"
-            
           ports:
             
             - name: http
@@ -556,6 +558,7 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            
             - mountPath: /etc/url-shortener-pg-ca
               name: database-ca
               readOnly: true
@@ -575,6 +578,7 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        
         - configMap:
             name: example-root-ca
           name: database-ca
@@ -688,7 +692,6 @@ spec:
               value: example-urls
             - name: CNPG_CLIENT_POOL_MAX
               value: "20"
-            
           ports:
             
             - name: http
@@ -717,6 +720,7 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            
             - mountPath: /etc/url-shortener-pg-ca
               name: database-ca
               readOnly: true
@@ -736,6 +740,7 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        
         - configMap:
             name: example-root-ca
           name: database-ca
@@ -831,7 +836,6 @@ spec:
               value: "0.25"
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
-            
           ports:
             
             - name: http
@@ -860,6 +864,7 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            
           resources:
             requests:
               cpu: 55m
@@ -873,6 +878,7 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        
 
 ---
 # Source: url-shortener/templates/components.yaml
@@ -958,7 +964,6 @@ spec:
               value: "0.25"
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
-            
           ports:
             
             - name: probes
@@ -985,6 +990,7 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            
           resources:
             requests:
               cpu: 22m
@@ -998,6 +1004,7 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        
 
 ---
 # Source: url-shortener/templates/components.yaml
@@ -1034,7 +1041,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: 6cc8a12e45c8522a4e7be2a224826d635663b2fae59a75b00908d564dcc9f3ef
+        checksum/config: 51d30cb016cf0e5c4dae975b2bed5ae3a7d5bf1a91bce5cad97398fb714da08f
     spec:
       serviceAccountName: app-account
       securityContext:
@@ -1083,17 +1090,6 @@ spec:
               value: "0.25"
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
-            
-            - name: S3_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: archive-secret
-                  key: id-key
-            - name: S3_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: archive-secret
-                  key: secret-key
           ports:
             
             - name: probes
@@ -1120,6 +1116,10 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            
+            - name: secrets
+              mountPath: /var/run/secrets/log
+              readOnly: true
           resources:
             requests:
               cpu: 33m
@@ -1133,6 +1133,18 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: archive-secret
+                  items:
+                    - key: id-key
+                      path: s3/accessKeyID
+                    - key: secret-key
+                      path: s3/secretAccessKey
 
 ---
 # Source: url-shortener/templates/route.yaml

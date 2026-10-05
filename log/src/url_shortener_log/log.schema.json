@@ -8,6 +8,7 @@
   "unevaluatedProperties": false,
   "required": ["events", "archive"],
   "properties": {
+    "secrets": { "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json" },
     "events": {
       "type": "object",
       "additionalProperties": false,

@@ -7,9 +7,10 @@ both are about what happens when a write fails.
 from __future__ import annotations
 
 import json
-import os
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import boto3
@@ -18,7 +19,7 @@ from botocore.config import Config as BotoConfig
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
 
-    from .config import Bucket
+    from .config import Bucket, Secrets
 
 
 class ObjectStore(Protocol):
@@ -115,7 +116,7 @@ def key_for(prefix: str, records: list[Record]) -> str:
     return f"{prefix.strip('/')}/{day}/{first.sequence:020d}.ndjson"
 
 
-def client(bucket: Bucket) -> S3Client:
+def client(bucket: Bucket, secrets: Secrets | None = None) -> S3Client:
     """Build the S3 client this configuration describes.
 
     The vendor is not in here, and that is the platform contract's rule about
@@ -138,20 +139,49 @@ def client(bucket: Bucket) -> S3Client:
         # exotic one, so a bundle the platform mounts is a supported input
         # rather than a reason to disable verification.
         kwargs["verify"] = ca
-    if names := bucket.get("credentialsEnv"):
+    if names := bucket.get("credentialsSecret"):
         # The configuration carries the NAMES. Reading them here, at the one
         # point they are needed, keeps the values out of everything that
         # renders, logs or commits the configuration.
-        kwargs["aws_access_key_id"] = _secret(names["accessKeyID"])
-        kwargs["aws_secret_access_key"] = _secret(names["secretAccessKey"])
+        kwargs["aws_access_key_id"] = read_secret(
+            secrets, "archive.bucket.credentialsSecret.accessKeyID", names["accessKeyID"]
+        )
+        kwargs["aws_secret_access_key"] = read_secret(
+            secrets, "archive.bucket.credentialsSecret.secretAccessKey", names["secretAccessKey"]
+        )
     return boto3.client("s3", **kwargs)
 
 
-def _secret(name: str) -> str:
-    """Read a variable the configuration named, or say which one is missing."""
-    value = os.environ.get(name)
+_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$")
+
+
+def read_secret(secrets: Secrets | None, field: str, name: str) -> str:
+    """Read the secret `name` that `field` holds, from the declared source.
+
+    This component reads the `file` source, which is what the chart delivers
+    (`platform.secretFiles`): the secret is a file under `secrets.root`. Any
+    other source is refused rather than guessed at. An error names the field,
+    never the name or a value.
+    """
+    if not secrets or secrets.get("source") != "file":
+        raise ValueError(
+            f"{field}: needs secrets.source file; this component reads files under secrets.root"
+        )
+    root = secrets.get("root", "")
+    if not _NAME.match(name):
+        raise ValueError(
+            f"{field}: the name is not a secret name (a relative path that does not climb)"
+        )
+    try:
+        value = Path(root, name).read_text(encoding="utf-8").removesuffix("\n")
+    except OSError as exc:
+        raise ValueError(
+            f"{field}: the secret it names is not readable under {root}: {exc.strerror}"
+        ) from None
     if not value:
-        raise ValueError(f"environment variable {name} is not set")
+        raise ValueError(
+            f"{field}: the secret it names is empty (a file under secrets.root {root})"
+        )
     return value
 
 

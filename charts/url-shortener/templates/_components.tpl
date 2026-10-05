@@ -87,11 +87,11 @@ client's environment: this component's share of the server's limit. */ -}}
 {{- end -}}
 {{- if eq $name "log" -}}
 {{- with $v.archive.bucket.credentialsSecret -}}
-{{- /* The NAMES are in the configuration file (`credentialsEnv`); the values
-are here, from a Secret, and appear in nothing that is rendered, printed or
-committed. */ -}}
+{{- /* The NAMES are in the configuration file (`credentialsSecret`); the
+values are here, from a Secret, projected as files under `secrets.root`, and
+appear in nothing that is rendered, printed or committed. */ -}}
 {{- $bucket := $v.archive.bucket -}}
-{{- $_ := set $p "secrets" (dict "S3_ACCESS_KEY_ID" (dict "secretName" . "key" $bucket.accessKeyIDKey) "S3_SECRET_ACCESS_KEY" (dict "secretName" . "key" $bucket.secretAccessKeyKey)) -}}
+{{- $_ := set $p "secretFiles" (dict "s3/accessKeyID" (dict "secretName" . "key" $bucket.accessKeyIDKey) "s3/secretAccessKey" (dict "secretName" . "key" $bucket.secretAccessKeyKey)) -}}
 {{- end -}}
 {{- end -}}
 {{- if $env -}}{{- $_ := set $p "env" $env -}}{{- end -}}
@@ -282,7 +282,8 @@ its own account; `redirect` and `log` never call it, so they are not admitted.
 {{- with $bucket.ca -}}{{- $_ := set $b "ca" . -}}{{- end -}}
 {{- if $bucket.pathStyle -}}{{- $_ := set $b "pathStyle" true -}}{{- end -}}
 {{- if $bucket.credentialsSecret -}}
-{{- $_ := set $b "credentialsEnv" (dict "accessKeyID" "S3_ACCESS_KEY_ID" "secretAccessKey" "S3_SECRET_ACCESS_KEY") -}}
+{{- $_ := set $b "credentialsSecret" (dict "accessKeyID" "s3/accessKeyID" "secretAccessKey" "s3/secretAccessKey") -}}
+{{- $_ := set $cfg "secrets" (dict "source" "file" "root" "/var/run/secrets/log") -}}
 {{- end -}}
 {{- $_ := set $cfg "events" (dict
   "nats" (include "url-shortener.natsConfig" (dict "root" $root "identity" false) | fromJson)

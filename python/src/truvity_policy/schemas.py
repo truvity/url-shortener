@@ -47,18 +47,16 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                 "default": False,
                 "description": "Address the bucket as a path rather than as a host. Required by most non-cloud implementations."
             },
-            "credentialsEnv": {
+            "credentialsSecret": {
                 "type": "object",
                 "additionalProperties": False,
-                "description": "The NAMES of the environment variables holding the credentials, never the values. Unset means the SDK's ambient credentials, which is what a workload identity provides.",
+                "description": "The NAMES of the two secrets holding the credentials, never the values, each a name under the service's one `secrets` source (docs/contracts/config.md rule 5). Unset means the SDK's ambient credentials, which is what a workload identity provides.",
                 "properties": {
                     "accessKeyID": {
-                        "type": "string",
-                        "minLength": 1
+                        "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name"
                     },
                     "secretAccessKey": {
-                        "type": "string",
-                        "minLength": 1
+                        "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name"
                     }
                 },
                 "required": [
@@ -197,7 +195,7 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://github.com/truvity/policy/schemas/fragments/platform.json",
         "title": "platform",
-        "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as environment variables, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
+        "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as files, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
         "type": "object",
         "additionalProperties": False,
         "properties": {
@@ -402,11 +400,11 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                     }
                 }
             },
-            "secrets": {
+            "secretFiles": {
                 "type": "object",
-                "description": "The environment variables that carry SECRETS, and nothing else (decision 0002): variable name to the Secret and key its value comes from. The configuration file names the VARIABLE; the value never appears in a values file or a render.",
+                "description": "The secrets the component reads, projected as FILES (decision 0012): secret NAME to the Secret and key its value comes from. The names are the `...Secret` values of the configuration and the files appear under `config.secrets.root`, mode 0440, so the configuration must declare `secrets: {source: file, root: <absolute directory>}`. The value never appears in a values file or a render, and a secret is never an environment variable.",
                 "propertyNames": {
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name"
                 },
                 "additionalProperties": {
                     "type": "object",
@@ -429,7 +427,7 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
             },
             "env": {
                 "type": "array",
-                "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002). A secret does not belong here; declare it in `secrets`.",
+                "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002). A secret does not belong here; declare it in `secretFiles`.",
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -547,7 +545,7 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://github.com/truvity/policy/schemas/fragments/postgres.json",
         "title": "postgres",
-        "description": "A PostgreSQL connection. The URL carries no password: it names the environment variable that does.",
+        "description": "A PostgreSQL connection. The URL carries no password: `passwordSecret` names the secret that does.",
         "type": "object",
         "additionalProperties": False,
         "required": [
@@ -577,12 +575,11 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                         }
                     }
                 ],
-                "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require. A password in the user information or in a password or sslpassword parameter is refused: the file is rendered into objects people read, and the password belongs to passwordEnv."
+                "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require. A password in the user information or in a password or sslpassword parameter is refused: the file is rendered into objects people read, and the password belongs to passwordSecret."
             },
-            "passwordEnv": {
-                "type": "string",
-                "minLength": 1,
-                "description": "The NAME of the environment variable holding the password. Unset means the connection needs none."
+            "passwordSecret": {
+                "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name",
+                "description": "The NAME of the secret holding the password, under the service's one `secrets` source (docs/contracts/config.md rule 5). Unset means the connection needs none."
             },
             "maxConnections": {
                 "type": "integer",
@@ -607,6 +604,63 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                 "type": "string",
                 "pattern": "^[^\\s]*:[0-9]{1,5}$",
                 "description": "host:port for /health/live and /health/ready."
+            }
+        }
+    },
+    "https://github.com/truvity/policy/schemas/fragments/secrets.json": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://github.com/truvity/policy/schemas/fragments/secrets.json",
+        "title": "secrets",
+        "description": "Where a service reads its secrets from: ONE declared source, and a root under which every `...Secret` field of the configuration is a name (docs/contracts/config.md rule 5). The file never holds a value. `env` is refused at start-up on a serverless function, whose environment is not a place for a secret; the schema cannot see the platform, the loader does.",
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "source"
+        ],
+        "properties": {
+            "source": {
+                "enum": [
+                    "env",
+                    "file",
+                    "ssm",
+                    "openbao"
+                ],
+                "description": "env: each name is an environment variable, for a platform whose environment is a Secret object. file: each name is a file under `root`. ssm: each name is a parameter under `root`. openbao: each name is a path under the mount `root`."
+            },
+            "root": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Where the source looks: a directory (file, absolute), a parameter path prefix (ssm, absolute) or a mount (openbao). Absent for env. No empty, `.` or `..` segment."
+            }
+        },
+        "allOf": [
+            {
+                "if": {
+                    "properties": {
+                        "source": {
+                            "const": "env"
+                        }
+                    }
+                },
+                "then": {
+                    "not": {
+                        "required": [
+                            "root"
+                        ]
+                    }
+                },
+                "else": {
+                    "required": [
+                        "root"
+                    ]
+                }
+            }
+        ],
+        "$defs": {
+            "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$",
+                "description": "The NAME of a secret under the service's `secrets` source: a relative path of letters, digits, dots, underscores and dashes, which neither starts at `/` nor climbs. Never a value."
             }
         }
     },

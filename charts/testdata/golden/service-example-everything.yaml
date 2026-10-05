@@ -36,8 +36,11 @@ data:
       level: debug
     probes:
       address: :7071
+    secrets:
+      root: /var/run/secrets/echo
+      source: file
     store:
-      tokenEnv: STORE_TOKEN
+      tokenSecret: store/token
     tls:
       address: :9443
       caFile: /var/run/example-identity/ca.crt
@@ -109,7 +112,7 @@ spec:
         # Restart on a configuration change. Without this a `helm upgrade`
         # that only edits the ConfigMap changes nothing at all: the pods keep
         # the file they started with, and the deploy reads as successful.
-        checksum/config: c050c0cc759689cb238ccd73097a2b49fa41548b3a35c3e807723e339dbf34df
+        checksum/config: cc6186f164f0a93b003ee29ab1fff0302aecdcb61cb5f436f686a32462cd92ec
     spec:
       serviceAccountName: echo-account
       securityContext:
@@ -161,12 +164,6 @@ spec:
               value: "/etc/echo/echo.yaml"
             - name: EXAMPLE_CLIENT_HOST
               value: client.example.invalid
-            
-            - name: STORE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: example-store
-                  key: token
           ports:
             
             - name: http
@@ -205,6 +202,10 @@ spec:
             - name: identity
               mountPath: /var/run/example-identity
               readOnly: true
+            
+            - name: secrets
+              mountPath: /var/run/secrets/echo
+              readOnly: true
             - mountPath: /etc/example-extra
               name: extra
               readOnly: true
@@ -223,6 +224,16 @@ spec:
           csi:
             driver: example.csi.invalid
             readOnly: true
+        
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: example-store
+                  items:
+                    - key: token
+                      path: store/token
         - configMap:
             name: example-extra
           name: extra

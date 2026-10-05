@@ -11,7 +11,8 @@ misconfiguration reads identically whichever runtime refused it.
 from truvity_policy import ConfigError, load, secret
 
 cfg = load("config.yaml", schema)  # validates, then returns
-password = secret(cfg["database"]["passwordEnv"])  # reads the NAME, never a value
+name = cfg["database"]["passwordSecret"]  # the NAME, never a value
+password = secret(name)  # reads the env source only
 ```
 
 See [`docs/contracts/config.md`](../docs/contracts/config.md) for the

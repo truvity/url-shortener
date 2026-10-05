@@ -98,14 +98,30 @@ def test_the_bucket_carries_no_credential_values() -> None:
             **VALID["archive"],
             "bucket": {
                 **VALID["archive"]["bucket"],
-                "credentialsEnv": {
-                    "accessKeyID": "S3_ACCESS_KEY_ID",
-                    "secretAccessKey": "S3_SECRET_ACCESS_KEY",
+                "credentialsSecret": {
+                    "accessKeyID": "s3/accessKeyID",
+                    "secretAccessKey": "s3/secretAccessKey",
                 },
             },
         },
     }
-    validate(named, config.schema())
+    validate(
+        {**named, "secrets": {"source": "file", "root": "/var/run/secrets/log"}}, config.schema()
+    )
+
+    # `...Env` is retired as a spelling: a name of a variable is not accepted.
+    retired = {
+        **VALID,
+        "archive": {
+            **VALID["archive"],
+            "bucket": {
+                **VALID["archive"]["bucket"],
+                "credentialsEnv": {"accessKeyID": "A", "secretAccessKey": "B"},
+            },
+        },
+    }
+    with pytest.raises(ConfigError):
+        validate(retired, config.schema())
 
 
 def test_a_batch_limit_below_one_is_refused() -> None:

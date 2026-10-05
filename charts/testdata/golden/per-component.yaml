@@ -499,7 +499,6 @@ spec:
               value: example-redirect
             - name: CNPG_CLIENT_POOL_MAX
               value: "10"
-            
           ports:
             
             - name: http
@@ -530,6 +529,7 @@ spec:
             - name: identity
               mountPath: /var/run/identity
               readOnly: true
+            
             - mountPath: /etc/url-shortener-pg-ca
               name: database-ca
               readOnly: true
@@ -549,6 +549,7 @@ spec:
           csi:
             driver: spiffe.csi.cert-manager.io
             readOnly: true
+        
         - configMap:
             name: pg-ca
           name: database-ca
@@ -652,7 +653,6 @@ spec:
               value: example-urls
             - name: CNPG_CLIENT_POOL_MAX
               value: "20"
-            
           ports:
             
             - name: http
@@ -681,6 +681,7 @@ spec:
             - name: identity
               mountPath: /var/run/identity
               readOnly: true
+            
             - mountPath: /etc/url-shortener-pg-ca
               name: database-ca
               readOnly: true
@@ -700,6 +701,7 @@ spec:
           csi:
             driver: spiffe.csi.cert-manager.io
             readOnly: true
+        
         - configMap:
             name: pg-ca
           name: database-ca
@@ -785,7 +787,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            
           ports:
             
             - name: http
@@ -814,6 +815,7 @@ spec:
             - name: identity
               mountPath: /var/run/identity
               readOnly: true
+            
           resources:
             requests:
               cpu: 50m
@@ -827,6 +829,7 @@ spec:
           csi:
             driver: spiffe.csi.cert-manager.io
             readOnly: true
+        
 
 ---
 # Source: url-shortener/templates/components.yaml
@@ -902,7 +905,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            
           ports:
             
             - name: probes
@@ -929,6 +931,7 @@ spec:
             - name: identity
               mountPath: /var/run/identity
               readOnly: true
+            
           resources:
             requests:
               cpu: 50m
@@ -942,6 +945,7 @@ spec:
           csi:
             driver: spiffe.csi.cert-manager.io
             readOnly: true
+        
 
 ---
 # Source: url-shortener/templates/components.yaml
@@ -1017,7 +1021,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            
           ports:
             
             - name: probes
@@ -1044,6 +1047,7 @@ spec:
             - name: identity
               mountPath: /var/run/identity
               readOnly: true
+            
           resources:
             requests:
               cpu: 50m

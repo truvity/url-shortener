@@ -85,7 +85,7 @@ eval "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && go run ./e2e/fixture/cmd/resol
 kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
 
 # Static credentials for the LOCAL store only. A real cluster gives its
-# workloads an identity instead, and the configuration's `credentialsEnv`
+# workloads an identity instead, and the configuration's `credentialsSecret`
 # stays unset — which is the better answer and the one the bucket fragment
 # documents, because an ambient credential leaves nothing to leak.
 BUCKET_SECRET="${APP}-archive"

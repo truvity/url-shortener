@@ -12,7 +12,7 @@ import com.truvity.policy.load
 import com.truvity.policy.secret
 
 val cfg = load("config.yaml", schema)              // validates, then returns
-val password = secret(cfg.at("/database/passwordEnv").asText())  // the NAME, never a value
+val password = secret(cfg.at("/database/passwordSecret").asText())  // the NAME (the env source only), never a value
 ```
 
 **Status:** built and tested in this repository's gate, against the same

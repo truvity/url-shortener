@@ -405,7 +405,6 @@ spec:
               value: example-redirect
             - name: CNPG_CLIENT_POOL_MAX
               value: "10"
-            
           ports:
             
             - name: http
@@ -431,6 +430,7 @@ spec:
               mountPath: /etc/url-shortener
               readOnly: true
             
+            
             - mountPath: /etc/url-shortener-pg-ca
               name: database-ca
               readOnly: true
@@ -445,6 +445,7 @@ spec:
         - name: config
           configMap:
             name: example-redirect-config
+        
         
         - configMap:
             name: pg-ca
@@ -549,7 +550,6 @@ spec:
               value: example-urls
             - name: CNPG_CLIENT_POOL_MAX
               value: "20"
-            
           ports:
             
             - name: http
@@ -575,6 +575,7 @@ spec:
               mountPath: /etc/url-shortener
               readOnly: true
             
+            
             - mountPath: /etc/url-shortener-pg-ca
               name: database-ca
               readOnly: true
@@ -589,6 +590,7 @@ spec:
         - name: config
           configMap:
             name: example-urls-config
+        
         
         - configMap:
             name: pg-ca
@@ -675,7 +677,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            
           ports:
             
             - name: http
@@ -701,6 +702,7 @@ spec:
               mountPath: /etc/url-shortener
               readOnly: true
             
+            
           resources:
             requests:
               cpu: 50m
@@ -709,6 +711,7 @@ spec:
         - name: config
           configMap:
             name: example-web-config
+        
         
 
 ---
@@ -785,7 +788,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            
           ports:
             
             - name: probes
@@ -809,6 +811,7 @@ spec:
               mountPath: /etc/url-shortener
               readOnly: true
             
+            
           resources:
             requests:
               cpu: 50m
@@ -817,6 +820,7 @@ spec:
         - name: config
           configMap:
             name: example-stat-config
+        
         
 
 ---
@@ -893,7 +897,6 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
-            
           ports:
             
             - name: probes
@@ -916,6 +919,7 @@ spec:
             - name: config
               mountPath: /etc/url-shortener
               readOnly: true
+            
             
           resources:
             requests:

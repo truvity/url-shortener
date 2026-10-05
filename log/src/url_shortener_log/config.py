@@ -70,8 +70,8 @@ class Events(TypedDict):
     consumer: Consumer
 
 
-class CredentialsEnv(TypedDict):
-    """The NAMES of the variables holding the credentials, never the values."""
+class CredentialsSecret(TypedDict):
+    """The NAMES of the secrets holding the credentials, never the values."""
 
     accessKeyID: str
     secretAccessKey: str
@@ -85,7 +85,7 @@ class Bucket(TypedDict):
     endpoint: NotRequired[str]
     ca: NotRequired[str]
     pathStyle: NotRequired[bool]
-    credentialsEnv: NotRequired[CredentialsEnv]
+    credentialsSecret: NotRequired[CredentialsSecret]
 
 
 class Batch(TypedDict):
@@ -103,6 +103,13 @@ class Archive(TypedDict):
     batch: NotRequired[Batch]
 
 
+class Secrets(TypedDict):
+    """The one source every `...Secret` name is read through, and its root."""
+
+    source: str
+    root: NotRequired[str]
+
+
 class Config(TypedDict):
     """The whole file."""
 
@@ -111,6 +118,7 @@ class Config(TypedDict):
     drain: NotRequired[Drain]
     events: Events
     archive: Archive
+    secrets: NotRequired[Secrets]
 
 
 def schema() -> dict[str, Any]:

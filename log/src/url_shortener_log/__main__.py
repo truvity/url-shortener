@@ -113,7 +113,7 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
     # access to is a refusal at start-up rather than a surprise an hour later
     # when the first batch fills.
     bucket = settings["bucket"]
-    s3 = archive.client(bucket)
+    s3 = archive.client(bucket, cfg.get("secrets"))
     await asyncio.to_thread(s3.head_bucket, Bucket=bucket["name"])
     writer = archive.Writer(
         s3,

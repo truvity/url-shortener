@@ -1,6 +1,6 @@
 # Every platform field set to something other than its default, and a
 # configuration that exercises what the library derives from it: a permissive
-# transport (a second port, the identity mounted), a declared secret, and a
+# transport (a second port, the identity mounted), a secret projected as a file, and a
 # file whose path reaches the process in an environment variable.
 #
 # The `config` block overrides every key the chart's own values.yaml sets, so
@@ -39,8 +39,8 @@ platform:
     sampleRatio: "0.25"
     resourceAttributes:
       deployment.example.tier: primary
-  secrets:
-    STORE_TOKEN: {secretName: example-store, key: token}
+  secretFiles:
+    store/token: {secretName: example-store, key: token}
   env:
     - {name: EXAMPLE_CLIENT_HOST, value: client.example.invalid}
   volumes:
@@ -58,7 +58,8 @@ config:
   log: {level: debug}
   drain: {seconds: 33}
   greeting: hello everyone
-  store: {tokenEnv: STORE_TOKEN}
+  secrets: {source: file, root: /var/run/secrets/echo}
+  store: {tokenSecret: store/token}
   tls:
     mode: permissive
     address: ":9443"

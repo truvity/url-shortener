@@ -16,17 +16,19 @@
         "listen": {
           "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json"
         },
+        "secrets": {
+          "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json"
+        },
         "store": {
           "additionalProperties": false,
-          "description": "A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`.",
+          "description": "A store the service reads. The token is a SECRET, so the file names it (a name under `secrets`) and the chart projects it as a file with `platform.secretFiles`.",
           "properties": {
-            "tokenEnv": {
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-              "type": "string"
+            "tokenSecret": {
+              "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name"
             }
           },
           "required": [
-            "tokenEnv"
+            "tokenSecret"
           ],
           "type": "object"
         },
@@ -128,7 +130,7 @@
       },
       "$id": "https://github.com/truvity/policy/schemas/fragments/platform.json",
       "additionalProperties": false,
-      "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as environment variables, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
+      "description": "What the platform provides one component of a service chart: the image, the replicas, the account it runs as, how it is probed, where its identity is mounted, which secrets reach it as files, and how it exports telemetry. The shape of the `platform` block of a chart's values, read by the library chart (decision 0009). Nothing here is the service's own configuration: that is the chart's `config` block, which is the service's schema and nothing else.",
       "properties": {
         "config": {
           "additionalProperties": false,
@@ -183,7 +185,7 @@
           "type": "object"
         },
         "env": {
-          "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002). A secret does not belong here; declare it in `secrets`.",
+          "description": "Environment a platform CLIENT LIBRARY reads (a database client's connection variables, for example), never the service's own configuration: a service takes no other structural input than its file (decision 0002). A secret does not belong here; declare it in `secretFiles`.",
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -280,7 +282,7 @@
           "description": "Kubernetes' own resource requirements. Open: it is passed through unchanged.",
           "type": "object"
         },
-        "secrets": {
+        "secretFiles": {
           "additionalProperties": {
             "additionalProperties": false,
             "properties": {
@@ -299,9 +301,9 @@
             ],
             "type": "object"
           },
-          "description": "The environment variables that carry SECRETS, and nothing else (decision 0002): variable name to the Secret and key its value comes from. The configuration file names the VARIABLE; the value never appears in a values file or a render.",
+          "description": "The secrets the component reads, projected as FILES (decision 0012): secret NAME to the Secret and key its value comes from. The names are the `...Secret` values of the configuration and the files appear under `config.secrets.root`, mode 0440, so the configuration must declare `secrets: {source: file, root: <absolute directory>}`. The value never appears in a values file or a render, and a secret is never an environment variable.",
           "propertyNames": {
-            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name"
           },
           "type": "object"
         },
@@ -457,6 +459,62 @@
         "address"
       ],
       "title": "probes",
+      "type": "object"
+    },
+    "https://github.com/truvity/policy/schemas/fragments/secrets.json": {
+      "$defs": {
+        "name": {
+          "description": "The NAME of a secret under the service's `secrets` source: a relative path of letters, digits, dots, underscores and dashes, which neither starts at `/` nor climbs. Never a value.",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$",
+          "type": "string"
+        }
+      },
+      "$id": "https://github.com/truvity/policy/schemas/fragments/secrets.json",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "required": [
+              "root"
+            ]
+          },
+          "if": {
+            "properties": {
+              "source": {
+                "const": "env"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "root"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Where a service reads its secrets from: ONE declared source, and a root under which every `...Secret` field of the configuration is a name (docs/contracts/config.md rule 5). The file never holds a value. `env` is refused at start-up on a serverless function, whose environment is not a place for a secret; the schema cannot see the platform, the loader does.",
+      "properties": {
+        "root": {
+          "description": "Where the source looks: a directory (file, absolute), a parameter path prefix (ssm, absolute) or a mount (openbao). Absent for env. No empty, `.` or `..` segment.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "description": "env: each name is an environment variable, for a platform whose environment is a Secret object. file: each name is a file under `root`. ssm: each name is a parameter under `root`. openbao: each name is a path under the mount `root`.",
+          "enum": [
+            "env",
+            "file",
+            "ssm",
+            "openbao"
+          ]
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "secrets",
       "type": "object"
     },
     "https://github.com/truvity/policy/schemas/fragments/tls.json": {

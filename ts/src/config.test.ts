@@ -20,7 +20,7 @@ const fixture = (name: string) => `${fixtures}${name}`;
 interface Shortener {
   probes: { address: string };
   baseURL: string;
-  database: { url: string; passwordEnv?: string; maxConnections?: number };
+  database: { url: string; passwordSecret?: string; maxConnections?: number };
 }
 
 describe("load", () => {

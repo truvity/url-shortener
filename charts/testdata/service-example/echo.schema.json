@@ -13,13 +13,14 @@
     "listen": { "$ref": "https://github.com/truvity/policy/schemas/fragments/listen.json" },
     "tls": { "$ref": "https://github.com/truvity/policy/schemas/fragments/tls.json" },
     "greeting": { "type": "string", "minLength": 1 },
+    "secrets": { "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json" },
     "store": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokenEnv"],
-      "description": "A store the service reads. The token is a SECRET, so the file names the environment variable that holds it and the chart declares that variable in `platform.secrets`.",
+      "required": ["tokenSecret"],
+      "description": "A store the service reads. The token is a SECRET, so the file names it (a name under `secrets`) and the chart projects it as a file with `platform.secretFiles`.",
       "properties": {
-        "tokenEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+        "tokenSecret": { "$ref": "https://github.com/truvity/policy/schemas/fragments/secrets.json#/$defs/name" }
       }
     }
   }
