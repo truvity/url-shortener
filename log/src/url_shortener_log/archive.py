@@ -152,7 +152,10 @@ def client(bucket: Bucket, secrets: Secrets | None = None) -> S3Client:
     return boto3.client("s3", **kwargs)
 
 
-_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$")
+_SEGMENT = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"
+# fullmatch, not match with `$`: `$` also matches before a trailing newline.
+_NAME = re.compile(rf"{_SEGMENT}(/{_SEGMENT})*")
+_ROOT = re.compile(rf"(/{_SEGMENT})+")
 
 
 def read_secret(secrets: Secrets | None, field: str, name: str) -> str:
@@ -168,7 +171,11 @@ def read_secret(secrets: Secrets | None, field: str, name: str) -> str:
             f"{field}: needs secrets.source file; this component reads files under secrets.root"
         )
     root = secrets.get("root", "")
-    if not _NAME.match(name):
+    if not _ROOT.fullmatch(root):
+        raise ValueError(
+            f"{field}: secrets.root must be an absolute directory with no empty, . or .. segment"
+        )
+    if not _NAME.fullmatch(name):
         raise ValueError(
             f"{field}: the name is not a secret name (a relative path that does not climb)"
         )

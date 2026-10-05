@@ -22,7 +22,7 @@ def test_a_secret_is_read_from_a_file_under_the_root(tmp_path: Path) -> None:
     assert read_secret(secrets, "f", "s3/key") == "value"
 
 
-@pytest.mark.parametrize("name", ["../x", "/etc/passwd", "a//b", "."])
+@pytest.mark.parametrize("name", ["../x", "/etc/passwd", "a//b", ".", "a\n", "ok\n"])
 def test_a_name_that_climbs_is_refused_without_quoting_it(tmp_path: Path, name: str) -> None:
     secrets: Secrets = {"source": "file", "root": str(tmp_path)}
     with pytest.raises(ValueError, match="not a secret name") as err:
@@ -43,4 +43,11 @@ def test_a_missing_or_empty_secret_is_refused(tmp_path: Path) -> None:
 @pytest.mark.parametrize("secrets", [None, {"source": "env"}, {"source": "ssm", "root": "/x"}])
 def test_a_source_other_than_file_is_refused(secrets: Secrets | None) -> None:
     with pytest.raises(ValueError, match=r"secrets\.source file"):
+        read_secret(secrets, "f", "a")
+
+
+@pytest.mark.parametrize("root", ["", "relative", "/a/../b", "/a//b", "/a/", "/a\n"])
+def test_a_root_that_is_not_clean_is_refused(root: str) -> None:
+    secrets: Secrets = {"source": "file", "root": root}
+    with pytest.raises(ValueError, match=r"secrets\.root"):
         read_secret(secrets, "f", "a")

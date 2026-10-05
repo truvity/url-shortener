@@ -1139,12 +1139,12 @@ spec:
             defaultMode: 0440
             sources:
               - secret:
-                  name: archive-secret
+                  name: "archive-secret"
                   items:
-                    - key: id-key
-                      path: s3/accessKeyID
-                    - key: secret-key
-                      path: s3/secretAccessKey
+                    - key: "id-key"
+                      path: "s3/accessKeyID"
+                    - key: "secret-key"
+                      path: "s3/secretAccessKey"
 
 ---
 # Source: url-shortener/templates/route.yaml

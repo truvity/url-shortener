@@ -230,10 +230,10 @@ spec:
             defaultMode: 0440
             sources:
               - secret:
-                  name: example-store
+                  name: "example-store"
                   items:
-                    - key: token
-                      path: store/token
+                    - key: "token"
+                      path: "store/token"
         - configMap:
             name: example-extra
           name: extra

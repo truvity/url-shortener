@@ -630,7 +630,7 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
             "root": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Where the source looks: a directory (file, absolute), a parameter path prefix (ssm, absolute) or a mount (openbao). Absent for env. No empty, `.` or `..` segment."
+                "description": "Where the source looks. file: an absolute directory. ssm: an absolute parameter path prefix. openbao: the mount path with no leading slash (for a KV v2 mount include the data segment, `secret/data/<app>`). Absent for env. No empty, `.` or `..` segment."
             }
         },
         "allOf": [
@@ -640,7 +640,10 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                         "source": {
                             "const": "env"
                         }
-                    }
+                    },
+                    "required": [
+                        "source"
+                    ]
                 },
                 "then": {
                     "not": {
@@ -648,11 +651,72 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                             "root"
                         ]
                     }
+                }
+            },
+            {
+                "if": {
+                    "properties": {
+                        "source": {
+                            "const": "file"
+                        }
+                    },
+                    "required": [
+                        "source"
+                    ]
                 },
-                "else": {
+                "then": {
                     "required": [
                         "root"
+                    ],
+                    "properties": {
+                        "root": {
+                            "pattern": "^(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$"
+                        }
+                    }
+                }
+            },
+            {
+                "if": {
+                    "properties": {
+                        "source": {
+                            "const": "ssm"
+                        }
+                    },
+                    "required": [
+                        "source"
                     ]
+                },
+                "then": {
+                    "required": [
+                        "root"
+                    ],
+                    "properties": {
+                        "root": {
+                            "pattern": "^(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$"
+                        }
+                    }
+                }
+            },
+            {
+                "if": {
+                    "properties": {
+                        "source": {
+                            "const": "openbao"
+                        }
+                    },
+                    "required": [
+                        "source"
+                    ]
+                },
+                "then": {
+                    "required": [
+                        "root"
+                    ],
+                    "properties": {
+                        "root": {
+                            "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$"
+                        }
+                    }
                 }
             }
         ],

@@ -473,17 +473,15 @@
       "additionalProperties": false,
       "allOf": [
         {
-          "else": {
-            "required": [
-              "root"
-            ]
-          },
           "if": {
             "properties": {
               "source": {
                 "const": "env"
               }
-            }
+            },
+            "required": [
+              "source"
+            ]
           },
           "then": {
             "not": {
@@ -492,12 +490,78 @@
               ]
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "file"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "pattern": "^(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$"
+              }
+            },
+            "required": [
+              "root"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "ssm"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "pattern": "^(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$"
+              }
+            },
+            "required": [
+              "root"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "openbao"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$"
+              }
+            },
+            "required": [
+              "root"
+            ]
+          }
         }
       ],
       "description": "Where a service reads its secrets from: ONE declared source, and a root under which every `...Secret` field of the configuration is a name (docs/contracts/config.md rule 5). The file never holds a value. `env` is refused at start-up on a serverless function, whose environment is not a place for a secret; the schema cannot see the platform, the loader does.",
       "properties": {
         "root": {
-          "description": "Where the source looks: a directory (file, absolute), a parameter path prefix (ssm, absolute) or a mount (openbao). Absent for env. No empty, `.` or `..` segment.",
+          "description": "Where the source looks. file: an absolute directory. ssm: an absolute parameter path prefix. openbao: the mount path with no leading slash (for a KV v2 mount include the data segment, `secret/data/<app>`). Absent for env. No empty, `.` or `..` segment.",
           "minLength": 1,
           "type": "string"
         },
