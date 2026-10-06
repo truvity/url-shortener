@@ -41,5 +41,10 @@ subjects:
     name: {{ include "url-shortener.componentServiceAccountName" (dict "root" $ "component" .) }}
     namespace: {{ $.Release.Namespace }}
   {{- end }}
+  {{- if .Values.prober.enabled }}
+  - kind: ServiceAccount
+    name: {{ include "url-shortener.proberServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+  {{- end }}
 {{- end }}
 {{- end }}

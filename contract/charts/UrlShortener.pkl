@@ -5,7 +5,6 @@
   `in` { true }
   require {
     "database.host"
-    "database.owner.passwordSecret"
     "database.app.passwordSecret"
     "events.url"
     "archive.bucket.name"
@@ -29,6 +28,9 @@ installName: String = ""
 /// Which kind of install this is, as url-shortener-infra's `tier`. `primary`: the identity ServiceAccount is rendered by url-shortener-infra, not here. `test`: this chart renders every account.
 tier: Tier.Tier = "test"
 
+/// How much redundancy this cluster wants (delivery interface step 14). `single`: one replica of every component and no PodDisruptionBudget. `high`: two replicas and a budget that keeps one running. Absent means `single`.
+availability: "single" | "high" = "single"
+
 /// Product alerts as a VMRule. Off by default; `remote` renders only the rule object, for an install evaluated on another cluster (no other value is then required).
 alerts: Alerts?
 
@@ -41,6 +43,7 @@ archive: Archive
 
 log: Log
 
+/// An explicit replica count for one component, which wins over `availability`.
 replicas: Replicas
 
 /// Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.
@@ -60,6 +63,9 @@ disruption: Disruption?
 tls: Tls?
 
 podSecurity: PodSecurity?
+
+/// An always-on synthetic prober against this release's urls and redirect Services. Off by default. It follows this release's tls and otel, and takes no Kubernetes API access.
+prober: Prober
 
 images: Images
 
@@ -195,13 +201,23 @@ class DatabaseTls {
   rootCA: DatabaseTlsRootCA?
 }
 
-class DatabaseOwner {
+/// The owner's credential, for the schema migration Job alone (delivery interface step 15). No long-running workload gets it.
+class DatabaseMigration {
   role: V.NonEmptyString = "url_shortener_owner"
 
   /// The Secret holding the role's password. Every install names its own.
   passwordSecret: V.NonEmptyString?
 
   passwordKey: V.NonEmptyString = "password"
+}
+
+/// Deprecated spelling of `migration`, read only when `migration` leaves the key unset.
+class DatabaseOwner {
+  role: V.NonEmptyString?
+
+  passwordSecret: V.NonEmptyString?
+
+  passwordKey: V.NonEmptyString?
 }
 
 class DatabaseApp {
@@ -223,7 +239,11 @@ class Database {
 
   tls: DatabaseTls?
 
-  owner: DatabaseOwner
+  /// The owner's credential, for the schema migration Job alone (delivery interface step 15). No long-running workload gets it.
+  migration: DatabaseMigration?
+
+  /// Deprecated spelling of `migration`, read only when `migration` leaves the key unset.
+  owner: DatabaseOwner?
 
   app: DatabaseApp
 }
@@ -294,15 +314,15 @@ class Log {
 }
 
 class Replicas {
-  redirect: V.NonNegativeInt = 2
+  redirect: V.NonNegativeInt?
 
-  stat: V.NonNegativeInt = 2
+  stat: V.NonNegativeInt?
 
-  log: V.NonNegativeInt = 2
+  log: V.NonNegativeInt?
 
-  urls: V.NonNegativeInt = 2
+  urls: V.NonNegativeInt?
 
-  web: V.NonNegativeInt = 2
+  web: V.NonNegativeInt?
 }
 
 /// Passed to Kubernetes verbatim, so the inside of each entry stays open: the platform validates it, and a chart that reimplements that schema goes stale.
@@ -451,7 +471,8 @@ class Drain {
 }
 
 class Disruption {
-  enabled: Boolean = true
+  /// Absent follows `availability`: a budget renders for `high` only.
+  enabled: Boolean?
 
   maxUnavailable: V.NonNegativeInt = 1
 }
@@ -573,6 +594,16 @@ class ImagesWeb {
   digest: String = ""
 }
 
+class ImagesProber {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/prober"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
 class Images {
   migrate: ImagesMigrate
 
@@ -585,6 +616,42 @@ class Images {
   log: ImagesLog
 
   web: ImagesWeb
+
+  prober: ImagesProber
+}
+
+class ProberLog {
+  level: V.LogLevel = "info"
+}
+
+class ProberDrain {
+  seconds: V.PositiveInt = 5
+}
+
+class ProberServiceAccount {
+  create: Boolean = true
+
+  name: String = ""
+}
+
+/// An always-on synthetic prober against this release's urls and redirect Services. Off by default. It follows this release's tls and otel, and takes no Kubernetes API access.
+class Prober {
+  enabled: Boolean = false
+
+  interval: V.NonEmptyString = "10s"
+
+  keyPrefix: V.NonEmptyString = "probe-"
+
+  statSettle: String = "60s"
+
+  /// Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale.
+  resources: V.OpenObject = new Dynamic { requests { cpu = "10m"; memory = "32Mi" } }
+
+  log: ProberLog?
+
+  drain: ProberDrain?
+
+  serviceAccount: ProberServiceAccount?
 }
 
 class Otel {

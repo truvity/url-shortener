@@ -113,8 +113,8 @@ helm upgrade --install "$APP" "$CHART_TGZ" -n "$NS" \
     --set "database.host=${DATABASE_HOST}" \
     --set "database.tls.rootCA.configMapName=${DATABASE_CA}" \
     --set "database.name=${DATABASE}" \
-    --set "database.owner.role=${OWNER_ROLE}" \
-    --set "database.owner.passwordSecret=${OWNER_SECRET}" \
+    --set "database.migration.role=${OWNER_ROLE}" \
+    --set "database.migration.passwordSecret=${OWNER_SECRET}" \
     --set "database.app.role=${APP_ROLE}" \
     --set "database.app.passwordSecret=${APP_SECRET}" \
     --set events.url=nats://nats.nats.svc:4222 \

@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 #
-# Enable the url-shortener-e2e chart's PROBER (charts/url-shortener-e2e/
-# templates/prober.yaml) on the release hack/install-e2e-chart.sh already
-# installed, and prove its journeys succeed within a bounded time — this is
-# the THIRD workload the pair of charts ships, distinct from the e2e Job:
-# docs/guides/testing.md's "separate from the e2e suite" and
-# charts/url-shortener-e2e/values.yaml's own comment on `prober`.
+# Enable the application chart's PROBER (charts/url-shortener/templates/
+# prober.yaml) on the release hack/install.sh already installed, and prove its
+# journeys succeed within a bounded time — the always-on synthetic traffic,
+# distinct from the end-to-end suite (docs/guides/testing.md), which runs from
+# the product's own CI and is not a chart.
 #
-# `--reuse-values`, so every name hack/install-e2e-chart.sh already resolved
-# (the database, the stream, the archive bucket, the local S3 stand-in's
-# static credentials) carries over unchanged — this script's own job is
-# only to flip the prober on, never to re-derive names a sibling script
-# already got right.
+# `--reuse-values`, so every name hack/install.sh already resolved (the
+# database, the stream, the archive bucket, the local S3 stand-in's static
+# credentials) carries over unchanged — this script's own job is only to flip
+# the prober on, never to re-derive names a sibling script already got right.
 set -euo pipefail
 
 # The cluster this example is installed into, BY NAME — see hack/install.sh's
@@ -23,14 +21,15 @@ helm() { command helm --kube-context "$KCTX" "$@"; }
 
 NS=${NS:-shortener}
 APP=${APP:-example}
-# The test chart's OWN release, matching hack/install-e2e-chart.sh's default.
-RELEASE=${RELEASE:-${APP}-e2e}
+# The application's own release: the prober is one of its workloads.
+RELEASE=${RELEASE:-${APP}}
 INTERVAL=${PROBER_INTERVAL:-5s}
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CHART_TGZ=${CHART_TGZ:-$(find "$ROOT/dist/charts" -name 'url-shortener-e2e-*.tgz' 2>/dev/null | sort -V | tail -1)}
+CHART_TGZ=${CHART_TGZ:-$(find "$ROOT/dist/charts" -name 'url-shortener-*.tgz' \
+    ! -name 'url-shortener-infra-*.tgz' 2>/dev/null | sort -V | tail -1)}
 if [ -z "$CHART_TGZ" ]; then
-    echo "no packaged url-shortener-e2e chart under dist/charts — run 'just example-snapshot' first" >&2
+    echo "no packaged url-shortener chart under dist/charts — run 'just example-snapshot' first" >&2
     exit 1
 fi
 

@@ -1,0 +1,78 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
+{{- if .Values.prober.enabled }}
+{{/*
+The prober's own configuration file: exactly the file the binary validates
+against its own schema at start-up (examples/url-shortener/schemas/prober.json),
+checked by chart_test.go's TestWhatTheProberRendersIsWhatTheBinaryAccepts.
+
+A separate template from templates/prober.yaml so that file's own
+`checksum/config` annotation can name THIS one: a template that hashed its own
+rendered output while computing it would recurse forever.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "url-shortener.proberName" . }}
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prober
+data:
+  prober.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: {{ .Values.prober.log.level | default "info" | quote }}
+    drain:
+      seconds: {{ .Values.prober.drain.seconds | default 5 }}
+    interval: {{ .Values.prober.interval | quote }}
+    keyPrefix: {{ .Values.prober.keyPrefix | quote }}
+    statSettle: {{ .Values.prober.statSettle | default "60s" | quote }}
+    {{- if include "url-shortener.tlsOn" . }}
+    tls:
+      {{- /*
+      `strict` whenever this is on at all: the prober SERVES nothing over this
+      transport (its only listener is the cleartext probes one above), so for
+      the calls it makes there is no second listener a `permissive` address
+      could ever name. A caller either presents an identity or it does not.
+      */}}
+      mode: strict
+      certFile: {{ .Values.tls.mountPath }}/tls.crt
+      keyFile: {{ .Values.tls.mountPath }}/tls.key
+      caFile: {{ .Values.tls.mountPath }}/ca.crt
+      trustDomain: {{ required "tls.trustDomain is required once tls.mode is not off: without it a peer from any trust domain is admitted" .Values.tls.trustDomain }}
+      {{- /*
+      Who this prober will ACCEPT AN ANSWER FROM: the two components it dials,
+      each as its own account, which this chart knows (it renders them).
+      */}}
+      peers:
+        {{- range (list "urls" "redirect") }}
+        - namespace: {{ $.Release.Namespace }}
+          serviceAccount: {{ include "url-shortener.componentServiceAccountName" (dict "root" $ "component" .) }}
+        {{- end }}
+    {{- end }}
+    {{- /*
+    The Services are {release}-urls and {release}-redirect, the exact names
+    templates/components.yaml renders. The PORT and SCHEME follow the mode each
+    target runs in: off means the ordinary cleartext port; strict means that
+    SAME port speaking TLS; permissive means the alternate port named by
+    tls.port, because under `permissive` the ordinary port is still cleartext
+    and the authenticated listener is the second one beside it.
+    */}}
+    urls:
+      {{- $urlsMode := include "url-shortener.tlsMode" (dict "root" . "component" "urls") }}
+      {{- if eq $urlsMode "strict" }}
+      address: https://{{ .Release.Name }}-urls:8080
+      {{- else if eq $urlsMode "permissive" }}
+      address: https://{{ .Release.Name }}-urls:{{ .Values.tls.port }}
+      {{- else }}
+      address: http://{{ .Release.Name }}-urls:8080
+      {{- end }}
+    redirect:
+      {{- $redirectMode := include "url-shortener.tlsMode" (dict "root" . "component" "redirect") }}
+      {{- if eq $redirectMode "permissive" }}
+      address: https://{{ .Release.Name }}-redirect:{{ .Values.tls.port }}
+      {{- else }}
+      address: http://{{ .Release.Name }}-redirect:8080
+      {{- end }}
+{{- end }}
+{{- end }}

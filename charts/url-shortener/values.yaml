@@ -20,6 +20,18 @@ installName: ""
 #            admitted before its identity exists. This chart only names it.
 tier: test
 
+# How much redundancy this cluster wants (delivery interface step 14): `single`
+# or `high`. The platform passes it per cluster, and the chart sizes its own
+# replicas and PodDisruptionBudget from it:
+#
+#   single   one replica of every component, and no budget (a budget on a
+#            single replica can only wedge the drain of its node).
+#   high     two replicas, and a budget that keeps one running.
+#
+# Absent means `single`. An explicit `replicas.<component>` or
+# `disruption.enabled` below still wins over what this gives.
+availability: single
+
 # Where this service's database and stream are.
 #
 # It does not create them: url-shortener-infra does, as a separate release
@@ -72,10 +84,17 @@ database:
   # No value appears in this file or in anything it renders. The password
   # reaches the process as a mounted FILE the client re-reads for every new
   # connection, so a rotated Secret is picked up without a restart.
-  owner:
-    role: url_shortener_owner
-    # `passwordSecret` is REQUIRED and not set here, as `host` above.
-    passwordKey: password
+  #
+  # `app` is the runtime role, and the ONLY credential any long-running
+  # workload gets (delivery interface step 15). `migration` is the owner's:
+  # the migration Job mounts it and nothing else does. Its role defaults to
+  # `url_shortener_owner` and its key to `password`.
+  # `database.owner` is the deprecated spelling of `migration`, read only when
+  # `migration` leaves a key unset.
+  # migration:
+  #   role: url_shortener_owner
+  #   passwordSecret: REQUIRED and not set here, as `host` above.
+  #   passwordKey: password
   app:
     role: url_shortener_app
     # `passwordSecret` is REQUIRED and not set here, as `host` above.
@@ -195,6 +214,10 @@ images:
   stat: {registry: ghcr.io, repository: truvity/policy/url-shortener/stat, tag: "", digest: ""}
   log: {registry: ghcr.io, repository: truvity/policy/url-shortener/log, tag: "", digest: ""}
   web: {registry: ghcr.io, repository: truvity/policy/url-shortener/web, tag: "", digest: ""}
+  # Read only when `prober.enabled`, so an install with the prober off never
+  # has to name a digest for an image it does not run (the release still
+  # stamps it).
+  prober: {registry: ghcr.io, repository: truvity/policy/url-shortener/prober, tag: "", digest: ""}
 
 pullPolicy: IfNotPresent
 
@@ -418,24 +441,27 @@ web:
     # The fraction of browser sessions that report anything, 0 to 1.
     sampleRate: 1
 
-replicas:
-  # Two, because one instance cannot be replaced without a gap whatever the
-  # strategy says. Both components run more than one safely: the redirect
-  # service holds no state, and the counter is a queue-group consumer.
-  redirect: 2
-  stat: 2
-  log: 2
-  urls: 2
-  web: 2
+# An explicit replica count for one component, which wins over `availability`
+# (single: one, high: two). Left out, `availability` decides: one instance
+# cannot be replaced without a gap whatever the strategy says, so `high` runs
+# two. Both components run more than one safely: the redirect service holds no
+# state, and the counter is a queue-group consumer.
+replicas: {}
+#  redirect: 2
+#  stat: 2
+#  log: 2
+#  urls: 2
+#  web: 2
 
 # Voluntary disruption, which is not the same thing as a rollout.
 #
-# `maxUnavailable: 0` above makes a ROLLOUT gapless. This makes a node drain
-# gapless too, and they are different events: nothing stops a cluster
-# autoscaler from evicting both replicas at once while every deployment sits
-# idle and healthy.
+# `maxUnavailable: 0` on the rollout makes a ROLLOUT gapless. A budget makes a
+# node drain gapless too, and they are different events: nothing stops a
+# cluster autoscaler from evicting both replicas at once while every
+# deployment sits idle and healthy. It renders when `availability` is `high`;
+# `enabled` says so explicitly, either way.
 disruption:
-  enabled: true
+  # enabled: true
   maxUnavailable: 1
 
 resources:
@@ -515,6 +541,33 @@ route:
       namespace: ""
       port: 0
 
+# An always-on synthetic prober (docs/guides/testing.md): ONE replica that
+# creates a short link, resolves it and reads its click count against this
+# release's `urls` and `redirect` Services, and reports each journey as
+# `probe_journey_total` (the `alerts` below read it). Off by default: an
+# install nobody watches has no use for synthetic traffic. It follows this
+# release's `tls` and `otel`, so the transport it speaks is the one the
+# components serve, and it takes no Kubernetes API access.
+#
+# The end-to-end SUITE is not a workload of this chart: it runs from the
+# product's own CI against an ephemeral environment (examples/url-shortener/e2e).
+prober:
+  enabled: false
+  interval: 10s
+  keyPrefix: "probe-"
+  statSettle: 60s
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+  log:
+    level: info
+  drain:
+    seconds: 5
+  # With the transport on, the prober presents its own identity under this
+  # account; empty means `<release>-prober`. Grant it in `tls.peers`.
+  serviceAccount:
+    create: true
+    name: ""
+
 # Product alerts, as a VMRule (operator.victoriametrics.com). Off by default.
 #
 # The rules read what the product pushes over OTLP, as a Prometheus-compatible
@@ -526,7 +579,7 @@ route:
 # and nothing is scraped. Every rule selects the install's namespace (and,
 # remotely, its cluster) and aggregates `by (k8s_cluster_name, ...)`, so a store
 # that holds many clusters never mixes them. The prober's rules need the
-# end-to-end chart's prober on, with telemetry enabled, in the same namespace
+# prober on (`prober.enabled`), with telemetry enabled, in the same namespace
 # unless `prober.namespace` says otherwise; the HTTP rules need a release that
 # carries the request metrics (the same release as these rules, or later).
 alerts:

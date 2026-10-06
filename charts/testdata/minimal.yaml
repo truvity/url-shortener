@@ -9,7 +9,7 @@ database:
   tls:
     rootCA:
       configMapName: pg-ca
-  owner:
+  migration:
     passwordSecret: owner
   app:
     passwordSecret: app

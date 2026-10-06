@@ -1,42 +1,4 @@
 ---
-# Source: url-shortener/templates/poddisruptionbudget.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: example-redirect
-  labels:
-    app.kubernetes.io/name: url-shortener
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: url-shortener
-      app.kubernetes.io/instance: example
-      app.kubernetes.io/component: redirect
-
----
-# Source: url-shortener/templates/poddisruptionbudget.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: example-stat
-  labels:
-    app.kubernetes.io/name: url-shortener
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: url-shortener
-      app.kubernetes.io/instance: example
-      app.kubernetes.io/component: stat
-
----
 # Source: url-shortener/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -325,7 +287,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -470,7 +432,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -615,7 +577,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -726,7 +688,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -835,7 +797,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:

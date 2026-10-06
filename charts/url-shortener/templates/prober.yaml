@@ -1,0 +1,101 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
+{{- if .Values.prober.enabled }}
+{{/*
+Always-on synthetic traffic (docs/guides/testing.md): a Deployment of ONE
+replica running examples/url-shortener/e2e/cmd/prober against this release's
+own `urls` and `redirect` Services. See templates/prober-config.yaml for the
+file it mounts and how it addresses them.
+
+A Deployment, not a Job or a hook: this workload is meant to keep running for
+the life of the release. Off by default (`prober.enabled`).
+
+Everything a pod of this chart shares (the security context, the telemetry
+variables, the image reference) comes from service-lib, so the prober cannot
+drift from the components on what a pod is allowed to do. Not a component:
+it has no Service, serves only its probes, and is not part of the rollout
+sizing `availability` gives the five.
+*/}}
+{{- $spec := dict "context" $ "name" "prober" "platform" (dict "telemetry" (.Values.otel | default dict) "podSecurity" .Values.podSecurity) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener.proberName" . }}
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prober
+spec:
+  replicas: 1
+  # Recreate, not the RollingUpdate default: with one replica, a maxUnavailable
+  # of 25% rounds down to 0, so RollingUpdate would leave the OLD pod running,
+  # and producing synthetic traffic, for as long as the new one fails to come
+  # up. That hides a broken prober from anything reading its metrics as a
+  # monitoring gate. Recreate stops the old pod first, so a bad rollout shows up
+  # as MISSING traffic instead.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: prober
+  template:
+    metadata:
+      labels:
+        {{- include "url-shortener.labels" . | nindent 8 }}
+        app.kubernetes.io/component: prober
+      annotations:
+        # Restart on a configuration change, as service-lib's workloads do.
+        checksum/config: {{ include (print $.Template.BasePath "/prober-config.yaml") . | sha256sum }}
+    spec:
+      {{- if include "url-shortener.tlsOn" . }}
+      # Named only while the transport identity is on: the CSI driver derives
+      # this pod's SPIFFE identity from the account it runs as.
+      serviceAccountName: {{ include "url-shortener.proberServiceAccountName" . }}
+      {{- end }}
+      # No Kubernetes API access at all: this workload only speaks HTTP to two
+      # Services. The certificate named by serviceAccountName arrives through
+      # the CSI driver's own request, which this flag does not govern.
+      automountServiceAccountToken: false
+      {{- include "service-lib.podSecurityContext" $spec | nindent 6 }}
+      containers:
+        - name: prober
+          image: {{ include "service-lib.image" $spec }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          {{- include "service-lib.containerSecurityContext" $spec | nindent 10 }}
+          args: ["-config", "/etc/url-shortener/prober.yaml"]
+          env:
+            {{- include "service-lib.telemetryEnv" $spec | nindent 12 }}
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            # Nothing but the process: a liveness probe that checked a
+            # journey's success would restart a healthy process the moment its
+            # TARGET went down, which is the one time it is doing its job.
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            {{- if include "url-shortener.tlsOn" . }}
+            - name: identity
+              mountPath: {{ .Values.tls.mountPath }}
+              readOnly: true
+            {{- end }}
+          resources: {{- toYaml .Values.prober.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "url-shortener.proberName" . }}
+        {{- if include "url-shortener.tlsOn" . }}
+        - name: identity
+          csi:
+            driver: {{ .Values.tls.csiDriver }}
+            readOnly: true
+        {{- end }}
+{{- end }}
+{{- end }}

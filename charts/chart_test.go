@@ -93,7 +93,7 @@ func defaults(extra ...string) []string {
 	return append([]string{
 		"--set", "database.host=example-pg-rw",
 		"--set", "database.tls.rootCA.configMapName=example-root-ca",
-		"--set", "database.owner.passwordSecret=example-pg-app",
+		"--set", "database.migration.passwordSecret=example-pg-app",
 		"--set", "database.app.passwordSecret=example-pg-runtime",
 		"--set", "events.url=nats://nats.nats.svc:4222",
 		"--set", "archive.bucket.name=url-shortener-archive",
@@ -572,7 +572,7 @@ func TestTheMigrationAndTheServicesUseDifferentCredentials(t *testing.T) {
 // must agree. This is the only place it can be checked: it is a property of
 // what is rendered, not of what runs.
 func TestARolloutHasNoGap(t *testing.T) {
-	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
+	out, err := render(t, defaults("--set", "availability=high", "--set", "images.web.tag=dev")...)
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
@@ -2358,5 +2358,139 @@ func TestTheIdentityAccountIsLeftToTheInfraChartOnAPrimaryInstall(t *testing.T) 
 	}
 	if out, err := render(t, defaults("--set", "serviceAccount.components.log.create=false")...); err == nil {
 		t.Errorf("serviceAccount.components.log.create is accepted; the convention has no switch:\n%s", out)
+	}
+}
+
+// replicasByDeployment lists the replica count of every Deployment of a render.
+func replicasByDeployment(t *testing.T, out string) map[string]int {
+	t.Helper()
+	got := map[string]int{}
+	for _, m := range documents(t, out) {
+		if m["kind"] != "Deployment" {
+			continue
+		}
+		spec, _ := m["spec"].(map[string]any)
+		n, _ := spec["replicas"].(float64)
+		if i, ok := spec["replicas"].(int); ok {
+			n = float64(i)
+		}
+		got[docNameOf(m)] = int(n)
+	}
+	return got
+}
+
+func budgetsOf(t *testing.T, out string) []string {
+	t.Helper()
+	var names []string
+	for _, m := range documents(t, out) {
+		if m["kind"] == "PodDisruptionBudget" {
+			names = append(names, docNameOf(m))
+		}
+	}
+	return names
+}
+
+// Delivery interface step 14: `availability` sizes the replicas and the
+// PodDisruptionBudget, and absent means `single`.
+func TestAvailabilitySizesReplicasAndBudget(t *testing.T) {
+	components := []string{"example-redirect", "example-urls", "example-web", "example-stat", "example-log"}
+
+	for name, tc := range map[string]struct {
+		set     []string
+		replica int
+		budgets int
+	}{
+		"absent is single":    {nil, 1, 0},
+		"single":              {[]string{"--set", "availability=single"}, 1, 0},
+		"high":                {[]string{"--set", "availability=high"}, 2, 2},
+		"explicit disruption": {[]string{"--set", "disruption.enabled=true"}, 1, 2},
+		"explicit off":        {[]string{"--set", "availability=high", "--set", "disruption.enabled=false"}, 2, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := render(t, defaults(tc.set...)...)
+			if err != nil {
+				t.Fatalf("the chart does not render: %v\n%s", err, out)
+			}
+			got := replicasByDeployment(t, out)
+			for _, c := range components {
+				if got[c] != tc.replica {
+					t.Errorf("%s runs %d replicas, want %d (all: %v)", c, got[c], tc.replica, got)
+				}
+			}
+			if b := budgetsOf(t, out); len(b) != tc.budgets {
+				t.Errorf("rendered budgets %v, want %d", b, tc.budgets)
+			}
+		})
+	}
+}
+
+// An explicit replica count still wins over what `availability` gives.
+func TestAnExplicitReplicaCountWinsOverAvailability(t *testing.T) {
+	out, err := render(t, defaults("--set", "availability=high", "--set", "replicas.urls=3", "--set", "replicas.web=0")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	got := replicasByDeployment(t, out)
+	if got["example-urls"] != 3 || got["example-web"] != 0 || got["example-redirect"] != 2 {
+		t.Errorf("replicas %v: urls must be 3, web 0 and redirect 2 from availability", got)
+	}
+}
+
+func TestAnUnknownAvailabilityIsRefused(t *testing.T) {
+	out, err := render(t, defaults("--set", "availability=extreme")...)
+	if err == nil {
+		t.Fatalf("availability=extreme was accepted:\n%s", out)
+	}
+}
+
+// Delivery interface step 15: the owner's credential is
+// `database.migration.passwordSecret`, and only the migration Job mounts it.
+func TestOnlyTheMigrationJobMountsTheMigrationSecret(t *testing.T) {
+	const sentinel = "owner-sentinel"
+	out, err := render(t, proberOn("--set", "database.migration.passwordSecret="+sentinel, "--set", "availability=high")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	var seen []string
+	for _, m := range documents(t, out) {
+		if strings.Contains(fmt.Sprint(m), sentinel) {
+			seen = append(seen, fmt.Sprintf("%v %s", m["kind"], docNameOf(m)))
+		}
+	}
+	if len(seen) != 1 || seen[0] != "Job example-migrate" {
+		t.Errorf("the migration secret is named by %v, want the migration Job alone", seen)
+	}
+	conformance.MigrationSecretOnlyInJobs(t, []byte(out), sentinel)
+}
+
+// `database.owner` is the deprecated spelling of `database.migration`: read
+// when `migration` leaves a key unset, and overridden by it otherwise.
+func TestTheDeprecatedOwnerKeysStillReachTheMigration(t *testing.T) {
+	base := []string{
+		"--set", "database.host=example-pg-rw",
+		"--set", "database.tls.rootCA.configMapName=example-root-ca",
+		"--set", "database.app.passwordSecret=example-pg-runtime",
+		"--set", "events.url=nats://nats.nats.svc:4222",
+		"--set", "archive.bucket.name=url-shortener-archive",
+	}
+	out, err := render(t, append(base, "--set", "database.owner.passwordSecret=old-secret", "--set", "database.owner.role=old_role")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "secretName: old-secret") || !strings.Contains(out, "value: \"old_role\"") {
+		t.Errorf("the deprecated owner keys did not reach the migration Job:\n%s", out)
+	}
+
+	out, err = render(t, append(base, "--set", "database.owner.passwordSecret=old-secret", "--set", "database.migration.passwordSecret=new-secret")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "old-secret") || !strings.Contains(out, "secretName: new-secret") {
+		t.Errorf("database.migration must win over database.owner:\n%s", out)
+	}
+
+	out, err = render(t, base...)
+	if err == nil || !strings.Contains(out, "database.migration.passwordSecret is required") {
+		t.Errorf("a render with neither key was not refused with the reason: %v\n%s", err, out)
 	}
 }

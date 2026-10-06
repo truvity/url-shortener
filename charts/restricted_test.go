@@ -87,20 +87,12 @@ func dig(m any, path ...string) any {
 	return m
 }
 
-// Every workload of the application chart and of the end-to-end chart —
-// services, migration, Job and prober — meets `restricted`, with every
+// Every workload of the application chart — services, migration and prober —
+// meets `restricted`, with every
 // optional workload switched on.
 func TestEveryWorkloadMeetsPodSecurityRestricted(t *testing.T) {
 	t.Run("application", func(t *testing.T) {
 		out, err := render(t, "-f", filepath.Join("testdata", "everything.yaml"))
-		if err != nil {
-			t.Fatalf("the chart does not render: %v\n%s", err, out)
-		}
-		assertRestricted(t, out)
-	})
-
-	t.Run("e2e", func(t *testing.T) {
-		out, err := renderE2E(t, "-f", filepath.Join("testdata", "e2e-everything.yaml"))
 		if err != nil {
 			t.Fatalf("the chart does not render: %v\n%s", err, out)
 		}

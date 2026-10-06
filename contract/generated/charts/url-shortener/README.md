@@ -7,6 +7,7 @@
 | `service-lib.global` | OpenObject |  | Helm's own `global` block, passed through unchanged. |
 | `installName` | string | `""` | The name this install is known by, folded into the NATS subject and durable consumer names. Empty means this chart's own release name. Letters, digits and hyphens only, at most 40 characters. |
 | `tier` | Tier | `"test"` | Which kind of install this is, as url-shortener-infra's `tier`. `primary`: the identity ServiceAccount is rendered by url-shortener-infra, not here. `test`: this chart renders every account. |
+| `availability` | "single" \| "high" | `"single"` | How much redundancy this cluster wants (delivery interface step 14). `single`: one replica of every component and no PodDisruptionBudget. `high`: two replicas and a budget that keeps one running. Absent means `single`. |
 | `alerts.enabled` | boolean | `false` |  |
 | `alerts.ruleLabels` | map of string | `{}` |  |
 | `alerts.alertLabels` | map of NonEmptyString | `{}` |  |
@@ -49,9 +50,12 @@
 | `database.tls.mode` | "verify-full" | `"verify-full"` | Only verify-full: the database client verifies the server against the root below, or does not connect. Kept so a platform that already sets it keeps rendering; `require` is refused. |
 | `database.tls.rootCA.configMapName` | string | `""` | The ConfigMap holding the root the database server certificate chains to. Required. |
 | `database.tls.rootCA.key` | NonEmptyString | `"ca-certificates.crt"` |  |
-| `database.owner.role` | NonEmptyString | `"url_shortener_owner"` |  |
-| `database.owner.passwordSecret` | NonEmptyString |  | The Secret holding the role's password. Every install names its own. |
-| `database.owner.passwordKey` | NonEmptyString | `"password"` |  |
+| `database.migration.role` | NonEmptyString | `"url_shortener_owner"` |  |
+| `database.migration.passwordSecret` | NonEmptyString |  | The Secret holding the role's password. Every install names its own. |
+| `database.migration.passwordKey` | NonEmptyString | `"password"` |  |
+| `database.owner.role` | NonEmptyString |  |  |
+| `database.owner.passwordSecret` | NonEmptyString |  |  |
+| `database.owner.passwordKey` | NonEmptyString |  |  |
 | `database.app.role` | NonEmptyString | `"url_shortener_app"` |  |
 | `database.app.passwordSecret` | NonEmptyString |  | The Secret holding the role's password. Every install names its own. |
 | `database.app.passwordKey` | NonEmptyString | `"password"` |  |
@@ -74,11 +78,11 @@
 | `archive.batch.maxRecords` | PositiveInt | `500` |  |
 | `archive.batch.maxSeconds` | PositiveInt | `60` |  |
 | `log.level` | LogLevel | `"info"` |  |
-| `replicas.redirect` | NonNegativeInt | `2` |  |
-| `replicas.stat` | NonNegativeInt | `2` |  |
-| `replicas.log` | NonNegativeInt | `2` |  |
-| `replicas.urls` | NonNegativeInt | `2` |  |
-| `replicas.web` | NonNegativeInt | `2` |  |
+| `replicas.redirect` | NonNegativeInt |  |  |
+| `replicas.stat` | NonNegativeInt |  |  |
+| `replicas.log` | NonNegativeInt |  |  |
+| `replicas.urls` | NonNegativeInt |  |  |
+| `replicas.web` | NonNegativeInt |  |  |
 | `resources.redirect` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
 | `resources.stat` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
 | `resources.migrate` | OpenObject | `{"requests": {"cpu": "50m", "memory": "64Mi"}}` |  |
@@ -129,7 +133,7 @@
 | `web.faro.sampleRate` | Ratio | `1` |  |
 | `drain.seconds` | PositiveInt | `20` |  |
 | `drain.preStopSeconds` | NonNegativeInt | `5` |  |
-| `disruption.enabled` | boolean | `true` |  |
+| `disruption.enabled` | boolean |  | Absent follows `availability`: a budget renders for `high` only. |
 | `disruption.maxUnavailable` | NonNegativeInt | `1` |  |
 | `tls.mode` | TlsMode | `"off"` | The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`. |
 | `tls.components.urls.mode` | TlsMode |  |  |
@@ -144,6 +148,15 @@
 | `podSecurity.runAsUser` | NonNegativeInt | `65532` |  |
 | `podSecurity.runAsGroup` | NonNegativeInt | `65532` |  |
 | `podSecurity.fsGroup` | NonNegativeInt | `65532` |  |
+| `prober.enabled` | boolean | `false` |  |
+| `prober.interval` | NonEmptyString | `"10s"` |  |
+| `prober.keyPrefix` | NonEmptyString | `"probe-"` |  |
+| `prober.statSettle` | string | `"60s"` |  |
+| `prober.resources` | OpenObject | `{"requests": {"cpu": "10m", "memory": "32Mi"}}` | Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale. |
+| `prober.log.level` | LogLevel | `"info"` |  |
+| `prober.drain.seconds` | PositiveInt | `5` |  |
+| `prober.serviceAccount.create` | boolean | `true` |  |
+| `prober.serviceAccount.name` | string | `""` |  |
 | `images.migrate.registry` | NonEmptyString | `"ghcr.io"` |  |
 | `images.migrate.repository` | NonEmptyString | `"truvity/policy/url-shortener/migrate"` |  |
 | `images.migrate.tag` | string | `""` |  |
@@ -168,6 +181,10 @@
 | `images.web.repository` | NonEmptyString | `"truvity/policy/url-shortener/web"` |  |
 | `images.web.tag` | string | `""` |  |
 | `images.web.digest` | string | `""` |  |
+| `images.prober.registry` | NonEmptyString | `"ghcr.io"` |  |
+| `images.prober.repository` | NonEmptyString | `"truvity/policy/url-shortener/prober"` |  |
+| `images.prober.tag` | string | `""` |  |
+| `images.prober.digest` | string | `""` |  |
 | `pullPolicy` | PullPolicy | `"IfNotPresent"` |  |
 | `otel.endpoint` | string | `""` |  |
 | `otel.protocol` | OtelProtocol | `"http/protobuf"` |  |

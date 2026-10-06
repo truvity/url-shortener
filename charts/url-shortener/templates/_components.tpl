@@ -50,7 +50,7 @@ What the platform provides a component. Takes (dict "root" $ "component" <n>).
 {{- $name := .component -}}
 {{- $p := dict
   "imagePullPolicy" $v.pullPolicy
-  "replicas" (get $v.replicas $name)
+  "replicas" (int (include "url-shortener.replicas" (dict "root" $root "component" $name)))
   "resources" (get $v.resources $name)
   "drain" (dict "preStopSeconds" $v.drain.preStopSeconds)
   "podSecurity" $v.podSecurity

@@ -29,6 +29,14 @@
       "description": "Which kind of install this is, as url-shortener-infra's `tier`. `primary`: the identity ServiceAccount is rendered by url-shortener-infra, not here. `test`: this chart renders every account.",
       "default": "test"
     },
+    "availability": {
+      "enum": [
+        "single",
+        "high"
+      ],
+      "description": "How much redundancy this cluster wants (delivery interface step 14). `single`: one replica of every component and no PodDisruptionBudget. `high`: two replicas and a budget that keeps one running. Absent means `single`.",
+      "default": "single"
+    },
     "alerts": {
       "type": "object",
       "additionalProperties": false,
@@ -372,7 +380,7 @@
             }
           }
         },
-        "owner": {
+        "migration": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -392,10 +400,26 @@
               "default": "password"
             }
           },
-          "default": {
-            "role": "url_shortener_owner",
-            "passwordKey": "password"
-          }
+          "description": "The owner's credential, for the schema migration Job alone (delivery interface step 15). No long-running workload gets it."
+        },
+        "owner": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordSecret": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "description": "Deprecated spelling of `migration`, read only when `migration` leaves the key unset."
         },
         "app": {
           "type": "object",
@@ -426,10 +450,6 @@
       "default": {
         "name": "url_shortener",
         "clusterDomain": "cluster.local",
-        "owner": {
-          "role": "url_shortener_owner",
-          "passwordKey": "password"
-        },
         "app": {
           "role": "url_shortener_app",
           "passwordKey": "password"
@@ -601,37 +621,27 @@
       "properties": {
         "redirect": {
           "type": "integer",
-          "minimum": 0,
-          "default": 2
+          "minimum": 0
         },
         "stat": {
           "type": "integer",
-          "minimum": 0,
-          "default": 2
+          "minimum": 0
         },
         "log": {
           "type": "integer",
-          "minimum": 0,
-          "default": 2
+          "minimum": 0
         },
         "urls": {
           "type": "integer",
-          "minimum": 0,
-          "default": 2
+          "minimum": 0
         },
         "web": {
           "type": "integer",
-          "minimum": 0,
-          "default": 2
+          "minimum": 0
         }
       },
-      "default": {
-        "redirect": 2,
-        "stat": 2,
-        "log": 2,
-        "urls": 2,
-        "web": 2
-      }
+      "description": "An explicit replica count for one component, which wins over `availability`.",
+      "default": {}
     },
     "resources": {
       "type": "object",
@@ -1118,7 +1128,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": true
+          "description": "Absent follows `availability`: a budget renders for `high` only."
         },
         "maxUnavailable": {
           "type": "integer",
@@ -1267,6 +1277,93 @@
           "type": "integer",
           "minimum": 0,
           "default": 65532
+        }
+      }
+    },
+    "prober": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1,
+          "default": "10s"
+        },
+        "keyPrefix": {
+          "type": "string",
+          "minLength": 1,
+          "default": "probe-"
+        },
+        "statSettle": {
+          "type": "string",
+          "default": "60s"
+        },
+        "resources": {
+          "type": "object",
+          "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale.",
+          "default": {
+            "requests": {
+              "cpu": "10m",
+              "memory": "32Mi"
+            }
+          }
+        },
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "enum": [
+                "debug",
+                "info",
+                "warn",
+                "error"
+              ],
+              "default": "info"
+            }
+          }
+        },
+        "drain": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5
+            }
+          }
+        },
+        "serviceAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "create": {
+              "type": "boolean",
+              "default": true
+            },
+            "name": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        }
+      },
+      "description": "An always-on synthetic prober against this release's urls and redirect Services. Off by default. It follows this release's tls and otel, and takes no Kubernetes API access.",
+      "default": {
+        "enabled": false,
+        "interval": "10s",
+        "keyPrefix": "probe-",
+        "statSettle": "60s",
+        "resources": {
+          "requests": {
+            "cpu": "10m",
+            "memory": "32Mi"
+          }
         }
       }
     },
@@ -1453,6 +1550,36 @@
             "tag": "",
             "digest": ""
           }
+        },
+        "prober": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1,
+              "default": "ghcr.io"
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/prober"
+            },
+            "tag": {
+              "type": "string",
+              "default": ""
+            },
+            "digest": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/prober",
+            "tag": "",
+            "digest": ""
+          }
         }
       },
       "default": {
@@ -1489,6 +1616,12 @@
         "web": {
           "registry": "ghcr.io",
           "repository": "truvity/policy/url-shortener/web",
+          "tag": "",
+          "digest": ""
+        },
+        "prober": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/prober",
           "tag": "",
           "digest": ""
         }
@@ -1569,11 +1702,6 @@
         "properties": {
           "database": {
             "properties": {
-              "owner": {
-                "required": [
-                  "passwordSecret"
-                ]
-              },
               "app": {
                 "required": [
                   "passwordSecret"
@@ -1582,7 +1710,6 @@
             },
             "required": [
               "host",
-              "owner",
               "app"
             ]
           },

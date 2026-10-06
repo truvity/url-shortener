@@ -122,8 +122,8 @@ func TestTheCounterCannotReachTheDatabase(t *testing.T) {
 // would crash-loop every prober against a fresh `tls.peers: []` install,
 // silently: the Deployment reports Ready throughout. This is the schema's
 // own half of that guarantee, proved directly against LoadProber rather
-// than through a chart render — see the e2e chart's own
-// TestProberTLSPeersRenderAsAnEmptyArrayNotNull for the render side.
+// than through a chart render — see the application chart's own
+// prober tests (charts/prober_test.go) for the render side.
 func TestTLSPeersNullIsRefused(t *testing.T) {
 	const path = "testdata/prober-null-peers.yaml"
 	writeFixture(t, path, `probes:

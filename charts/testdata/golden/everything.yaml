@@ -104,6 +104,19 @@ metadata:
     "example.invalid/role": "app"
 
 ---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: given-prober-account
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: prober
+
+---
 # Source: url-shortener/templates/components.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -310,6 +323,45 @@ data:
       source: file
 
 ---
+# Source: url-shortener/templates/prober-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-prober
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: prober
+data:
+  prober.yaml: |
+    probes:
+      address: ":7070"
+    log:
+      level: "debug"
+    drain:
+      seconds: 3
+    interval: "5s"
+    keyPrefix: "synthetic-"
+    statSettle: "30s"
+    tls:
+      mode: strict
+      certFile: /var/run/example-identity/tls.crt
+      keyFile: /var/run/example-identity/tls.key
+      caFile: /var/run/example-identity/ca.crt
+      trustDomain: example.invalid
+      peers:
+        - namespace: default
+          serviceAccount: example-urls
+        - namespace: default
+          serviceAccount: example-redirect
+    urls:
+      address: https://example-urls:8080
+    redirect:
+      address: https://example-redirect:9443
+
+---
 # Source: url-shortener/templates/identity-rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -355,6 +407,9 @@ subjects:
     namespace: default
   - kind: ServiceAccount
     name: app-account
+    namespace: default
+  - kind: ServiceAccount
+    name: given-prober-account
     namespace: default
 
 ---
@@ -1145,6 +1200,123 @@ spec:
                       path: "s3/accessKeyID"
                     - key: "secret-key"
                       path: "s3/secretAccessKey"
+
+---
+# Source: url-shortener/templates/prober.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-prober
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: prober
+spec:
+  replicas: 1
+  # Recreate, not the RollingUpdate default: with one replica, a maxUnavailable
+  # of 25% rounds down to 0, so RollingUpdate would leave the OLD pod running,
+  # and producing synthetic traffic, for as long as the new one fails to come
+  # up. That hides a broken prober from anything reading its metrics as a
+  # monitoring gate. Recreate stops the old pod first, so a bad rollout shows up
+  # as MISSING traffic instead.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: prober
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: prober
+      annotations:
+        # Restart on a configuration change, as service-lib's workloads do.
+        checksum/config: 6ecf4bc96c7b932fa695640dc210ae3a68e28a522455fda431e104dc30e4232d
+    spec:
+      # Named only while the transport identity is on: the CSI driver derives
+      # this pod's SPIFFE identity from the account it runs as.
+      serviceAccountName: given-prober-account
+      # No Kubernetes API access at all: this workload only speaks HTTP to two
+      # Services. The certificate named by serviceAccountName arrives through
+      # the CSI driver's own request, which this flag does not govern.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1234
+        runAsGroup: 5678
+        fsGroup: 9012
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prober
+          image: example.io/shortener/prober@sha256:7777777777777777777777777777777777777777777777777777777777777777
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/prober.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-prober"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://collector.example.invalid:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "otlp"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "0.25"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.example.tier=primary
+          ports:
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            # Nothing but the process: a liveness probe that checked a
+            # journey's success would restart a healthy process the moment its
+            # TARGET went down, which is the one time it is doing its job.
+            httpGet: { path: /health/live, port: probes }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: probes }
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            - name: identity
+              mountPath: /var/run/example-identity
+              readOnly: true
+          resources:
+            limits:
+              cpu: 40m
+              memory: 96Mi
+            requests:
+              cpu: 20m
+              memory: 48Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-prober
+        - name: identity
+          csi:
+            driver: example.csi.invalid
+            readOnly: true
 
 ---
 # Source: url-shortener/templates/route.yaml

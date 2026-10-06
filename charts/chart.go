@@ -10,14 +10,12 @@ package charts
 
 import "embed"
 
-// Files is all THREE charts, exactly as they are published, and the example
-// chart that follows the library convention.
+// Files is both charts of the product, exactly as they are published, and the
+// example chart that follows the library convention.
 //
-// All three, because the split between them is itself part of the contract
-// — the application chart must not create what its migration migrates, and
-// the e2e chart must not be able to render without being told what the
-// other two created — and a test that only ever rendered a subset could not
-// see that hold.
+// Both, because the split between them is itself part of the contract: the
+// application chart must not create what its migration migrates, and a test
+// that only ever rendered a subset could not see that hold.
 //
 // The library chart is not here: it is at the repository root, charts/service-lib,
 // and embedded by package github.com/truvity/policy/charts. The two charts that
@@ -25,5 +23,5 @@ import "embed"
 // is the smallest chart that follows the library convention, which the library's
 // own tests render.
 //
-//go:embed all:url-shortener all:url-shortener-infra all:url-shortener-e2e all:testdata/service-example
+//go:embed all:url-shortener all:url-shortener-infra all:testdata/service-example
 var Files embed.FS

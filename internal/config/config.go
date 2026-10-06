@@ -160,16 +160,10 @@ type (
 	//
 	// It DOES carry a `tls` block, on exactly the same terms as the
 	// counter's own schema (stat.json): a client either presents an
-	// identity or it does not. It is NOT the application release's own
-	// switch reused — charts/url-shortener-e2e is a SEPARATE Helm release
-	// from charts/url-shortener, with no copy of the other's values to
-	// read `tls.mode` off, so a platform sets this chart's own `tls.mode`
-	// to match it. Absent, or `off` (the default), is cleartext, on
-	// exactly the same terms as every other component here. This used to
-	// be left out on the theory that "a platform that turns on transport
-	// identity for the release turns it on for this workload too" — true
-	// only when both are the SAME release, which this pair of charts never
-	// is.
+	// identity or it does not. The chart renders it from the application
+	// release's own `tls` block, so the prober cannot disagree with the
+	// components it calls. Absent, or `off` (the default), is cleartext, on
+	// exactly the same terms as every other component here.
 	Prober struct {
 		// APIVersion is the envelope's: which version of this document the
 		// file is (docs/contracts/config.md, rule 7). Absent is v1, the

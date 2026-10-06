@@ -118,29 +118,19 @@ func TestEveryWorkloadAndServiceCarriesTheInstanceLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the infrastructure chart does not render: %v\n%s", err, infra)
 	}
-	// The prober enabled too, not only the Job: it is the other workload
-	// this chart can render, and the ONLY Deployment it carries at all —
-	// TestTheE2EJobCarriesTheInstanceLabel already covers the Job on its
-	// own, but nothing else exercises the prober's Deployment through this
-	// check unless it is turned on here.
-	e2e, err := renderE2E(t, e2eDefaults(
-		"--set", "prober.enabled=true",
-		"--set", "images.prober.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
-	)...)
+	// The prober enabled too: it is the one other Deployment the application
+	// chart can render, and nothing else exercises it through this check.
+	prober, err := render(t, proberOn("--set", "images.web.tag=dev")...)
 	if err != nil {
-		t.Fatalf("the e2e chart does not render: %v\n%s", err, e2e)
+		t.Fatalf("the application chart with the prober does not render: %v\n%s", err, prober)
 	}
 
-	// Each render was installed under its own release name — renderE2E
-	// names a SEPARATE release from render/renderInfra's "example", since
-	// this chart tests somebody else's release rather than sharing its
-	// name — so the label each one's objects must carry differs to match.
 	renders := []struct {
 		out, release string
 	}{
 		{app, "example"},
 		{infra, "example"},
-		{e2e, "example-e2e"},
+		{prober, "example"},
 	}
 
 	var checked int
@@ -186,20 +176,15 @@ func TestNoPlainJobSetsTTLSecondsAfterFinished(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the infrastructure chart does not render: %v\n%s", err, infra)
 	}
-	// The prober enabled too, on the same terms as
-	// TestEveryWorkloadAndServiceCarriesTheInstanceLabel above: it renders
-	// no extra Job, but exercising it here keeps this chart's render
-	// covered by every default-values check the same way.
-	e2e, err := renderE2E(t, e2eDefaults(
-		"--set", "prober.enabled=true",
-		"--set", "images.prober.digest=sha256:2222222222222222222222222222222222222222222222222222222222222222",
-	)...)
+	// The prober enabled too: it renders no Job, but exercising it here keeps
+	// its render covered by every default-values check.
+	prober, err := render(t, proberOn("--set", "images.web.tag=dev")...)
 	if err != nil {
-		t.Fatalf("the e2e chart does not render: %v\n%s", err, e2e)
+		t.Fatalf("the application chart with the prober does not render: %v\n%s", err, prober)
 	}
 
 	var checked int
-	for _, out := range []string{app, infra, e2e} {
+	for _, out := range []string{app, infra, prober} {
 		for _, doc := range documents(t, out) {
 			if kind, _ := doc["kind"].(string); kind != "Job" {
 				continue

@@ -8,6 +8,8 @@
 # one would otherwise pass every test in this package.
 installName: example-install
 
+availability: high
+
 database:
   host: pg-rw
   name: shortener
@@ -17,7 +19,7 @@ database:
     rootCA:
       configMapName: example-root-ca
       key: root.pem
-  owner:
+  migration:
     role: owner_role
     passwordSecret: owner-secret
     passwordKey: owner-key
@@ -51,6 +53,7 @@ images:
   stat: {registry: example.io, repository: shortener/stat, tag: "9.9.9", digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"}
   log: {registry: example.io, repository: shortener/log, tag: "9.9.9", digest: "sha256:5555555555555555555555555555555555555555555555555555555555555555"}
   web: {registry: example.io, repository: shortener/web, tag: "9.9.9", digest: "sha256:6666666666666666666666666666666666666666666666666666666666666666"}
+  prober: {registry: example.io, repository: shortener/prober, tag: "9.9.9", digest: "sha256:7777777777777777777777777777777777777777777777777777777777777777"}
 pullPolicy: Always
 log:
   level: debug
@@ -157,6 +160,21 @@ web:
     appName: example-web
     environment: example
     sampleRate: 0.25
+
+prober:
+  enabled: true
+  interval: 5s
+  keyPrefix: "synthetic-"
+  statSettle: 30s
+  resources:
+    requests: { cpu: 20m, memory: 48Mi }
+    limits: { cpu: 40m, memory: 96Mi }
+  log:
+    level: debug
+  drain:
+    seconds: 3
+  serviceAccount:
+    name: given-prober-account
 
 alerts:
   enabled: true

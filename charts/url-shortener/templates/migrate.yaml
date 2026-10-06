@@ -14,6 +14,7 @@ runs forever), so the Job is written out here; everything a pod of this chart
 shares comes from the library all the same, so the migration cannot drift from
 the services on telemetry or on what the pod is allowed to do.
 */}}
+{{- $migration := include "url-shortener.migrationDatabase" . | fromJson }}
 {{- $spec := dict "context" $ "name" "migrate" "platform" (dict "telemetry" (.Values.otel | default dict) "podSecurity" .Values.podSecurity) }}
 apiVersion: batch/v1
 kind: Job
@@ -41,7 +42,7 @@ spec:
           args: ["-config", "/etc/url-shortener/migrate.yaml"]
           env:
             {{- include "service-lib.telemetryEnv" $spec | nindent 12 }}
-            {{- include "url-shortener.dbEnv" (dict "root" $ "role" .Values.database.owner "component" "migrate") | nindent 12 }}
+            {{- include "url-shortener.dbEnv" (dict "root" $ "role" $migration "component" "migrate") | nindent 12 }}
             {{- /* DDL can outlast the services' 30 s default, and a
             migration that is cut off half way is worse than one that is
             slow. */}}
@@ -56,7 +57,7 @@ spec:
           resources: {{- toYaml .Values.resources.migrate | nindent 12 }}
       volumes:
         {{- include "url-shortener.dbCAVolume" . | nindent 8 }}
-        {{- include "url-shortener.dbPasswordVolume" .Values.database.owner | nindent 8 }}
+        {{- include "url-shortener.dbPasswordVolume" $migration | nindent 8 }}
         - name: config
           configMap:
             name: {{ include "url-shortener.name" . }}-migrate-config

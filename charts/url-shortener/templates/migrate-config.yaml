@@ -13,7 +13,7 @@ Weight -5 puts it before the job at weight 0. `before-hook-creation` replaces
 it on each run, so an upgrade migrates with the configuration of the release
 being installed rather than the one before it.
 */}}
-{{- $config := dict "log" (dict "level" .Values.log.level) "ownerRole" .Values.database.owner.role }}
+{{- $config := dict "log" (dict "level" .Values.log.level) "ownerRole" (include "url-shortener.migrationDatabase" . | fromJson).role }}
 {{- with .Values.database.app.role }}{{- $_ := set $config "appRole" . }}{{- end }}
 {{- $platform := dict "configMap" (dict "annotations" (dict
   "helm.sh/hook" "pre-install,pre-upgrade"

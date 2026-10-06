@@ -53,10 +53,10 @@ func registrySteps(t *testing.T) map[int]bool {
 	return steps
 }
 
-// TestEveryChartDeclaresTheSameDeliveryInterface holds the three charts of
+// TestEveryChartDeclaresTheSameDeliveryInterface holds the two charts of
 // the product to the registry's rules 2 and 3: each carries the annotation,
 // as one whole number, naming a step the registry lists, and the number is
-// the same on all three because they are released and pinned together.
+// the same on both because they are released and pinned together.
 func TestEveryChartDeclaresTheSameDeliveryInterface(t *testing.T) {
 	t.Parallel()
 
@@ -64,7 +64,7 @@ func TestEveryChartDeclaresTheSameDeliveryInterface(t *testing.T) {
 
 	declared := map[string]int{}
 
-	for _, chart := range []string{"url-shortener", "url-shortener-infra", "url-shortener-e2e"} {
+	for _, chart := range []string{"url-shortener", "url-shortener-infra"} {
 		raw, err := charts.Files.ReadFile(chart + "/Chart.yaml")
 		if err != nil {
 			t.Fatal(err)
@@ -106,7 +106,7 @@ func TestEveryChartDeclaresTheSameDeliveryInterface(t *testing.T) {
 		}
 
 		if n != first {
-			t.Errorf("%s declares interface %d but another chart of the product declares %d: the three are released and pinned together, so they carry one number", chart, n, first)
+			t.Errorf("%s declares interface %d but another chart of the product declares %d: the two are released and pinned together, so they carry one number", chart, n, first)
 		}
 	}
 }

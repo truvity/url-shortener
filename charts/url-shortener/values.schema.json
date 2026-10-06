@@ -24,7 +24,6 @@
       "database": {
         "required": ["host"],
         "properties": {
-          "owner": { "required": ["passwordSecret"] },
           "app": { "required": ["passwordSecret"] }
         }
       },
@@ -64,6 +63,14 @@
         "primary"
       ],
       "description": "Which kind of install this is, as url-shortener-infra's `tier`. `primary`: the identity ServiceAccount is rendered by url-shortener-infra, not here. `test`: this chart renders every account."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "single",
+        "high"
+      ],
+      "description": "How much redundancy this cluster wants (delivery interface step 14). `single`: one replica of every component and no PodDisruptionBudget. `high`: two replicas and a budget that keeps one running. Absent means `single`."
     },
     "alerts": {
       "type": "object",
@@ -175,7 +182,6 @@
       "additionalProperties": false,
       "required": [
         "name",
-        "owner",
         "app"
       ],
       "properties": {
@@ -219,12 +225,30 @@
             }
           }
         },
+        "migration": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The owner's credential, for the schema migration Job alone (delivery interface step 15). No long-running workload gets it.",
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "passwordSecret": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Secret holding the role's password. Every install names its own."
+            },
+            "passwordKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
         "owner": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "role"
-          ],
+          "description": "Deprecated spelling of `migration`, read only when `migration` leaves the key unset.",
           "properties": {
             "role": {
               "type": "string",
@@ -689,12 +713,10 @@
     "disruption": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "enabled"
-      ],
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Absent follows `availability`: a budget renders for `high` only."
         },
         "maxUnavailable": {
           "type": "integer",
@@ -846,7 +868,8 @@
         "urls",
         "stat",
         "log",
-        "web"
+        "web",
+        "prober"
       ],
       "properties": {
         "migrate": {
@@ -990,6 +1013,100 @@
             },
             "digest": {
               "type": "string"
+            }
+          }
+        }
+,
+        "prober": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "prober": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "An always-on synthetic prober against this release's urls and redirect Services. Off by default. It follows this release's tls and otel, and takes no Kubernetes API access.",
+      "required": [
+        "enabled",
+        "interval",
+        "keyPrefix"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keyPrefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statSettle": {
+          "type": "string",
+          "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$"
+        },
+        "resources": {
+          "type": "object",
+          "description": "Passed to Kubernetes verbatim, so the inside stays open: the platform validates it, and a chart that reimplements that schema goes stale."
+        },
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "enum": [
+                "debug",
+                "info",
+                "warn",
+                "error"
+              ]
+            }
+          }
+        },
+        "drain": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "serviceAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "create": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+              "maxLength": 253
             }
           }
         }

@@ -151,15 +151,14 @@ also the tag its source maps are pushed under. The maps are built hidden, kept
 out of the image and pushed as an OCI artifact when the release is configured
 to; see [docs/guides/source-maps.md](../../docs/guides/source-maps.md).
 
-## Three charts, and the library they render with
+## Two charts, and the library they render with
 
 | Chart | Installs | Who installs it |
 |---|---|---|
-| [`url-shortener`](charts/url-shortener) | the six components, their configuration, probes, rollout and route | whoever installs the example |
+| [`url-shortener`](charts/url-shortener) | the six components, their configuration, probes, rollout and route, the migration Job, and an optional always-on prober | whoever installs the example |
 | [`url-shortener-infra`](charts/url-shortener-infra) | what one install owns: its database and roles, its stream, and — at `tier: primary` — its store and the identity that reaches it | the same caller, once per install, with the same release name |
-| [`url-shortener-e2e`](charts/url-shortener-e2e) | the end-to-end suite as a Job, and an optional always-on prober | whoever wants the install proved where it runs |
 
-A fourth, [`service-lib`](../../charts/service-lib), is a **library chart** and is
+A third, [`service-lib`](../../charts/service-lib), is a **library chart** and is
 installed by nobody: it renders what every component of the first chart shares
 (a Deployment, a ServiceAccount of its own, a Service, the probes, the mounts,
 the telemetry and secret variables) from a `platform` block and a `config`
@@ -190,5 +189,6 @@ or one step at a time — `just cluster` stands up the box
 `just example-snapshot` builds the images and packages the charts exactly as
 a release does, `just example-fixture` provisions what the infrastructure
 chart would, `just example-install` installs the packaged application chart,
-and `just example-smoke`, `just example-e2e-chart` and `just example-prober`
-prove it works. The suite itself is Go, under [`e2e/suite`](e2e/suite).
+and `just example-smoke` and `just example-prober`
+prove it works. The suite itself is Go, under [`e2e/suite`](e2e/suite), and
+runs from the product's own CI: no chart carries it.

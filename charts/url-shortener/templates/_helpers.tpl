@@ -9,9 +9,9 @@ the only thing that guarantees it.
 
 {{/*
 app.kubernetes.io/version is this chart's OWN version — never a value,
-because THREE charts release under one version together (see
-.github/workflows/release.yaml's own comment on why url-shortener,
-url-shortener-infra and url-shortener-e2e ship as one) and a value could
+because the charts release under one version together (see
+.github/workflows/release.yaml's own comment on why url-shortener and
+url-shortener-infra ship as one) and a value could
 disagree with what the release actually stamped. Quoted: an appVersion
 that happens to look like a number (e.g. a bare "2") must still render as
 a label VALUE, not a YAML integer metadata.labels rejects.
@@ -25,8 +25,8 @@ the opposite of what a rolling update needs.
 
 This is also the ONE label examples/url-shortener/e2e's own suite reads
 off a live pod to prove a test is judging the version that was actually
-promoted — see e2e/suite/readiness_test.go's waitForPromotedRollout and
-charts/url-shortener-e2e/templates/job.yaml's E2E_APP_VERSION.
+promoted — see e2e/suite/readiness_test.go's waitForPromotedRollout and the
+E2E_APP_VERSION a product's own CI hands the suite.
 */}}
 {{- define "url-shortener.labels" -}}
 app.kubernetes.io/name: url-shortener
@@ -222,6 +222,12 @@ for `stat` too. The migration counts, so its rights stay off the request path.
 {{- fail (printf "serviceAccount: %s and %s would both run as %q; every component needs its own account, or the identity cannot tell them apart" (get $seen $n) . $n) -}}
 {{- end -}}
 {{- $_ := set $seen $n . -}}
+{{- end -}}
+{{- if .Values.prober.enabled -}}
+{{- $pr := include "url-shortener.proberServiceAccountName" . -}}
+{{- if hasKey $seen $pr -}}
+{{- fail (printf "serviceAccount: %s and the prober would both run as %q; the prober needs an account of its own, so an allow-list can name it alone" (get $seen $pr) $pr) -}}
+{{- end -}}
 {{- end -}}
 {{- $m := include "url-shortener.migrateServiceAccountName" . -}}
 {{- if hasKey $seen $m -}}
@@ -460,4 +466,75 @@ k8s_cluster_name: {{ .cluster | quote }}
 {{- range $k, $v := .extra }}
 {{ $k }}: {{ $v | quote }}
 {{- end }}
+{{- end -}}
+
+{{/*
+How much redundancy the cluster wants, as the platform states it (delivery
+interface step 14): `single` or `high`. Absent means `single`; anything else is
+refused, so a typo cannot quietly give a cluster the wrong number of replicas.
+*/}}
+{{- define "url-shortener.availability" -}}
+{{- $a := .Values.availability | default "single" -}}
+{{- if not (has $a (list "single" "high")) -}}
+{{- fail (printf "availability %q is not one of single, high" $a) -}}
+{{- end -}}
+{{- $a -}}
+{{- end -}}
+
+{{/*
+The replicas of ONE component: an explicit `replicas.<component>` wins, and
+otherwise `availability` decides (single: one, high: two). Takes
+(dict "root" $ "component" <name>).
+*/}}
+{{- define "url-shortener.replicas" -}}
+{{- $replicas := .root.Values.replicas | default dict -}}
+{{- $own := get $replicas .component -}}
+{{- if not (hasKey $replicas .component) -}}
+{{- ternary 2 1 (eq (include "url-shortener.availability" .root) "high") -}}
+{{- else -}}
+{{- $own -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Whether the PodDisruptionBudgets render: an explicit `disruption.enabled` wins,
+and otherwise `availability: high` does. A budget on a single replica would
+only wedge the drain of its node, so `single` renders none.
+*/}}
+{{- define "url-shortener.disruptionOn" -}}
+{{- $disruption := .Values.disruption | default dict -}}
+{{- $en := get $disruption "enabled" -}}
+{{- if not (hasKey $disruption "enabled") -}}
+{{- if eq (include "url-shortener.availability" .) "high" }}yes{{ end -}}
+{{- else if $en }}yes{{ end -}}
+{{- end -}}
+
+{{/*
+The credential of the schema migration, and the ONLY route the owner's password
+takes into this chart (delivery interface step 15): `database.migration.*`,
+read by the migration Job and by nothing else. `database.owner.*` is the
+deprecated spelling of the same thing and is read only when `migration` leaves
+the key unset. Renders JSON: role, passwordSecret, passwordKey.
+*/}}
+{{- define "url-shortener.migrationDatabase" -}}
+{{- $m := .Values.database.migration | default dict -}}
+{{- $o := .Values.database.owner | default dict -}}
+{{- $secret := $m.passwordSecret | default $o.passwordSecret -}}
+{{- if not $secret -}}
+{{- fail "database.migration.passwordSecret is required: the Secret holding the owner's password, mounted by the migration Job alone" -}}
+{{- end -}}
+{{- dict "role" ($m.role | default $o.role | default "url_shortener_owner") "passwordSecret" $secret "passwordKey" ($m.passwordKey | default $o.passwordKey | default "password") | toJson -}}
+{{- end -}}
+
+{{/*
+The prober's own name, and the account it runs as under the transport identity:
+`prober.serviceAccount.name`, or `<release>-prober`. A separate account from
+every component's, so an allow-list can name it alone.
+*/}}
+{{- define "url-shortener.proberName" -}}
+{{- printf "%s-prober" (include "url-shortener.name" .) -}}
+{{- end -}}
+
+{{- define "url-shortener.proberServiceAccountName" -}}
+{{- .Values.prober.serviceAccount.name | default (include "url-shortener.proberName" .) -}}
 {{- end -}}
