@@ -770,6 +770,11 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
                 "minLength": 1,
                 "description": "The root of every identity this service will admit, for example 'example.internal'. A peer whose identity belongs to another trust domain is refused before its account is even considered."
             },
+            "gatewayFronted": {
+                "type": "boolean",
+                "default": False,
+                "description": "True when an edge (a gateway, or a browser through one) terminates TLS and forwards cleartext to this workload. Such a workload cannot run 'strict': a strict listener refuses its only caller."
+            },
             "peers": {
                 "type": "array",
                 "description": "Who may call. Each entry is an ACCOUNT, not an address: an address resolves to whoever holds it today. An empty list admits no one, which is the correct default for a service nobody has been granted.",
@@ -794,6 +799,27 @@ SHARED_SCHEMAS: dict[str, dict[str, Any]] = {
             }
         },
         "allOf": [
+            {
+                "if": {
+                    "properties": {
+                        "gatewayFronted": {
+                            "const": True
+                        }
+                    },
+                    "required": [
+                        "gatewayFronted"
+                    ]
+                },
+                "then": {
+                    "properties": {
+                        "mode": {
+                            "not": {
+                                "const": "strict"
+                            }
+                        }
+                    }
+                }
+            },
             {
                 "if": {
                     "properties": {

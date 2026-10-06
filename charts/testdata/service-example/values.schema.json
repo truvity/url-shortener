@@ -588,6 +588,27 @@
         {
           "if": {
             "properties": {
+              "gatewayFronted": {
+                "const": true
+              }
+            },
+            "required": [
+              "gatewayFronted"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "not": {
+                  "const": "strict"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
               "mode": {
                 "enum": [
                   "permissive",
@@ -625,6 +646,11 @@
           "description": "The certificate this workload presents, mounted and rotated by the platform. Re-read when it changes, never cached for the process's lifetime: a one-hour certificate outlives no deployment.",
           "minLength": 1,
           "type": "string"
+        },
+        "gatewayFronted": {
+          "default": false,
+          "description": "True when an edge (a gateway, or a browser through one) terminates TLS and forwards cleartext to this workload. Such a workload cannot run 'strict': a strict listener refuses its only caller.",
+          "type": "boolean"
         },
         "keyFile": {
           "description": "Its private key. It lives in the pod and never in a secret, so a workload that can read secrets in its namespace still cannot read a neighbour's key.",
