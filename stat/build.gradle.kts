@@ -67,7 +67,7 @@ dependencies {
     // OTEL_TRACES_EXPORTER=none, which is what a deployment with no
     // endpoint sets -- so nothing here tests an enable flag, and the
     // instrumentation for the web layer comes with it.
-    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.31.1")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.32.0")
 
     // The OUTBOUND call to urls, and the reason for a library rather than
     // asking the starter above for it: that starter instruments what
