@@ -136,8 +136,8 @@ github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWD
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/tinylib/msgp v1.6.4 h1:mOwYbyYDLPj35mkA2BjjYejgJk9BuHxDdvRnb6v2ZcQ=
 github.com/tinylib/msgp v1.6.4/go.mod h1:RSp0LW9oSxFut3KzESt5Voq4GVWyS+PSulT77roAqEA=
-github.com/truvity/cnpg/v2 v2.10.0 h1:hTpAsYRP+0MDcU7zMxUsj58aoFqmm43erxMGFB7Pct4=
-github.com/truvity/cnpg/v2 v2.10.0/go.mod h1:jv88O9qFQXTSJ1ll6D2wT4LBcfc115Sz73lao0/+XMQ=
+github.com/truvity/cnpg/v2 v2.10.1 h1:HPuraiuWDX6oH49we1mwgQtYCb9ui6f8WUefDv6jL1k=
+github.com/truvity/cnpg/v2 v2.10.1/go.mod h1:jv88O9qFQXTSJ1ll6D2wT4LBcfc115Sz73lao0/+XMQ=
 github.com/truvity/gemaal v0.24.3 h1:9kADzRbN5KgLAk+wmJ0PdmI+qczzPQR7e+QmI60+I4c=
 github.com/truvity/gemaal v0.24.3/go.mod h1:Xf5KI0AfhRsFHUKwSvcwAece46exRI7ZNpWQFKjKenU=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
