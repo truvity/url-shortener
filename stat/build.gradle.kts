@@ -90,7 +90,7 @@ dependencies {
     testImplementation("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.31.1-alpha")
 
     // The broker's own client.
-    implementation("io.nats:jnats:2.26.3")
+    implementation("io.nats:jnats:2.26.4")
 
     // Connect, as a CLIENT. The Kotlin library generates no servers, which
     // is a real constraint on where a JVM service sits in a topology and is
