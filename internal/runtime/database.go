@@ -53,9 +53,9 @@ func DatabaseConfig(getenv func(string) string) (pgclient.Config, error) {
 // at warn level: the attempt number, the error and the delay before the next
 // try. Without it a database that is away for minutes looks like a hung
 // start-up.
-func LogRetry(log *slog.Logger) func(attempt int, err error, delay time.Duration) {
+func LogRetry(ctx context.Context, log *slog.Logger) func(attempt int, err error, delay time.Duration) {
 	return func(attempt int, err error, delay time.Duration) {
-		log.Warn("database not ready, retrying",
+		log.WarnContext(ctx, "database not ready, retrying",
 			slog.Int("attempt", attempt),
 			slog.Any("error", err),
 			slog.Duration("delay", delay))
@@ -80,7 +80,7 @@ func LogRetry(log *slog.Logger) func(attempt int, err error, delay time.Duration
 // own pgx tracer (otelpg) is deliberately NOT set: both would record every
 // statement, and a trace with each query twice is worse than one without.
 func OpenDatabase(ctx context.Context, log *slog.Logger, cfg pgclient.Config) (*gorm.DB, func(), error) {
-	cfg.Retry.OnRetry = LogRetry(log)
+	cfg.Retry.OnRetry = LogRetry(ctx, log)
 	pool, err := pgclient.New(ctx, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("connect to the database: %w", err)

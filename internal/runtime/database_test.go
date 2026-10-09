@@ -116,7 +116,7 @@ func TestDatabaseConfigKeepsTheStartupPatience(t *testing.T) {
 func TestLogRetryReportsEachAttempt(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, nil))
-	runtime.LogRetry(log)(3, errors.New("connection refused"), 2*time.Second)
+	runtime.LogRetry(t.Context(), log)(3, errors.New("connection refused"), 2*time.Second)
 	out := buf.String()
 	for _, want := range []string{"level=WARN", "attempt=3", "connection refused", "delay=2s"} {
 		if !strings.Contains(out, want) {
