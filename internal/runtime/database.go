@@ -49,6 +49,19 @@ func DatabaseConfig(getenv func(string) string) (pgclient.Config, error) {
 	return cfg, cfg.Validate()
 }
 
+// LogRetry returns the pgclient retry hook that reports every failed attempt
+// at warn level: the attempt number, the error and the delay before the next
+// try. Without it a database that is away for minutes looks like a hung
+// start-up.
+func LogRetry(log *slog.Logger) func(attempt int, err error, delay time.Duration) {
+	return func(attempt int, err error, delay time.Duration) {
+		log.Warn("database not ready, retrying",
+			slog.Int("attempt", attempt),
+			slog.Any("error", err),
+			slog.Duration("delay", delay))
+	}
+}
+
 // OpenDatabase connects, waiting for the server per cfg.Retry, and returns a
 // gorm handle over the client's pool, with the function that closes both.
 //
@@ -67,6 +80,7 @@ func DatabaseConfig(getenv func(string) string) (pgclient.Config, error) {
 // own pgx tracer (otelpg) is deliberately NOT set: both would record every
 // statement, and a trace with each query twice is worse than one without.
 func OpenDatabase(ctx context.Context, log *slog.Logger, cfg pgclient.Config) (*gorm.DB, func(), error) {
+	cfg.Retry.OnRetry = LogRetry(log)
 	pool, err := pgclient.New(ctx, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("connect to the database: %w", err)

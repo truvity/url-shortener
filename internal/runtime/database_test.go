@@ -1,6 +1,9 @@
 package runtime_test
 
 import (
+	"bytes"
+	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -105,5 +108,19 @@ func TestDatabaseConfigKeepsTheStartupPatience(t *testing.T) {
 	}
 	if cfg.Retry.Budget != 45*time.Second {
 		t.Errorf("the environment's retry budget was overridden: %+v", cfg.Retry)
+	}
+}
+
+// Each failed attempt is reported at warn level with its number, the error
+// and the delay, so a slow database start is visible in the log.
+func TestLogRetryReportsEachAttempt(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	runtime.LogRetry(log)(3, errors.New("connection refused"), 2*time.Second)
+	out := buf.String()
+	for _, want := range []string{"level=WARN", "attempt=3", "connection refused", "delay=2s"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the retry log %q lacks %q", out, want)
+		}
 	}
 }
