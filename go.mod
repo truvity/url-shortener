@@ -21,7 +21,7 @@ require (
 	github.com/nats-io/nats.go v1.54.0
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
-	github.com/truvity/cnpg/v2 v2.10.1
+	github.com/truvity/cnpg/v2 v2.12.0
 	github.com/truvity/gemaal v0.24.3
 	github.com/truvity/policy v0.9.3
 	go.opentelemetry.io/otel v1.47.0
@@ -104,7 +104,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.22.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
