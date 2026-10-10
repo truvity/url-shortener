@@ -499,6 +499,8 @@ spec:
               name: database-password
               readOnly: true
           resources:
+            limits:
+              memory: 128Mi
             requests:
               cpu: 50m
               memory: 64Mi
@@ -651,6 +653,8 @@ spec:
               name: database-password
               readOnly: true
           resources:
+            limits:
+              memory: 128Mi
             requests:
               cpu: 50m
               memory: 64Mi
@@ -779,6 +783,8 @@ spec:
               readOnly: true
             
           resources:
+            limits:
+              memory: 256Mi
             requests:
               cpu: 50m
               memory: 96Mi
@@ -1015,6 +1021,8 @@ spec:
               readOnly: true
             
           resources:
+            limits:
+              memory: 256Mi
             requests:
               cpu: 50m
               memory: 128Mi
@@ -1149,6 +1157,8 @@ spec:
               mountPath: /etc/url-shortener
               readOnly: true
           resources:
+            limits:
+              memory: 128Mi
             requests:
               cpu: 50m
               memory: 64Mi

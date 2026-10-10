@@ -465,8 +465,14 @@ disruption:
   maxUnavailable: 1
 
 resources:
+  # Every component is limited in memory: with no limit a leak or a spike takes
+  # the node's memory, not just the pod. The limits are 2-3x the peak working
+  # set seen over seven days on every environment (redirect 23Mi, urls 28Mi,
+  # log 98Mi, web 116Mi, migrate 5Mi, prober 19Mi), never below 128Mi. The
+  # requests are what each asks for in steady state and stay as they were.
   redirect:
     requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 128Mi }
   # The counter is the one JVM component. Without a limit the JVM sizes its
   # maximum heap to a quarter of the NODE and its working set swings far above
   # what it holds live, so it is limited, and `jvmOptions.stat` (below) sizes
@@ -476,14 +482,19 @@ resources:
     limits: { memory: 384Mi }
   log:
     requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
   urls:
     requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 128Mi }
   web:
     requests: { cpu: 50m, memory: 96Mi }
+    limits: { memory: 256Mi }
   migrate:
     requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 128Mi }
   verify:
     requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 128Mi }
 
 # JAVA_TOOL_OPTIONS for a component that runs on the JVM, which is `stat` only.
 # The heap is a share of the container's memory limit (`resources.stat`), not of
@@ -570,6 +581,7 @@ prober:
   statSettle: 60s
   resources:
     requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
   log:
     level: info
   drain:
