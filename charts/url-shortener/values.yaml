@@ -467,8 +467,13 @@ disruption:
 resources:
   redirect:
     requests: { cpu: 50m, memory: 64Mi }
+  # The counter is the one JVM component. Without a limit the JVM sizes its
+  # maximum heap to a quarter of the NODE and its working set swings far above
+  # what it holds live, so it is limited, and `jvmOptions.stat` (below) sizes
+  # the heap from that limit instead of from the node.
   stat:
-    requests: { cpu: 50m, memory: 64Mi }
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { memory: 384Mi }
   log:
     requests: { cpu: 50m, memory: 128Mi }
   urls:
@@ -479,6 +484,13 @@ resources:
     requests: { cpu: 50m, memory: 64Mi }
   verify:
     requests: { cpu: 50m, memory: 64Mi }
+
+# JAVA_TOOL_OPTIONS for a component that runs on the JVM, which is `stat` only.
+# The heap is a share of the container's memory limit (`resources.stat`), not of
+# the node's; and a process that does run out of memory exits at once, so the
+# kubelet restarts it, instead of limping on in a half-working state.
+jvmOptions:
+  stat: "-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
 
 # The route this service is reached through. Off by default: a chart that
 # exposes something the moment it is installed is a chart that exposes

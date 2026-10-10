@@ -435,6 +435,16 @@
         }
       }
     },
+    "jvmOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "JAVA_TOOL_OPTIONS of a component that runs on the JVM. Empty or left out sets nothing.",
+      "properties": {
+        "stat": {
+          "type": "string"
+        }
+      }
+    },
     "resources": {
       "type": "object",
       "additionalProperties": false,

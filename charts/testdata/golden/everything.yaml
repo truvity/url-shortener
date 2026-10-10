@@ -1019,6 +1019,8 @@ spec:
               value: "0.25"
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: deployment.example.tier=primary
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError
           ports:
             
             - name: probes
@@ -1047,6 +1049,8 @@ spec:
               readOnly: true
             
           resources:
+            limits:
+              memory: 384Mi
             requests:
               cpu: 22m
               memory: 222Mi

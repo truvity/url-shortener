@@ -750,6 +750,8 @@ spec:
               value: "none"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError
           ports:
             
             - name: probes
@@ -775,9 +777,11 @@ spec:
             
             
           resources:
+            limits:
+              memory: 384Mi
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 256Mi
       volumes:
         - name: config
           configMap:

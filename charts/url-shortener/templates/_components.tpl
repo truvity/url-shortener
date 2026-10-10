@@ -94,6 +94,9 @@ appear in nothing that is rendered, printed or committed. */ -}}
 {{- $_ := set $p "secretFiles" (dict "s3/accessKeyID" (dict "secretName" . "key" $bucket.accessKeyIDKey) "s3/secretAccessKey" (dict "secretName" . "key" $bucket.secretAccessKeyKey)) -}}
 {{- end -}}
 {{- end -}}
+{{- with (get ($v.jvmOptions | default dict) $name) -}}
+{{- $env = append $env (dict "name" "JAVA_TOOL_OPTIONS" "value" .) -}}
+{{- end -}}
 {{- if $env -}}{{- $_ := set $p "env" $env -}}{{- end -}}
 {{- if $volumes -}}{{- $_ := set $p "volumes" $volumes -}}{{- end -}}
 {{- if $mounts -}}{{- $_ := set $p "volumeMounts" $mounts -}}{{- end -}}
