@@ -590,6 +590,11 @@ func TestEveryUrlShortenerComponentFollowsItsOwnFile(t *testing.T) {
 				if component == "redirect" || component == "urls" {
 					allowed = client
 				}
+				if component == "stat" {
+					// The one JVM component: the heap options are a chart value
+					// (jvmOptions.stat), not structure.
+					allowed = []string{"JAVA_TOOL_OPTIONS"}
+				}
 				conformance.EnvIsDeclared(t, []byte(out), workload, allowed...)
 				conformance.SecretsAreFiles(t, []byte(out), workload)
 				conformance.NoEnvSecretFields(t, conformance.ConfigMapData(t, []byte(out), component+".yaml"))
