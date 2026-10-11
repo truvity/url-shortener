@@ -2280,8 +2280,10 @@ func TestTheChartRendersItsDashboardsOnlyWhenAsked(t *testing.T) {
 	if n := strings.Count(out, "allowCrossNamespaceImport: true"); n != 2 {
 		t.Errorf("%d objects with allowCrossNamespaceImport: true, want 2 (folder and dashboard)", n)
 	}
-	if f, _, _ := strings.Cut(out[strings.Index(out, "\nkind: GrafanaFolder"):], "\n---"); !strings.Contains(f, "allowCrossNamespaceImport: true") {
-		t.Errorf("the GrafanaFolder lacks allowCrossNamespaceImport: true:\n%s", f)
+	_, afterFolder, _ := strings.Cut(out, "\nkind: GrafanaFolder")
+	folder, _, _ := strings.Cut(afterFolder, "\n---")
+	if !strings.Contains(folder, "allowCrossNamespaceImport: true") {
+		t.Errorf("the GrafanaFolder lacks allowCrossNamespaceImport: true:\n%s", folder)
 	}
 	for _, want := range []string{
 		"\nkind: GrafanaDashboard",
