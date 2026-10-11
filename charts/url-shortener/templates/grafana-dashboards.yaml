@@ -1,0 +1,56 @@
+{{- /*
+The product's dashboards, as grafana-operator objects for the ONE shared
+Grafana. Off by default: a cluster that does not run the operator has no
+GrafanaFolder or GrafanaDashboard kind, and an object of an unknown kind fails
+the sync.
+
+What the operator of THIS cluster does with them: it places them under the
+cluster's own folder (observability.dashboards.clusterFolderUID), in a subfolder
+named after the product. The operator holds Edit on its cluster folder only, and
+a nested folder inherits it. People are Viewers and change a dashboard by pull
+request: the JSON is dashboards/overview.json in this chart.
+
+The datasources are named by uid, in the JSON, through the dashboard's own
+`datasource` and `logsds` variables; the uids are values.
+*/ -}}
+{{- $o := .Values.observability.dashboards }}
+{{- if and $o.enabled (not (include "url-shortener.alertsRemote" .)) }}
+{{- $folder := required "observability.dashboards.clusterFolderUID is required when observability.dashboards.enabled: it is the uid of this cluster's folder in the shared Grafana (the folder.uid of the observability-cluster chart, the cluster name by default)" $o.clusterFolderUID }}
+{{- $metrics := required "observability.dashboards.datasources.metrics is required when observability.dashboards.enabled: the uid of the metrics datasource of the Grafana this cluster's dashboards live in" $o.datasources.metrics }}
+{{- $logs := required "observability.dashboards.datasources.logs is required when observability.dashboards.enabled: the uid of the logs datasource of the Grafana this cluster's dashboards live in" $o.datasources.logs }}
+{{- $uid := printf "%s-url-shortener" $folder }}
+{{- if not (regexMatch "^[A-Za-z0-9_-]{1,40}$" $uid) }}
+{{- fail (printf "observability.dashboards.clusterFolderUID %q gives the product folder uid %q, which must be 1 to 40 characters of letters, digits, '-' and '_'" $folder $uid) }}
+{{- end }}
+{{- $selector := dict "matchLabels" (dict "observability.truvity.io/grafana" "shared") }}
+{{- if $o.instanceSelector }}{{ $selector = $o.instanceSelector }}{{ end }}
+{{- $name := include "url-shortener.name" . }}
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: {{ $name }}-folder
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  title: url-shortener
+  uid: {{ $uid | quote }}
+  parentFolderUID: {{ $folder | quote }}
+  instanceSelector:
+    {{- toYaml $selector | nindent 4 }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $name }}-overview
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+spec:
+  # The Grafana resource lives in the observability-cluster release's
+  # namespace, not this one.
+  allowCrossNamespaceImport: true
+  folderUID: {{ $uid | quote }}
+  instanceSelector:
+    {{- toYaml $selector | nindent 4 }}
+  json: |
+    {{- .Files.Get "dashboards/overview.json" | replace "__DATASOURCE_UID__" $metrics | replace "__LOGS_DATASOURCE_UID__" $logs | replace "__NAMESPACE__" .Release.Namespace | nindent 4 }}
+{{- end }}

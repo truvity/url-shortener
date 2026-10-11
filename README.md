@@ -176,6 +176,22 @@ own database could never migrate it. [platform.md
 §11](../../docs/contracts/platform.md) has the whole argument and places
 every resource by scope.
 
+## Dashboards
+
+The chart ships the product's own dashboard (`charts/url-shortener/dashboards/overview.json`) as grafana-operator objects: a `GrafanaFolder` (`url-shortener`) and a `GrafanaDashboard`. The operator of each cluster places them in the one shared Grafana, under that cluster's folder (`<cluster> / url-shortener`); people there are Viewers and change a dashboard by pull request to the JSON. It has no traces panel and no panel that sums across namespaces, so it works for someone who sees one namespace.
+
+Off by default, because a cluster without the operator has no such kinds. Turn it on per cluster, on the primary install only:
+
+```yaml
+observability:
+  dashboards:
+    enabled: true
+    clusterFolderUID: <the cluster's folder uid>   # folder.uid of observability-cluster, at most 26 characters
+    datasources:
+      metrics: <uid of the metrics datasource>
+      logs: <uid of the logs datasource>
+```
+
 ## Running it
 
 From the repository root, with a container runtime:

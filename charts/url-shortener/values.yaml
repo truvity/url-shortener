@@ -660,3 +660,39 @@ alerts:
   # 99th percentile of redirect's / web's request duration, in seconds.
   redirectLatency: {enabled: true, seconds: 0.5, for: 15m}
   webLatency: {enabled: true, seconds: 2, for: 15m}
+
+# Dashboards (grafana-operator). The product's own, shipped with it: a
+# GrafanaFolder (the subfolder `url-shortener`) and a GrafanaDashboard
+# (dashboards/overview.json), which the grafana-operator of THIS cluster
+# (observability-cluster, externalGrafana mode) places in the ONE shared
+# Grafana, under the cluster's folder: <cluster> / url-shortener. People are
+# Viewers there and change a dashboard by pull request to
+# dashboards/overview.json. The data is filtered per person by the stores' proxy;
+# the dashboard has no traces panel and no panel that sums across namespaces.
+#
+# OFF BY DEFAULT. A cluster that does not run the operator has no
+# GrafanaFolder / GrafanaDashboard kind, and an object of an unknown kind fails
+# the sync. Turn it on per cluster, once that cluster's operator is installed,
+# and ONLY on the primary install: the folder and dashboard uids are fixed, and
+# a second install on the same cluster would fight over them. It renders
+# nothing with `alerts.remote.enabled`.
+observability:
+  dashboards:
+    enabled: false
+    # The uid of this cluster's folder in the shared Grafana (`folder.uid` of
+    # the observability-cluster chart; the cluster name unless overridden), at
+    # most 26 characters. Required when enabled. The product folder's uid is
+    # <clusterFolderUID>-url-shortener.
+    clusterFolderUID: ""
+    # The uids of the datasources of the Grafana's stores that hold this
+    # cluster's data. Required when enabled; they differ per cluster (the
+    # platform sends them with clusterFolderUID). The dashboard offers them as
+    # the default of its `datasource` / `logsds` variables.
+    datasources:
+      metrics: ""
+      logs: ""
+    # Which Grafana the objects go to. Empty means the shared one, selected by
+    # the label observability-cluster stamps on it
+    # (observability.truvity.io/grafana: shared). Otherwise a full selector
+    # ({matchLabels: ...} or {matchExpressions: ...}).
+    instanceSelector: {}

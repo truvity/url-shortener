@@ -72,6 +72,30 @@
       ],
       "description": "How much redundancy this cluster wants (delivery interface step 14). `single`: one replica of every component and no PodDisruptionBudget. `high`: two replicas and a budget that keeps one running. Absent means `single`."
     },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Product dashboards as grafana-operator objects for the shared Grafana. Off by default (a cluster without the operator has no such kinds). See values.yaml.",
+      "properties": {
+        "dashboards": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "clusterFolderUID": { "type": "string", "pattern": "^[A-Za-z0-9_-]*$", "maxLength": 26 },
+            "datasources": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "metrics": { "type": "string", "pattern": "^[A-Za-z0-9_-]*$" },
+                "logs": { "type": "string", "pattern": "^[A-Za-z0-9_-]*$" }
+              }
+            },
+            "instanceSelector": { "type": "object" }
+          }
+        }
+      }
+    },
     "alerts": {
       "type": "object",
       "additionalProperties": false,

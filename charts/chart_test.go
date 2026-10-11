@@ -1,6 +1,7 @@
 package charts_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -2244,6 +2245,168 @@ func TestTheRemoteAlertsRenderTheRulesAlone(t *testing.T) {
 	// Without remote the workloads' own values are still required.
 	if out, err := render(t, "--set", "alerts.enabled=true"); err == nil {
 		t.Errorf("a local render without a database rendered:\n%s", out)
+	}
+}
+
+// The product's dashboards are grafana-operator objects, off by default: a
+// cluster without the operator has no such kinds, and an object of an unknown
+// kind fails the sync. Enabled, they sit under the cluster's folder, select the
+// shared Grafana, and the dashboard is safe for someone who sees one namespace:
+// valid JSON, no traces panel, every query filtered by the namespace variable.
+func TestTheChartRendersItsDashboardsOnlyWhenAsked(t *testing.T) {
+	out, err := render(t, defaults("--set", "images.web.tag=dev")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "grafana.integreatly.org") {
+		t.Errorf("a chart with dashboards off renders a Grafana object")
+	}
+
+	on := []string{
+		"--set", "observability.dashboards.enabled=true",
+		"--set", "observability.dashboards.clusterFolderUID=cl1",
+		"--set", "observability.dashboards.datasources.metrics=cl1-metrics",
+		"--set", "observability.dashboards.datasources.logs=cl1-logs",
+	}
+	out, err = render(t, defaults(append([]string{"--set", "images.web.tag=dev"}, on...)...)...)
+	if err != nil {
+		t.Fatalf("the chart does not render with dashboards on: %v\n%s", err, out)
+	}
+	if n := strings.Count(out, "\nkind: GrafanaFolder"); n != 1 {
+		t.Errorf("%d GrafanaFolder objects, want 1", n)
+	}
+	for _, want := range []string{
+		"\nkind: GrafanaDashboard",
+		`parentFolderUID: "cl1"`,
+		`uid: "cl1-url-shortener"`,
+		`folderUID: "cl1-url-shortener"`,
+		"allowCrossNamespaceImport: true",
+		"observability.truvity.io/grafana: shared",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q", want)
+		}
+	}
+	if strings.Contains(out, "__DATASOURCE_UID__") || strings.Contains(out, "__LOGS_DATASOURCE_UID__") || strings.Contains(out, "__NAMESPACE__") {
+		t.Errorf("a placeholder survived the render")
+	}
+
+	var dash map[string]any
+	for _, doc := range strings.Split(out, "\n---\n") {
+		var obj struct {
+			Kind string `yaml:"kind"`
+			Spec struct {
+				JSON string `yaml:"json"`
+			} `yaml:"spec"`
+		}
+		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil || obj.Kind != "GrafanaDashboard" {
+			continue
+		}
+		if err := json.Unmarshal([]byte(obj.Spec.JSON), &dash); err != nil {
+			t.Fatalf("the dashboard is not valid JSON: %v", err)
+		}
+	}
+	if dash == nil {
+		t.Fatalf("no GrafanaDashboard in the render")
+	}
+	if title, _ := dash["title"].(string); !strings.Contains(title, "$cluster") {
+		t.Errorf("the title %q does not say the cluster", title)
+	}
+	for _, v := range dash["templating"].(map[string]any)["list"].([]any) {
+		m := v.(map[string]any)
+		switch m["name"] {
+		case "datasource":
+			if cur := m["current"].(map[string]any)["value"]; cur != "cl1-metrics" {
+				t.Errorf("the metrics datasource defaults to %v, want cl1-metrics", cur)
+			}
+		case "logsds":
+			if cur := m["current"].(map[string]any)["value"]; cur != "cl1-logs" {
+				t.Errorf("the logs datasource defaults to %v, want cl1-logs", cur)
+			}
+		case "namespace":
+			if cur := m["current"].(map[string]any)["value"]; cur != "default" {
+				t.Errorf("the namespace defaults to %v, want the release namespace", cur)
+			}
+		}
+	}
+	var walk func(panels []any)
+	walk = func(panels []any) {
+		for _, p := range panels {
+			panel := p.(map[string]any)
+			if typ, _ := panel["type"].(string); typ == "traces" || strings.Contains(strings.ToLower(panel["title"].(string)), "trace") {
+				t.Errorf("panel %q reads traces, which a namespace-only viewer may not", panel["title"])
+			}
+			if sub, ok := panel["panels"].([]any); ok {
+				walk(sub)
+			}
+			targets, _ := panel["targets"].([]any)
+			for _, tg := range targets {
+				expr, _ := tg.(map[string]any)["expr"].(string)
+				if expr == "" {
+					continue
+				}
+				if !strings.Contains(expr, "$namespace") {
+					t.Errorf("panel %q: a query that is not filtered by the namespace variable: %s", panel["title"], expr)
+				}
+				if strings.Contains(expr, "k8s_namespace_name=~") {
+					t.Errorf("panel %q: a regular-expression namespace can sum across namespaces: %s", panel["title"], expr)
+				}
+			}
+		}
+	}
+	walk(dash["panels"].([]any))
+
+	// What it reads is what the product pushes (see the alerts' list).
+	for _, metric := range []string{"http_server_request_duration_seconds_count", "rpc_server_call_duration_seconds_bucket", "kube_deployment_status_replicas_ready", "container_memory_working_set_bytes"} {
+		if !strings.Contains(out, metric) {
+			t.Errorf("the dashboard does not read %s", metric)
+		}
+	}
+
+	// Required values, named in the refusal.
+	for _, tc := range []struct {
+		missing string
+		set     []string
+	}{
+		{"clusterFolderUID", []string{"datasources.metrics=m", "datasources.logs=l"}},
+		{"datasources.metrics", []string{"clusterFolderUID=cl1", "datasources.logs=l"}},
+		{"datasources.logs", []string{"clusterFolderUID=cl1", "datasources.metrics=m"}},
+	} {
+		args := []string{"--set", "images.web.tag=dev", "--set", "observability.dashboards.enabled=true"}
+		for _, s := range tc.set {
+			args = append(args, "--set", "observability.dashboards."+s)
+		}
+		out, err := render(t, defaults(args...)...)
+		if err == nil || !strings.Contains(out, tc.missing+" is required") {
+			t.Errorf("enabled without %s: err=%v\n%s", tc.missing, err, out)
+		}
+	}
+	// A folder uid that overflows once the product is appended is refused by the schema.
+	long := append([]string{"--set", "images.web.tag=dev"}, on...)
+	long = append(long, "--set", "observability.dashboards.clusterFolderUID=0123456789012345678901234567")
+	if out, err := render(t, defaults(long...)...); err == nil {
+		t.Errorf("a folder uid of 28 characters rendered:\n%s", out)
+	}
+
+	// The selector can be replaced; the default is gone then.
+	sel := append([]string{"--set", "images.web.tag=dev"}, on...)
+	sel = append(sel, "--set", "observability.dashboards.instanceSelector.matchLabels.team=blue")
+	out, err = render(t, defaults(sel...)...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "team: blue") || strings.Contains(out, "observability.truvity.io/grafana") {
+		t.Errorf("the instanceSelector override did not replace the default")
+	}
+
+	// A remote alerts render is the rule alone, dashboards on or not.
+	remote := append([]string{"--set", "alerts.remote.enabled=true", "--set", "alerts.remote.clusterName=stage", "--set", "alerts.remote.namespace=url-shortener"}, on...)
+	out, err = render(t, remote...)
+	if err != nil {
+		t.Fatalf("the remote render fails: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "grafana.integreatly.org") {
+		t.Errorf("a remote alerts render includes dashboards")
 	}
 }
 
