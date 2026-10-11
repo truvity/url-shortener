@@ -2302,8 +2302,8 @@ func TestTheChartRendersItsDashboardsOnlyWhenAsked(t *testing.T) {
 		t.Errorf("the fixed dashboard uid survived, or its placeholder did")
 	}
 	// The folder is applied (wave 0) before the dashboard (wave 1).
-	dashDoc := out[strings.Index(out, "\nkind: GrafanaDashboard"):]
-	dashDoc, _, _ = strings.Cut(dashDoc, "\n---")
+	_, afterDash, _ := strings.Cut(out, "\nkind: GrafanaDashboard")
+	dashDoc, _, _ := strings.Cut(afterDash, "\n---")
 	if !strings.Contains(folder, `argocd.argoproj.io/sync-wave: "0"`) {
 		t.Errorf("the GrafanaFolder is not sync wave 0:\n%s", folder)
 	}
