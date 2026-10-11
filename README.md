@@ -186,7 +186,7 @@ Off by default, because a cluster without the operator has no such kinds. Turn i
 observability:
   dashboards:
     enabled: true
-    clusterFolderUID: <the cluster's folder uid>   # folder.uid of observability-cluster, at most 26 characters
+    clusterFolderUID: <the cluster's folder uid>   # folder.uid of observability-cluster, at most 17 characters
     datasources:
       metrics: <uid of the metrics datasource>
       logs: <uid of the logs datasource>

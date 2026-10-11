@@ -681,8 +681,9 @@ observability:
     enabled: false
     # The uid of this cluster's folder in the shared Grafana (`folder.uid` of
     # the observability-cluster chart; the cluster name unless overridden), at
-    # most 26 characters. Required when enabled. The product folder's uid is
-    # <clusterFolderUID>-url-shortener.
+    # most 17 characters. Required when enabled. The product folder's uid is
+    # <clusterFolderUID>-url-shortener, the dashboard's <clusterFolderUID>-url-shortener-overview
+    # (dashboard uids are global in the shared Grafana, so they carry the cluster).
     clusterFolderUID: ""
     # The uids of the datasources of the Grafana's stores that hold this
     # cluster's data. Required when enabled; they differ per cluster (the

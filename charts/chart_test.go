@@ -2290,12 +2290,25 @@ func TestTheChartRendersItsDashboardsOnlyWhenAsked(t *testing.T) {
 		`parentFolderUID: "cl1"`,
 		`uid: "cl1-url-shortener"`,
 		`folderUID: "cl1-url-shortener"`,
+		`"uid": "cl1-url-shortener-overview"`,
 		"allowCrossNamespaceImport: true",
 		"observability.truvity.io/grafana: shared",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the render lacks %q", want)
 		}
+	}
+	if strings.Contains(out, "product-url-shortener") || strings.Contains(out, "__DASHBOARD_UID__") {
+		t.Errorf("the fixed dashboard uid survived, or its placeholder did")
+	}
+	// The folder is applied (wave 0) before the dashboard (wave 1).
+	dashDoc := out[strings.Index(out, "\nkind: GrafanaDashboard"):]
+	dashDoc, _, _ = strings.Cut(dashDoc, "\n---")
+	if !strings.Contains(folder, `argocd.argoproj.io/sync-wave: "0"`) {
+		t.Errorf("the GrafanaFolder is not sync wave 0:\n%s", folder)
+	}
+	if !strings.Contains(dashDoc, `argocd.argoproj.io/sync-wave: "1"`) {
+		t.Errorf("the GrafanaDashboard is not sync wave 1:\n%s", dashDoc)
 	}
 	if strings.Contains(out, "__DATASOURCE_UID__") || strings.Contains(out, "__LOGS_DATASOURCE_UID__") || strings.Contains(out, "__NAMESPACE__") {
 		t.Errorf("a placeholder survived the render")
@@ -2391,11 +2404,16 @@ func TestTheChartRendersItsDashboardsOnlyWhenAsked(t *testing.T) {
 			t.Errorf("enabled without %s: err=%v\n%s", tc.missing, err, out)
 		}
 	}
-	// A folder uid that overflows once the product is appended is refused by the schema.
+	// A folder uid that overflows once the product and -overview are appended is refused by the schema.
 	long := append([]string{"--set", "images.web.tag=dev"}, on...)
-	long = append(long, "--set", "observability.dashboards.clusterFolderUID=0123456789012345678901234567")
+	long = append(long, "--set", "observability.dashboards.clusterFolderUID=012345678901234568")
 	if out, err := render(t, defaults(long...)...); err == nil {
-		t.Errorf("a folder uid of 28 characters rendered:\n%s", out)
+		t.Errorf("a folder uid of 18 characters rendered:\n%s", out)
+	}
+	fit := append([]string{"--set", "images.web.tag=dev"}, on...)
+	fit = append(fit, "--set", "observability.dashboards.clusterFolderUID=01234567890123456")
+	if out, err := render(t, defaults(fit...)...); err != nil {
+		t.Errorf("a folder uid of 17 characters (a 40-character dashboard uid) is refused: %v\n%s", err, out)
 	}
 
 	// The selector can be replaced; the default is gone then.

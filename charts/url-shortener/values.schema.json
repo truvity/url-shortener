@@ -82,7 +82,7 @@
           "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
-            "clusterFolderUID": { "type": "string", "pattern": "^[A-Za-z0-9_-]*$", "maxLength": 26 },
+            "clusterFolderUID": { "type": "string", "pattern": "^[A-Za-z0-9_-]*$", "maxLength": 17 },
             "datasources": {
               "type": "object",
               "additionalProperties": false,

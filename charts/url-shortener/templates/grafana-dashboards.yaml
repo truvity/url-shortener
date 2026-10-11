@@ -7,7 +7,16 @@ the sync.
 What the operator of THIS cluster does with them: it places them under the
 cluster's own folder (observability.dashboards.clusterFolderUID), in a subfolder
 named after the product. The operator holds Edit on its cluster folder only, and
-a nested folder inherits it. People are Viewers and change a dashboard by pull
+a nested folder inherits it.
+
+The dashboard's uid is derived from the cluster folder
+(<clusterFolderUID>-url-shortener-overview): every cluster's operator writes into the ONE
+shared Grafana, where dashboard uids are global, so a fixed uid collides across
+clusters (the second answers 403). The GrafanaFolder is Argo CD sync wave 0 and
+the GrafanaDashboard wave 1, so the dashboard is applied only once the folder is
+Healthy; the operator does not retry a dashboard applied before its folder.
+
+People are Viewers and change a dashboard by pull
 request: the JSON is dashboards/overview.json in this chart.
 
 The datasources are named by uid, in the JSON, through the dashboard's own
@@ -19,8 +28,9 @@ The datasources are named by uid, in the JSON, through the dashboard's own
 {{- $metrics := required "observability.dashboards.datasources.metrics is required when observability.dashboards.enabled: the uid of the metrics datasource of the Grafana this cluster's dashboards live in" $o.datasources.metrics }}
 {{- $logs := required "observability.dashboards.datasources.logs is required when observability.dashboards.enabled: the uid of the logs datasource of the Grafana this cluster's dashboards live in" $o.datasources.logs }}
 {{- $uid := printf "%s-url-shortener" $folder }}
-{{- if not (regexMatch "^[A-Za-z0-9_-]{1,40}$" $uid) }}
-{{- fail (printf "observability.dashboards.clusterFolderUID %q gives the product folder uid %q, which must be 1 to 40 characters of letters, digits, '-' and '_'" $folder $uid) }}
+{{- $dashUID := printf "%s-overview" $uid }}
+{{- if not (regexMatch "^[A-Za-z0-9_-]{1,40}$" $dashUID) }}
+{{- fail (printf "observability.dashboards.clusterFolderUID %q gives the dashboard uid %q, which must be 1 to 40 characters of letters, digits, '-' and '_'" $folder $dashUID) }}
 {{- end }}
 {{- $selector := dict "matchLabels" (dict "observability.truvity.io/grafana" "shared") }}
 {{- if $o.instanceSelector }}{{ $selector = $o.instanceSelector }}{{ end }}
@@ -31,6 +41,8 @@ metadata:
   name: {{ $name }}-folder
   labels:
     {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   # The Grafana resource lives in the observability-cluster release's
   # namespace, not this one; the folder needs the flag as much as the
@@ -49,6 +61,8 @@ metadata:
   name: {{ $name }}-overview
   labels:
     {{- include "url-shortener.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   # The Grafana resource lives in the observability-cluster release's
   # namespace, not this one.
@@ -57,5 +71,5 @@ spec:
   instanceSelector:
     {{- toYaml $selector | nindent 4 }}
   json: |
-    {{- .Files.Get "dashboards/overview.json" | replace "__DATASOURCE_UID__" $metrics | replace "__LOGS_DATASOURCE_UID__" $logs | replace "__NAMESPACE__" .Release.Namespace | nindent 4 }}
+    {{- .Files.Get "dashboards/overview.json" | replace "__DASHBOARD_UID__" $dashUID | replace "__DATASOURCE_UID__" $metrics | replace "__LOGS_DATASOURCE_UID__" $logs | replace "__NAMESPACE__" .Release.Namespace | nindent 4 }}
 {{- end }}
