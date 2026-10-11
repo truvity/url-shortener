@@ -4,8 +4,8 @@
 // owns the table to count it. It holds no database credential: the table is
 // somebody else's property, and this component has an address.
 plugins {
-    kotlin("jvm") version "2.4.20"
-    kotlin("plugin.spring") version "2.4.20"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.spring") version "2.4.21"
     id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.google.protobuf") version "0.10.0"

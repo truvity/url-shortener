@@ -5,7 +5,7 @@
 // contract whose implementations are tested against different inputs is
 // several contracts wearing one name.
 plugins {
-    kotlin("jvm") version "2.4.20"
+    kotlin("jvm") version "2.4.21"
 }
 
 group = "com.truvity"
