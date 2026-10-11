@@ -32,6 +32,11 @@ metadata:
   labels:
     {{- include "url-shortener.labels" . | nindent 4 }}
 spec:
+  # The Grafana resource lives in the observability-cluster release's
+  # namespace, not this one; the folder needs the flag as much as the
+  # dashboard does, or the operator skips it ("None of the available Grafana
+  # instances matched the selector").
+  allowCrossNamespaceImport: true
   title: url-shortener
   uid: {{ $uid | quote }}
   parentFolderUID: {{ $folder | quote }}

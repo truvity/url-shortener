@@ -2275,6 +2275,14 @@ func TestTheChartRendersItsDashboardsOnlyWhenAsked(t *testing.T) {
 	if n := strings.Count(out, "\nkind: GrafanaFolder"); n != 1 {
 		t.Errorf("%d GrafanaFolder objects, want 1", n)
 	}
+	// The folder needs the flag as much as the dashboard: the Grafana lives in
+	// another namespace, and without it the operator skips the folder.
+	if n := strings.Count(out, "allowCrossNamespaceImport: true"); n != 2 {
+		t.Errorf("%d objects with allowCrossNamespaceImport: true, want 2 (folder and dashboard)", n)
+	}
+	if f, _, _ := strings.Cut(out[strings.Index(out, "\nkind: GrafanaFolder"):], "\n---"); !strings.Contains(f, "allowCrossNamespaceImport: true") {
+		t.Errorf("the GrafanaFolder lacks allowCrossNamespaceImport: true:\n%s", f)
+	}
 	for _, want := range []string{
 		"\nkind: GrafanaDashboard",
 		`parentFolderUID: "cl1"`,
