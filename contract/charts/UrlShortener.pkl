@@ -604,6 +604,16 @@ class ImagesProber {
   digest: String = ""
 }
 
+class ImagesIdentityCheck {
+  registry: V.NonEmptyString = "ghcr.io"
+
+  repository: V.NonEmptyString = "truvity/policy/url-shortener/identity-check"
+
+  tag: String = ""
+
+  digest: String = ""
+}
+
 class Images {
   migrate: ImagesMigrate
 
@@ -618,6 +628,8 @@ class Images {
   web: ImagesWeb
 
   prober: ImagesProber
+
+  `identity-check`: ImagesIdentityCheck
 }
 
 class ProberLog {

@@ -218,6 +218,9 @@ images:
   # has to name a digest for an image it does not run (the release still
   # stamps it).
   prober: {registry: ghcr.io, repository: truvity/policy/url-shortener/prober, tag: "", digest: ""}
+  # Read only on a primary install, by service-lib's identity check
+  # (templates/identity-check.yaml); stamped like the rest.
+  identity-check: {registry: ghcr.io, repository: truvity/policy/url-shortener/identity-check, tag: "", digest: ""}
 
 pullPolicy: IfNotPresent
 

@@ -1,0 +1,23 @@
+# A primary install: the identity account is url-shortener-infra's, so this
+# chart renders no account for `log` and runs the identity check as it instead
+# (service-lib's identityCheck, decision 0013). The golden is the proof that
+# the Job is the only thing the tier adds here.
+tier: primary
+database:
+  host: pg
+  clusterDomain: cluster.example
+  tls:
+    rootCA:
+      configMapName: pg-ca
+  migration:
+    passwordSecret: owner
+  app:
+    passwordSecret: app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+serviceAccount:
+  app:
+    name: archiver

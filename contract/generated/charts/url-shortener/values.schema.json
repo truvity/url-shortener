@@ -1580,6 +1580,36 @@
             "tag": "",
             "digest": ""
           }
+        },
+        "identity-check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1,
+              "default": "ghcr.io"
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1,
+              "default": "truvity/policy/url-shortener/identity-check"
+            },
+            "tag": {
+              "type": "string",
+              "default": ""
+            },
+            "digest": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "default": {
+            "registry": "ghcr.io",
+            "repository": "truvity/policy/url-shortener/identity-check",
+            "tag": "",
+            "digest": ""
+          }
         }
       },
       "default": {
@@ -1622,6 +1652,12 @@
         "prober": {
           "registry": "ghcr.io",
           "repository": "truvity/policy/url-shortener/prober",
+          "tag": "",
+          "digest": ""
+        },
+        "identity-check": {
+          "registry": "ghcr.io",
+          "repository": "truvity/policy/url-shortener/identity-check",
           "tag": "",
           "digest": ""
         }

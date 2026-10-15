@@ -190,7 +190,7 @@ func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 //
 // Regenerate with `just golden` after reading the diff, never before.
 func TestWhatTheChartRenders(t *testing.T) {
-	for _, name := range []string{"minimal", "everything", "per-component"} {
+	for _, name := range []string{"minimal", "everything", "per-component", "primary"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := render(t, "-f", filepath.Join("testdata", name+".yaml"))
 			if err != nil {

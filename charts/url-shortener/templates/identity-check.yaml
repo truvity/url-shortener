@@ -1,0 +1,14 @@
+{{- if not (include "url-shortener.alertsRemote" .) -}}
+{{/*
+Proof that a pod admitted now gets `log`'s cloud identity, before any of this
+release's workloads exist (service-lib's `identityCheck`; decision 0013).
+
+Rendered exactly when `log`'s account is the identity account that
+url-shortener-infra renders, after the Pod Identity association
+(`url-shortener.identityInInfra`): that is the case where an association is
+created moments before this release, and where the account already exists
+when a hook needs it. Nothing else switches it.
+*/}}
+{{- $log := include "url-shortener.platform" (dict "root" $ "component" "log") | fromJson }}
+{{ include "service-lib.identityCheck" (dict "context" $ "name" "log" "platform" $log "cloudIdentity" (not (not (include "url-shortener.identityInInfra" .)))) }}
+{{- end }}

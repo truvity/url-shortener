@@ -903,7 +903,8 @@
         "stat",
         "log",
         "web",
-        "prober"
+        "prober",
+        "identity-check"
       ],
       "properties": {
         "migrate": {
@@ -1052,6 +1053,30 @@
         }
 ,
         "prober": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "repository"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "identity-check": {
           "type": "object",
           "additionalProperties": false,
           "required": [

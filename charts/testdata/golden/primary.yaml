@@ -1,0 +1,1087 @@
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: redirect
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: urls
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: web
+
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: stat
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-redirect-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: redirect
+data:
+  redirect.yaml: |
+    drain:
+      seconds: 20
+    events:
+      nats:
+        url: nats://nats:4222
+      redirectSubject: default-example.redirect
+      requestSubject: default-example.log
+    listen:
+      address: :8080
+    log:
+      level: info
+    probes:
+      address: :7070
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-urls-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: urls
+data:
+  urls.yaml: |
+    drain:
+      seconds: 20
+    listen:
+      address: :8080
+    log:
+      level: info
+    probes:
+      address: :7070
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-web-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: web
+data:
+  web.yaml: |
+    assets:
+      directory: /app/assets
+    csp:
+      connectSrc: []
+      mode: report-only
+    drain:
+      seconds: 20
+    listen:
+      address: :8080
+    log:
+      level: info
+    probes:
+      address: :7070
+    urls:
+      address: http://example-urls:8080
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-stat-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: stat
+data:
+  stat.yaml: |
+    drain:
+      seconds: 20
+    events:
+      consumer:
+        durable: default-example-stat
+        stream: default-example-events
+        subject: default-example.redirect
+      nats:
+        url: nats://nats:4222
+    log:
+      level: info
+    probes:
+      address: :7070
+    urls:
+      address: http://example-urls:8080
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-log-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: log
+data:
+  log.yaml: |
+    archive:
+      batch:
+        maxRecords: 500
+        maxSeconds: 60
+      bucket:
+        name: archive
+      prefix: url-shortener/requests
+    drain:
+      seconds: 20
+    events:
+      consumer:
+        durable: default-example-log
+        stream: default-example-events
+        subject: default-example.log
+      nats:
+        url: nats://nats:4222
+    log:
+      level: info
+    probes:
+      address: :7070
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/component: redirect
+  ports:
+    
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/component: urls
+  ports:
+    
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/component: web
+  ports:
+    
+    - name: http
+      port: 8080
+      targetPort: http
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-redirect
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: redirect
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: redirect
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 2307d451dd913bd588f639b2f3b0c60ddc8ea9f3ab163d282a23b97a5feeec92
+    spec:
+      serviceAccountName: example-redirect
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: redirect
+      containers:
+        - name: redirect
+          image: ghcr.io/truvity/policy/url-shortener/redirect:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/redirect.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-redirect"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: PGHOST
+              value: pg.default.svc.cluster.example
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: url_shortener
+            - name: PGUSER
+              value: url_shortener_app
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/url-shortener-pg-ca/ca-certificates.crt
+            - name: CNPG_CLIENT_PASSWORD_FILE
+              value: /etc/url-shortener-pg-password/password
+            - name: PGAPPNAME
+              value: example-redirect
+            - name: CNPG_CLIENT_POOL_MAX
+              value: "10"
+          ports:
+            
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            
+            - mountPath: /etc/url-shortener-pg-ca
+              name: database-ca
+              readOnly: true
+            - mountPath: /etc/url-shortener-pg-password
+              name: database-password
+              readOnly: true
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-redirect-config
+        
+        
+        - configMap:
+            name: pg-ca
+          name: database-ca
+        - name: database-password
+          secret:
+            defaultMode: 288
+            items:
+            - key: password
+              path: password
+            secretName: app
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-urls
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: urls
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: urls
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: d30a50a0d6534021f278cdef5a5ac71cdd37a36737607ca4f0da1857e6977523
+    spec:
+      serviceAccountName: example-urls
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: urls
+      containers:
+        - name: urls
+          image: ghcr.io/truvity/policy/url-shortener/urls:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/urls.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-urls"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: PGHOST
+              value: pg.default.svc.cluster.example
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: url_shortener
+            - name: PGUSER
+              value: url_shortener_app
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/url-shortener-pg-ca/ca-certificates.crt
+            - name: CNPG_CLIENT_PASSWORD_FILE
+              value: /etc/url-shortener-pg-password/password
+            - name: PGAPPNAME
+              value: example-urls
+            - name: CNPG_CLIENT_POOL_MAX
+              value: "20"
+          ports:
+            
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            
+            - mountPath: /etc/url-shortener-pg-ca
+              name: database-ca
+              readOnly: true
+            - mountPath: /etc/url-shortener-pg-password
+              name: database-password
+              readOnly: true
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-urls-config
+        
+        
+        - configMap:
+            name: pg-ca
+          name: database-ca
+        - name: database-password
+          secret:
+            defaultMode: 288
+            items:
+            - key: password
+              path: password
+            secretName: app
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-web
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: web
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: ad54d00352821c79ce7bcfc94b708896577ba3463873cfdd95675ba05d0edfd0
+    spec:
+      serviceAccountName: example-web
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: web
+      containers:
+        - name: web
+          image: ghcr.io/truvity/policy/url-shortener/web:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/web.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-web"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+          ports:
+            
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 96Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-web-config
+        
+        
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-stat
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: stat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: stat
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: be13bcb73cadcdae8b3b0f00eda70cb2d50d3f9e109c2de961a11617da1b3179
+    spec:
+      serviceAccountName: example-stat
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: stat
+      containers:
+        - name: stat
+          image: ghcr.io/truvity/policy/url-shortener/stat:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/stat.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-stat"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError
+          ports:
+            
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            
+          resources:
+            limits:
+              memory: 384Mi
+            requests:
+              cpu: 50m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-stat-config
+        
+        
+
+---
+# Source: url-shortener/templates/components.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-log
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: log
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: log
+      annotations:
+        # Restart on a configuration change. Without this a `helm upgrade`
+        # that only edits the ConfigMap changes nothing at all: the pods keep
+        # the file they started with, and the deploy reads as successful.
+        checksum/config: 948a57d7a404375d31a29aad835e0eff8d09f0ae7f448f9acbcfa40dd05b518c
+    spec:
+      serviceAccountName: archiver
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: example
+              app.kubernetes.io/component: log
+      containers:
+        - name: log
+          image: ghcr.io/truvity/policy/url-shortener/log:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/log.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-log"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+          ports:
+            
+            - name: probes
+              containerPort: 7070
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: probes
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: probes
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+            
+            
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: example-log-config
+---
+# Source: url-shortener/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-migrate
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+    "helm.sh/hook-weight": "-10"
+
+---
+# Source: url-shortener/templates/migrate-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-migrate-config
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+    "helm.sh/hook-weight": "-5"
+data:
+  migrate.yaml: |
+    appRole: url_shortener_app
+    log:
+      level: info
+    ownerRole: url_shortener_owner
+
+---
+# Source: url-shortener/templates/identity-check.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example-log-identity-check
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/component: log
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-20"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+        app.kubernetes.io/component: log
+    spec:
+      restartPolicy: Never
+      serviceAccountName: archiver
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: identity-check
+          image: ghcr.io/truvity/policy/url-shortener/identity-check:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+
+---
+# Source: url-shortener/templates/migrate.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example-migrate
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.0.0"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: example-migrate
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: ghcr.io/truvity/policy/url-shortener/migrate:0.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          args: ["-config", "/etc/url-shortener/migrate.yaml"]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "example-migrate"
+            - name: OTEL_TRACES_EXPORTER
+              value: "none"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: PGHOST
+              value: "pg.default.svc.cluster.example"
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: "url_shortener"
+            - name: PGUSER
+              value: "url_shortener_owner"
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/url-shortener-pg-ca/ca-certificates.crt
+            - name: CNPG_CLIENT_PASSWORD_FILE
+              value: /etc/url-shortener-pg-password/password
+            - name: PGAPPNAME
+              value: "example-migrate"
+            - name: CNPG_CLIENT_STATEMENT_TIMEOUT
+              value: "10m"
+          volumeMounts:
+            - name: database-ca
+              mountPath: /etc/url-shortener-pg-ca
+              readOnly: true
+            - name: database-password
+              mountPath: /etc/url-shortener-pg-password
+              readOnly: true
+            - name: config
+              mountPath: /etc/url-shortener
+              readOnly: true
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: database-ca
+          configMap:
+            name: pg-ca
+        - name: database-password
+          secret:
+            secretName: owner
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
+        - name: config
+          configMap:
+            name: example-migrate-config
+

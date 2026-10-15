@@ -185,6 +185,10 @@
 | `images.prober.repository` | NonEmptyString | `"truvity/policy/url-shortener/prober"` |  |
 | `images.prober.tag` | string | `""` |  |
 | `images.prober.digest` | string | `""` |  |
+| `images.identity-check.registry` | NonEmptyString | `"ghcr.io"` |  |
+| `images.identity-check.repository` | NonEmptyString | `"truvity/policy/url-shortener/identity-check"` |  |
+| `images.identity-check.tag` | string | `""` |  |
+| `images.identity-check.digest` | string | `""` |  |
 | `pullPolicy` | PullPolicy | `"IfNotPresent"` |  |
 | `otel.endpoint` | string | `""` |  |
 | `otel.protocol` | OtelProtocol | `"http/protobuf"` |  |
