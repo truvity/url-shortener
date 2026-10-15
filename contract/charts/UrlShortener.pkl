@@ -609,9 +609,9 @@ class ImagesIdentityCheck {
 
   repository: V.NonEmptyString = "truvity/k8s/identity-check"
 
-  tag: String = "v0.0.0-pending"
+  tag: String = "0.31.0"
 
-  digest: String = ""
+  digest: String = "sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"
 }
 
 class Images {

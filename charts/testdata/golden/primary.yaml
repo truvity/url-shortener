@@ -971,7 +971,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: identity-check
-          image: ghcr.io/truvity/k8s/identity-check:v0.0.0-pending
+          image: ghcr.io/truvity/k8s/identity-check@sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

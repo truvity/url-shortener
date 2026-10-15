@@ -1597,18 +1597,18 @@
             },
             "tag": {
               "type": "string",
-              "default": "v0.0.0-pending"
+              "default": "0.31.0"
             },
             "digest": {
               "type": "string",
-              "default": ""
+              "default": "sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"
             }
           },
           "default": {
             "registry": "ghcr.io",
             "repository": "truvity/k8s/identity-check",
-            "tag": "v0.0.0-pending",
-            "digest": ""
+            "tag": "0.31.0",
+            "digest": "sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"
           }
         }
       },
@@ -1658,8 +1658,8 @@
         "identity-check": {
           "registry": "ghcr.io",
           "repository": "truvity/k8s/identity-check",
-          "tag": "v0.0.0-pending",
-          "digest": ""
+          "tag": "0.31.0",
+          "digest": "sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"
         }
       }
     },
