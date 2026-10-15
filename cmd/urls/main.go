@@ -29,7 +29,6 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
 	"golang.org/x/sync/errgroup"
-	"gorm.io/gorm"
 
 	policytelemetry "github.com/truvity/policy/telemetry"
 	"github.com/truvity/policy/transport"
@@ -110,18 +109,14 @@ func run() error {
 	// liveness answers, readiness says why not, and nothing restarts a
 	// process that is doing exactly what it should. Exiting here instead is
 	// what turned a one-minute database reload into a crash loop.
-	var pool atomic.Pointer[gorm.DB]
+	var pool atomic.Pointer[runtime.Database]
 	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
 		db := pool.Load()
 		if db == nil {
 			return errors.New("database: not connected yet")
 		}
-		sqlDB, err := db.DB()
-		if err != nil {
+		if err := db.Health(ctx); err != nil {
 			return err
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			return fmt.Errorf("database: %w", err)
 		}
 		return nil
 	})
@@ -138,7 +133,7 @@ func run() error {
 	defer closeDB()
 	pool.Store(db)
 
-	storeClient, err := store.NewClient(ctx, log, db)
+	storeClient, err := store.NewClient(ctx, log, db.Gorm, db.Do)
 	if err != nil {
 		return fmt.Errorf("build the store client: %w", err)
 	}

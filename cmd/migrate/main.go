@@ -88,7 +88,7 @@ func run() error {
 	defer closeDB()
 
 	if err := withSpan(ctx, "migrate.run", func(ctx context.Context) error {
-		return migration.Run(ctx, log, db, cfg.OwnerRole, cfg.AppRole)
+		return migration.Run(ctx, log, db.Gorm, cfg.OwnerRole, cfg.AppRole)
 	}); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}

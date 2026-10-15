@@ -25,7 +25,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"golang.org/x/sync/errgroup"
-	"gorm.io/gorm"
 
 	policytelemetry "github.com/truvity/policy/telemetry"
 
@@ -107,7 +106,7 @@ func run() error {
 	// process that is doing exactly what it should. Exiting here instead is
 	// what turned a one-minute database reload into a crash loop.
 	var (
-		pool   atomic.Pointer[gorm.DB]
+		pool   atomic.Pointer[runtime.Database]
 		stream atomic.Pointer[nats.Conn]
 	)
 	probes := runtime.Probes(cfg.Probes.Address, func(ctx context.Context) error {
@@ -115,12 +114,8 @@ func run() error {
 		if db == nil {
 			return errors.New("database: not connected yet")
 		}
-		sqlDB, err := db.DB()
-		if err != nil {
+		if err := db.Health(ctx); err != nil {
 			return err
-		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			return fmt.Errorf("database: %w", err)
 		}
 		if nc := stream.Load(); nc == nil || !nc.IsConnected() {
 			return errors.New("not connected to the event stream")
@@ -166,7 +161,7 @@ func run() error {
 
 	// --- what this process is ---
 
-	storeClient, err := store.NewClient(ctx, log, db)
+	storeClient, err := store.NewClient(ctx, log, db.Gorm, db.Do)
 	if err != nil {
 		return fmt.Errorf("build the store client: %w", err)
 	}

@@ -62,6 +62,54 @@ func LogRetry(ctx context.Context, log *slog.Logger) func(attempt int, err error
 	}
 }
 
+// Database is the connection a service holds: the gorm handle over the
+// client's pool, plus the two things the client adds that gorm does not
+// know about, readiness and the retry of a unit of work.
+type Database struct {
+	// Gorm is the handle the store queries through.
+	Gorm *gorm.DB
+
+	pool    *pgclient.Pool
+	request pgclient.RetryPolicy
+}
+
+// Health is the readiness check: SELECT 1 on a pooled connection, bounded to
+// two seconds by the client, through the real path (Service, TLS, password).
+func (d *Database) Health(ctx context.Context) error {
+	if err := d.pool.Health(ctx); err != nil {
+		return fmt.Errorf("database: %w", err)
+	}
+	return nil
+}
+
+// Do runs one unit of work again when, and only when, the connection failed
+// under it (a switchover, a crash, a demoted primary: see
+// pgclient.IsRetryable). The unit MUST be safe to run twice: a statement that
+// committed just before the connection broke is run again.
+func (d *Database) Do(ctx context.Context, fn func(context.Context) error) error {
+	return pgclient.Retry(ctx, d.request, fn)
+}
+
+// RequestRetry is the patience of a call in flight, which is not the
+// patience of a process starting. The start-up policy waits minutes; a
+// request that waits that long has long been abandoned by its caller. When
+// the environment tuned the retry, that wins; otherwise the client's own
+// default (5 tries, 30 s) applies.
+func RequestRetry(ctx context.Context, cfg pgclient.Config, log *slog.Logger) pgclient.RetryPolicy {
+	p := cfg.Retry
+	if p.Attempts == startupRetry.Attempts && p.InitialDelay == startupRetry.InitialDelay &&
+		p.MaxDelay == startupRetry.MaxDelay && p.Budget == startupRetry.Budget {
+		p = pgclient.DefaultRetryPolicy()
+	}
+	p.OnRetry = func(attempt int, err error, delay time.Duration) {
+		log.WarnContext(ctx, "database write interrupted, retrying",
+			slog.Int("attempt", attempt),
+			slog.Any("error", err),
+			slog.Duration("delay", delay))
+	}
+	return p
+}
+
 // OpenDatabase connects, waiting for the server per cfg.Retry, and returns a
 // gorm handle over the client's pool, with the function that closes both.
 //
@@ -79,7 +127,7 @@ func LogRetry(ctx context.Context, log *slog.Logger) func(attempt int, err error
 // Tracing stays this package's gorm plugin (TraceDatabase), so pgclient's
 // own pgx tracer (otelpg) is deliberately NOT set: both would record every
 // statement, and a trace with each query twice is worse than one without.
-func OpenDatabase(ctx context.Context, log *slog.Logger, cfg pgclient.Config) (*gorm.DB, func(), error) {
+func OpenDatabase(ctx context.Context, log *slog.Logger, cfg pgclient.Config) (*Database, func(), error) {
 	cfg.Retry.OnRetry = LogRetry(ctx, log)
 	pool, err := pgclient.New(ctx, cfg)
 	if err != nil {
@@ -107,7 +155,7 @@ func OpenDatabase(ctx context.Context, log *slog.Logger, cfg pgclient.Config) (*
 	}
 	log.InfoContext(ctx, "database connected",
 		slog.String("host", cfg.Host), slog.String("database", cfg.Database), slog.String("user", cfg.User))
-	return db, func() {
+	return &Database{Gorm: db, pool: pool, request: RequestRetry(context.WithoutCancel(ctx), cfg, log)}, func() {
 		_ = sqlDB.Close()
 		pool.Close()
 	}, nil

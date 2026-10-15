@@ -20,7 +20,14 @@ type (
 	Client struct {
 		db     *gorm.DB
 		logger *slog.Logger
+		do     Retry
 	}
+
+	// Retry runs a unit of work again if the database connection failed under
+	// it (a switchover, a crash). It is runtime.Database.Do in the services.
+	// The store hands it only units that are safe to run twice; see each
+	// write below for why.
+	Retry func(ctx context.Context, fn func(context.Context) error) error
 
 	// URLInfo represents URL information from the store
 	// Note: Code is used internally for the url_key, URLKey is the API field name
@@ -43,12 +50,17 @@ func NewClient(
 	ctx context.Context,
 	logger *slog.Logger,
 	db *gorm.DB,
+	retry Retry,
 ) (*Client, error) {
+	if retry == nil {
+		retry = func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) }
+	}
 	logger.InfoContext(ctx, "creating store client")
 
 	return &Client{
 		db:     db,
 		logger: logger,
+		do:     retry,
 	}, nil
 }
 
@@ -62,43 +74,51 @@ func hashLongURL(longURL string) string {
 // Note: Stats are NOT created here - they are created lazily by IncrementClickCount (upsert)
 // when the first redirect happens, so a reader of the counters needs no
 // rights to create them.
+//
+// The whole unit (look, then insert) is retried when the connection breaks
+// under it. That is safe because the row's id is the hash of the long URL: if
+// the first insert committed and only its acknowledgement was lost, the
+// second run finds the row and succeeds without writing.
 func (c *Client) PutURL(ctx context.Context, urlKey, longURL string, expiresAt *time.Time) error {
 	// Calculate deterministic hash for ID (idempotency key)
 	id := hashLongURL(longURL)
+	createdAt := time.Now()
 
-	// Check if URL already exists (idempotent)
-	var existing models.URL
-	err := c.db.WithContext(ctx).Where("id = ?", id).First(&existing).Error
-	if err == nil {
-		// URL already exists (idempotent success)
-		c.logger.InfoContext(ctx, "URL already exists (idempotent)",
+	return c.do(ctx, func(ctx context.Context) error {
+		// Check if URL already exists (idempotent)
+		var existing models.URL
+		err := c.db.WithContext(ctx).Where("id = ?", id).First(&existing).Error
+		if err == nil {
+			// URL already exists (idempotent success)
+			c.logger.InfoContext(ctx, "URL already exists (idempotent)",
+				slog.String("url_key", urlKey),
+				slog.String("long_url", longURL),
+				slog.String("id", id))
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("failed to check existing URL: %w", err)
+		}
+
+		// Create URL
+		url := models.URL{
+			ID:        id,
+			URLKey:    urlKey,
+			LongURL:   longURL,
+			CreatedAt: createdAt,
+			ExpiresAt: expiresAt,
+		}
+		if err := c.db.WithContext(ctx).Create(&url).Error; err != nil {
+			return fmt.Errorf("failed to create URL: %w", err)
+		}
+
+		c.logger.InfoContext(ctx, "URL stored successfully",
 			slog.String("url_key", urlKey),
 			slog.String("long_url", longURL),
 			slog.String("id", id))
+
 		return nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return fmt.Errorf("failed to check existing URL: %w", err)
-	}
-
-	// Create URL
-	url := models.URL{
-		ID:        id,
-		URLKey:    urlKey,
-		LongURL:   longURL,
-		CreatedAt: time.Now(),
-		ExpiresAt: expiresAt,
-	}
-	if err := c.db.WithContext(ctx).Create(&url).Error; err != nil {
-		return fmt.Errorf("failed to create URL: %w", err)
-	}
-
-	c.logger.InfoContext(ctx, "URL stored successfully",
-		slog.String("url_key", urlKey),
-		slog.String("long_url", longURL),
-		slog.String("id", id))
-
-	return nil
+	})
 }
 
 // GetURL retrieves URL info by url_key
@@ -262,6 +282,11 @@ func (c *Client) GetClickCount(ctx context.Context, urlKey string) (int64, error
 }
 
 // IncrementClickCount increments click count (atomic)
+//
+// Deliberately NOT retried: it adds one to a counter, so a run that committed
+// before its connection broke would count the click twice. A click lost to a
+// switchover is the lesser error for a statistic; the redirect does not wait
+// on it.
 // Uses upsert to handle the case where Stat record doesn't exist yet
 func (c *Client) IncrementClickCount(ctx context.Context, longURL string) error {
 	id := hashLongURL(longURL)
@@ -291,39 +316,91 @@ func (c *Client) IncrementClickCount(ctx context.Context, longURL string) error 
 }
 
 // DeleteURL soft deletes a URL
+//
+// Retried, with the one difference that makes it safe: a second run after the
+// first committed finds nothing left to delete, which on the first run is an
+// error ("not found or already deleted") and on a retry is the success the
+// first run already achieved. So a retry that matches no row accepts a row
+// that is now deleted.
 func (c *Client) DeleteURL(ctx context.Context, urlKey string) error {
 	now := time.Now()
-	result := c.db.WithContext(ctx).
-		Model(&models.URL{}).
-		Where("url_key = ? AND deleted_at IS NULL", urlKey).
-		Update("deleted_at", now)
+	attempt := 0
+	err := c.do(ctx, func(ctx context.Context) error {
+		attempt++
+		result := c.db.WithContext(ctx).
+			Model(&models.URL{}).
+			Where("url_key = ? AND deleted_at IS NULL", urlKey).
+			Update("deleted_at", now)
 
-	if result.Error != nil {
-		return fmt.Errorf("failed to delete URL: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("URL not found or already deleted: %s", urlKey)
+		if result.Error != nil {
+			return fmt.Errorf("failed to delete URL: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if attempt > 1 {
+				return c.settled(ctx, urlKey, true, fmt.Errorf("URL not found or already deleted: %s", urlKey))
+			}
+			return fmt.Errorf("URL not found or already deleted: %s", urlKey)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	c.logger.InfoContext(ctx, "deleted URL", slog.String("url_key", urlKey))
 	return nil
 }
 
-// RestoreURL restores a deleted URL
-func (c *Client) RestoreURL(ctx context.Context, urlKey string) error {
-	result := c.db.WithContext(ctx).
-		Model(&models.URL{}).
-		Where("url_key = ? AND deleted_at IS NOT NULL", urlKey).
-		Updates(map[string]interface{}{
-			"deleted_at": nil,
-			"updated_at": time.Now(),
-		})
-
-	if result.Error != nil {
-		return fmt.Errorf("failed to restore URL: %w", result.Error)
+// settled is the retry's answer to "no row matched": nil when the row is in
+// the state the write was aiming at (deleted when wantDeleted, live
+// otherwise), because then an earlier run of the same write did the work;
+// otherwise notFound. A failure of the lookup itself is returned as it is, so
+// a connection error still gets its retry.
+func (c *Client) settled(ctx context.Context, urlKey string, wantDeleted bool, notFound error) error {
+	var url models.URL
+	err := c.db.WithContext(ctx).Where("url_key = ?", urlKey).First(&url).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return notFound
 	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("URL not found or not deleted: %s", urlKey)
+	if err != nil {
+		return fmt.Errorf("failed to check URL: %w", err)
+	}
+	if (url.DeletedAt != nil) == wantDeleted {
+		return nil
+	}
+	return notFound
+}
+
+// RestoreURL restores a deleted URL
+//
+// Retried on the same terms as DeleteURL: a retry that matches no row accepts
+// a row that is now live.
+func (c *Client) RestoreURL(ctx context.Context, urlKey string) error {
+	now := time.Now()
+	attempt := 0
+	err := c.do(ctx, func(ctx context.Context) error {
+		attempt++
+		result := c.db.WithContext(ctx).
+			Model(&models.URL{}).
+			Where("url_key = ? AND deleted_at IS NOT NULL", urlKey).
+			Updates(map[string]interface{}{
+				"deleted_at": nil,
+				"updated_at": now,
+			})
+
+		if result.Error != nil {
+			return fmt.Errorf("failed to restore URL: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if attempt > 1 {
+				return c.settled(ctx, urlKey, false, fmt.Errorf("URL not found or not deleted: %s", urlKey))
+			}
+			return fmt.Errorf("URL not found or not deleted: %s", urlKey)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	c.logger.InfoContext(ctx, "restored URL", slog.String("url_key", urlKey))
@@ -348,16 +425,25 @@ func (c *Client) UpdateURL(ctx context.Context, urlKey string, longURL *string, 
 		updates["expires_at"] = nil
 	}
 
-	result := c.db.WithContext(ctx).
-		Model(&models.URL{}).
-		Where("url_key = ? AND deleted_at IS NULL", urlKey).
-		Updates(updates)
+	// Retried: the same absolute values (the timestamp is taken once, above)
+	// are written to the same row, so a second run after a committed first
+	// changes nothing and still matches the row.
+	err := c.do(ctx, func(ctx context.Context) error {
+		result := c.db.WithContext(ctx).
+			Model(&models.URL{}).
+			Where("url_key = ? AND deleted_at IS NULL", urlKey).
+			Updates(updates)
 
-	if result.Error != nil {
-		return nil, fmt.Errorf("failed to update URL: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return nil, fmt.Errorf("URL not found or already deleted: %s", urlKey)
+		if result.Error != nil {
+			return fmt.Errorf("failed to update URL: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("URL not found or already deleted: %s", urlKey)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch updated URL

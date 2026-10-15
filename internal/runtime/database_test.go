@@ -124,3 +124,27 @@ func TestLogRetryReportsEachAttempt(t *testing.T) {
 		}
 	}
 }
+
+// A call in flight does not get the start-up patience: three minutes of
+// retry is longer than any caller waits. It gets the client's default unless
+// the environment tuned it.
+func TestRequestRetryIsNotTheStartupRetry(t *testing.T) {
+	cfg, err := runtime.DatabaseConfig(env(verifyFull()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := runtime.RequestRetry(t.Context(), cfg, slog.New(slog.DiscardHandler))
+	if got.Budget != 30*time.Second || got.Attempts != 5 {
+		t.Errorf("the request retry is %+v, want the client default (5 tries, 30s)", got)
+	}
+
+	e := verifyFull()
+	e["CNPG_CLIENT_RETRY_BUDGET"] = "45s"
+	cfg, err = runtime.DatabaseConfig(env(e))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := runtime.RequestRetry(t.Context(), cfg, slog.New(slog.DiscardHandler)); got.Budget != 45*time.Second {
+		t.Errorf("the environment's retry budget was ignored: %+v", got)
+	}
+}
