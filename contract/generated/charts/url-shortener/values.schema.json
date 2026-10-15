@@ -1593,11 +1593,11 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/identity-check"
+              "default": "truvity/k8s/identity-check"
             },
             "tag": {
               "type": "string",
-              "default": ""
+              "default": "v0.0.0-pending"
             },
             "digest": {
               "type": "string",
@@ -1606,8 +1606,8 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/identity-check",
-            "tag": "",
+            "repository": "truvity/k8s/identity-check",
+            "tag": "v0.0.0-pending",
             "digest": ""
           }
         }
@@ -1657,8 +1657,8 @@
         },
         "identity-check": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/identity-check",
-          "tag": "",
+          "repository": "truvity/k8s/identity-check",
+          "tag": "v0.0.0-pending",
           "digest": ""
         }
       }

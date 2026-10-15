@@ -607,9 +607,9 @@ class ImagesProber {
 class ImagesIdentityCheck {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/identity-check"
+  repository: V.NonEmptyString = "truvity/k8s/identity-check"
 
-  tag: String = ""
+  tag: String = "v0.0.0-pending"
 
   digest: String = ""
 }

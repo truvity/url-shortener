@@ -186,8 +186,8 @@
 | `images.prober.tag` | string | `""` |  |
 | `images.prober.digest` | string | `""` |  |
 | `images.identity-check.registry` | NonEmptyString | `"ghcr.io"` |  |
-| `images.identity-check.repository` | NonEmptyString | `"truvity/policy/url-shortener/identity-check"` |  |
-| `images.identity-check.tag` | string | `""` |  |
+| `images.identity-check.repository` | NonEmptyString | `"truvity/k8s/identity-check"` |  |
+| `images.identity-check.tag` | string | `"v0.0.0-pending"` |  |
 | `images.identity-check.digest` | string | `""` |  |
 | `pullPolicy` | PullPolicy | `"IfNotPresent"` |  |
 | `otel.endpoint` | string | `""` |  |

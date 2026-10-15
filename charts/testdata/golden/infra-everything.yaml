@@ -81,6 +81,43 @@ spec:
 
 ---
 # Source: url-shortener-infra/templates/cloud.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: example-identity-check-egress
+  labels:
+    app.kubernetes.io/name: url-shortener-infra
+    app.kubernetes.io/instance: example
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: example
+      app.kubernetes.io/component: log-identity-check
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+      ports:
+        - port: 80
+          protocol: TCP
+    - to:
+        - domainNames: ["*.amazonaws.com"]
+      ports:
+        - port: 443
+          protocol: TCP
+
+---
+# Source: url-shortener-infra/templates/cloud.yaml
 apiVersion: s3.services.k8s.aws/v1alpha1
 kind: Bucket
 metadata:

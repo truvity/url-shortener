@@ -219,8 +219,11 @@ images:
   # stamps it).
   prober: {registry: ghcr.io, repository: truvity/policy/url-shortener/prober, tag: "", digest: ""}
   # Read only on a primary install, by service-lib's identity check
-  # (templates/identity-check.yaml); stamped like the rest.
-  identity-check: {registry: ghcr.io, repository: truvity/policy/url-shortener/identity-check, tag: "", digest: ""}
+  # (templates/identity-check.yaml). Not built here: the command and its image
+  # belong to truvity/k8s (cmd/identity-check), so this release stamps nothing
+  # into it. TODO: pinned to a truvity/k8s release; a follow-up sets the real
+  # tag and digest once that repository publishes it.
+  identity-check: {registry: ghcr.io, repository: truvity/k8s/identity-check, tag: v0.0.0-pending, digest: ""}
 
 pullPolicy: IfNotPresent
 

@@ -135,7 +135,7 @@ func TestOnlyTheCloudIdentityComponentIsChecked(t *testing.T) {
 		t.Fatalf("render: %v\n%s", err, out)
 	}
 	for _, job := range identityCheckJobs(t, out) {
-		if got := at(t, job, "metadata", "labels", "app.kubernetes.io/component"); got != "log" {
+		if got := at(t, job, "metadata", "labels", "app.kubernetes.io/component"); got != "log-identity-check" {
 			t.Errorf("an identity check for component %v, which has no cloud identity", got)
 		}
 	}
@@ -166,5 +166,59 @@ func TestTheInfraChartOrdersRoleAssociationAccount(t *testing.T) {
 	role, association, account := wave("Role"), wave("PodIdentityAssociation"), wave("ServiceAccount")
 	if role >= association || association >= account {
 		t.Errorf("the Role is wave %d, the association %d and the account %d; each must come strictly after the one it depends on", role, association, account)
+	}
+}
+
+// No selector of the chart matches the check's pod.
+//
+// A Job pod with no readiness probe is Ready while it runs, so a Service that
+// selected it would route real traffic to a pod that serves nothing, and a
+// PodDisruptionBudget that matched it would skew the disruption arithmetic.
+func TestNoSelectorMatchesTheIdentityCheckPod(t *testing.T) {
+	out, err := render(t, primaryApp("--set", "availability=high")...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+
+	jobs := identityCheckJobs(t, out)
+	if len(jobs) != 1 {
+		t.Fatalf("want one identity check, got %d", len(jobs))
+	}
+	labels, _ := at(t, jobs[0], "spec", "template", "metadata", "labels").(map[string]any)
+	if len(labels) == 0 {
+		t.Fatal("the check's pod has no labels")
+	}
+
+	matches := func(selector any) bool {
+		sel, _ := selector.(map[string]any)
+		if len(sel) == 0 {
+			return false // an empty selector is a different bug, not this one
+		}
+		for k, v := range sel {
+			if labels[k] != v {
+				return false
+			}
+		}
+		return true
+	}
+
+	var checked int
+	for _, doc := range documents(t, out) {
+		var selector any
+		switch doc["kind"] {
+		case "Service":
+			selector = at(t, doc, "spec", "selector")
+		case "PodDisruptionBudget", "Deployment":
+			selector = at(t, doc, "spec", "selector", "matchLabels")
+		default:
+			continue
+		}
+		checked++
+		if matches(selector) {
+			t.Errorf("%v %v selects the identity check's pod (%v)", doc["kind"], at(t, doc, "metadata", "name"), labels)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no Service, budget or Deployment was rendered, so no selector was checked")
 	}
 }

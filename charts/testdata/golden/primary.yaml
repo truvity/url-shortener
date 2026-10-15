@@ -941,7 +941,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "0.0.0"
-    app.kubernetes.io/component: log
+    app.kubernetes.io/component: log-identity-check
+    service-lib.io/identity-check: "true"
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-20"
@@ -956,7 +957,8 @@ spec:
         app.kubernetes.io/instance: example
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "0.0.0"
-        app.kubernetes.io/component: log
+        app.kubernetes.io/component: log-identity-check
+        service-lib.io/identity-check: "true"
     spec:
       restartPolicy: Never
       serviceAccountName: archiver
@@ -969,7 +971,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: identity-check
-          image: ghcr.io/truvity/policy/url-shortener/identity-check:0.0.0
+          image: ghcr.io/truvity/k8s/identity-check:v0.0.0-pending
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
