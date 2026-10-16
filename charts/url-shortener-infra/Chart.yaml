@@ -12,3 +12,14 @@ appVersion: "0.0.0"
 # renders the keys of every step up to it and compares no version.
 annotations:
   delivery.truvity.io/interface: "15"
+# The runtime role of a platform-owned database (and the password generated
+# for it) is the cnpg-database chart's, not this chart's: a product states
+# the role, the chart renders the DatabaseRole, the Password generator and
+# the ExternalSecret. It is rendered only for a database the platform owns
+# (`postgres.platformOwned`); values.yaml says what the platform hands it
+# and templates/guard.yaml what must agree with `postgres`.
+dependencies:
+  - name: cnpg-database
+    version: 2.29.0
+    repository: oci://ghcr.io/truvity/charts
+    condition: postgres.platformOwned

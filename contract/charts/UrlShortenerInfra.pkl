@@ -18,6 +18,9 @@ cloud: Cloud?
 
 postgres: Postgres
 
+/// The values of the cnpg-database chart, which renders the runtime role of a platform-owned database. Validated by that chart's own schema; the chart holds clusterName, the role and its Secret to `postgres`.
+`cnpg-database`: Mapping<String, Any>?
+
 events: Events
 
 /// The objects a primary install owns. Every name is given, never derived. Unused on a test install.

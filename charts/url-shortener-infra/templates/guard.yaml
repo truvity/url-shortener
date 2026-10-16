@@ -1,0 +1,57 @@
+{{- /*
+The one place the two halves of a platform-owned database are held to each
+other.
+
+The runtime role of a platform-owned database is rendered by the
+cnpg-database chart (on exactly when `postgres.platformOwned` is), from the
+values under `cnpg-database`: the defaults in values.yaml, which are the live
+install's, or the platform's own.
+A subchart's values cannot be computed from this chart's (Helm resolves them
+before a template runs), so the role's name, its Secret and the cluster it
+belongs to are stated TWICE: here under `postgres`, which everything else in
+this chart and the application read, and under `cnpg-database`, which renders
+the objects. Two statements of one fact drift, and the way this one drifts
+is a DatabaseRole for a role nothing connects as, or a Secret under a name
+nothing mounts. So the render refuses unless they agree. It renders nothing.
+*/}}
+{{- $pg := .Values.postgres }}
+{{- $cnpg := index .Values "cnpg-database" | default dict }}
+{{- if $pg.platformOwned }}
+{{- $cluster := printf "%s-pg" .Release.Name }}
+{{- if ne ($cnpg.clusterName | default "") $cluster }}
+{{- fail (printf "cnpg-database.clusterName must be %q, the cluster this release's database is known as (got %q)" $cluster ($cnpg.clusterName | default "")) }}
+{{- end }}
+{{- $role := include "url-shortener-infra.resolvedAppRole" . }}
+{{- $roles := $cnpg.roles | default list }}
+{{- if ne (len $roles) 1 }}
+{{- fail (printf "cnpg-database.roles must hold exactly the runtime role %q (got %d roles)" $role (len $roles)) }}
+{{- end }}
+{{- $r := index $roles 0 }}
+{{- if ne ($r.name | default "") $role }}
+{{- fail (printf "cnpg-database.roles[0].name must be the runtime role %q (got %q)" $role ($r.name | default "")) }}
+{{- end }}
+{{- $have := $r.labels | default dict }}
+{{- if ne (index $have "app.kubernetes.io/instance") .Release.Name }}
+{{- fail (printf "cnpg-database.roles[0].labels must carry app.kubernetes.io/instance: %s, this release's name (got %v)" .Release.Name (index $have "app.kubernetes.io/instance")) }}
+{{- end }}
+{{- if ne (index $have "app.kubernetes.io/name") "url-shortener-infra" }}
+{{- fail "cnpg-database.roles[0].labels must carry app.kubernetes.io/name: url-shortener-infra" }}
+{{- end }}
+{{- $secret := required "postgres.runtimePasswordSecret is the NAME of a basic-auth secret; the chart does not invent one, though it can be asked to fill it -- see postgres.runtimePassword.generate" $pg.runtimePasswordSecret }}
+{{- if $pg.runtimePassword.generate }}
+{{- $gp := $r.generatedPassword | default dict }}
+{{- if ne ($gp.secretName | default "") $secret }}
+{{- fail (printf "cnpg-database.roles[0].generatedPassword.secretName must be postgres.runtimePasswordSecret %q (got %q)" $secret ($gp.secretName | default "")) }}
+{{- end }}
+{{- if ne (int ($gp.length | default 32)) (int $pg.runtimePassword.length) }}
+{{- fail (printf "cnpg-database.roles[0].generatedPassword.length must be postgres.runtimePassword.length %v (got %v)" $pg.runtimePassword.length ($gp.length | default 32)) }}
+{{- end }}
+{{- else }}
+{{- if $r.generatedPassword }}
+{{- fail "cnpg-database.roles[0].generatedPassword is set while postgres.runtimePassword.generate is false: say one or the other" }}
+{{- end }}
+{{- if ne ($r.passwordSecret | default "") $secret }}
+{{- fail (printf "cnpg-database.roles[0].passwordSecret must be postgres.runtimePasswordSecret %q (got %q)" $secret ($r.passwordSecret | default "")) }}
+{{- end }}
+{{- end }}
+{{- end }}

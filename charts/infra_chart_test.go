@@ -543,9 +543,10 @@ func TestGenerateWithNoNameStillRefuses(t *testing.T) {
 }
 
 // In platform-owned mode the chart renders no Cluster, and the role the
-// services log in as is a DatabaseRole against the platform's database.
+// services log in as is a DatabaseRole against the platform's database,
+// rendered by the cnpg-database chart with the Secret's generator beside it.
 func TestThePlatformOwnedInfraChartRendersNoCluster(t *testing.T) {
-	out, err := renderInfra(t, infraDefaults("--set", "postgres.platformOwned=true")...)
+	out, err := renderInfra(t, "-f", filepath.Join("testdata", "infra-platform-owned.yaml"))
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
@@ -560,8 +561,99 @@ func TestThePlatformOwnedInfraChartRendersNoCluster(t *testing.T) {
 		}
 	}
 
+	// Each of the three objects of the role's credential exactly once: a
+	// second owner of the Password generator would be two charts fighting.
+	for _, kind := range []string{"kind: DatabaseRole", "kind: Password", "kind: ExternalSecret"} {
+		if n := strings.Count(out, "\n"+kind+"\n"); n != 1 {
+			t.Errorf("%q is rendered %d times, want once:\n%s", kind, n, out)
+		}
+	}
+
 	if strings.Contains(out, "kind: Database\n") {
 		t.Errorf("a Database was rendered; the platform's chart declares the bootstrap database and a second object would be refused:\n%s", out)
+	}
+}
+
+// The role is stated twice, under `postgres` and under `cnpg-database`,
+// because a subchart's values cannot be computed from the parent's. The
+// render refuses when the two disagree, so a DatabaseRole for a role nothing
+// connects as, or a Secret nothing mounts, never reaches a cluster.
+func TestThePlatformOwnedInfraChartRefusesTwoAccountsOfTheRole(t *testing.T) {
+	good := filepath.Join("testdata", "infra-platform-owned.yaml")
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"a release the defaults do not describe",
+			infraDefaults("--set", "postgres.platformOwned=true"),
+			"cnpg-database.clusterName must be"},
+		{"another release in the instance label",
+			[]string{"-f", good, "--set", "cnpg-database.roles[0].labels.app\\.kubernetes\\.io/instance=other"},
+			"app.kubernetes.io/instance"},
+		{"another cluster",
+			[]string{"-f", good, "--set", "cnpg-database.clusterName=other-pg"},
+			"cnpg-database.clusterName must be"},
+		{"another role",
+			[]string{"-f", good, "--set", "postgres.runtimeRole=someone_else"},
+			"cnpg-database.roles[0].name must be"},
+		{"another secret",
+			[]string{"-f", good, "--set", "postgres.runtimePasswordSecret=elsewhere"},
+			"generatedPassword.secretName must be"},
+		{"another length",
+			[]string{"-f", good, "--set", "postgres.runtimePassword.length=40"},
+			"generatedPassword.length must be"},
+		{"a generator nobody asked for",
+			[]string{"-f", good, "--set", "postgres.runtimePassword.generate=false"},
+			"generatedPassword is set while"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := renderInfra(t, c.args...)
+			if err == nil {
+				t.Fatalf("the chart rendered although the two accounts of the role disagree:\n%s", out)
+			}
+			if !strings.Contains(out, c.want) {
+				t.Errorf("the refusal does not say %q:\n%s", c.want, out)
+			}
+		})
+	}
+}
+
+// The defaults ARE the live install: a platform that sets nothing under
+// `cnpg-database` and installs under the release name it always has gets the
+// role, the generator and the ExternalSecret, named as they have always been.
+func TestThePlatformOwnedInfraChartNeedsNothingFromThePlatformForTheLiveInstall(t *testing.T) {
+	cmd := exec.Command("helm", "template", "url-shortener-infra", chartDir(t, "url-shortener-infra"),
+		"--set", "postgres.platformOwned=true",
+		"--set", "postgres.runtimePasswordSecret=url-shortener-pg-runtime",
+		"--set", "postgres.runtimePassword.generate=true",
+		"--set", "postgres.labels.extra=one")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("the chart does not render with the live install's values: %v\n%s", err, out)
+	}
+	for _, want := range []string{"name: url-shortener-infra-pg-role-url-shortener-app", "name: url-shortener-pg-runtime"} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("the render lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+// Where the platform does not own the database the chart renders the Cluster
+// and the credential itself, and the cnpg-database chart renders nothing.
+func TestTheInfraChartLeavesCnpgDatabaseOffUnlessThePlatformOwnsTheDatabase(t *testing.T) {
+	out, err := renderInfra(t, infraDefaults("--set", "postgres.runtimePassword.generate=true")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "kind: DatabaseRole") {
+		t.Errorf("a DatabaseRole was rendered beside the Cluster's managed role:\n%s", out)
+	}
+	for _, want := range []string{"kind: Cluster", "kind: Password", "kind: ExternalSecret"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the render lacks %q:\n%s", want, out)
+		}
 	}
 }
 

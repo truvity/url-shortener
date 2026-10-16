@@ -116,8 +116,10 @@ type Names struct {
 
 // Resolve renders both charts and reads back the names they use. It needs
 // `helm` on PATH and nothing else — no cluster, no network beyond what helm
-// itself needs to run locally, which is none: the one dependency is a
-// local path, resolved by `helm dependency build --skip-refresh`.
+// itself needs to run locally, which is none, except one fetch: the
+// application chart's dependency is a local path, but the infrastructure
+// chart's cnpg-database is pulled from the public registry (anonymously) by
+// `helm dependency build --skip-refresh`, as the lock says.
 func Resolve(o Options) (Names, error) {
 	o = o.withDefaults()
 
@@ -277,8 +279,8 @@ func helmTemplate(release, chartDir, namespace string, extra ...string) (string,
 // top/charts/service-lib, exactly as the chart tests do (charts_test.go's
 // chartDir) — duplicated rather than shared, because that helper takes a
 // *testing.T and this package has callers (apply.sh, by way of cmd/resolve)
-// that are not tests. It then resolves the application chart's dependency
-// from its committed Chart.lock, as `helmctl package` does for a release.
+// that are not tests. It then resolves both charts' dependencies from their
+// committed Chart.lock, as `helmctl package` does for a release.
 func writeCharts(top, root string) error {
 	if err := os.CopyFS(root, charts.Files); err != nil {
 		return err
@@ -286,15 +288,17 @@ func writeCharts(top, root string) error {
 	if err := os.CopyFS(filepath.Join(top, "charts"), policycharts.Library); err != nil {
 		return err
 	}
-	app := filepath.Join(root, "url-shortener")
-	// An archive resolved on this machine is ignored by git, so the embed
-	// may carry a stale one; the lock decides what is resolved.
-	if err := os.RemoveAll(filepath.Join(app, "charts")); err != nil {
-		return err
-	}
-	out, err := exec.Command("helm", "dependency", "build", "--skip-refresh", app).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("helm dependency build: %w\n%s", err, out)
+	for _, name := range []string{"url-shortener", "url-shortener-infra"} {
+		dir := filepath.Join(root, name)
+		// An archive resolved on this machine is ignored by git, so the embed
+		// may carry a stale one; the lock decides what is resolved.
+		if err := os.RemoveAll(filepath.Join(dir, "charts")); err != nil {
+			return err
+		}
+		out, err := exec.Command("helm", "dependency", "build", "--skip-refresh", dir).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("helm dependency build %s: %w\n%s", name, err, out)
+		}
 	}
 
 	return nil

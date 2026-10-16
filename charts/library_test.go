@@ -158,6 +158,35 @@ func TestTheApplicationChartResolvesTheLibraryFromItsLock(t *testing.T) {
 	}
 }
 
+// The infrastructure chart renders its platform-owned runtime role through
+// the cnpg-database chart, pinned to one version in Chart.yaml and in the
+// committed Chart.lock, and only when the platform owns the database. The pin
+// is exact: a range would let a release of that chart move what a live
+// DatabaseRole renders without a change here.
+func TestTheInfraChartPinsCnpgDatabase(t *testing.T) {
+	var meta struct {
+		Dependencies []struct{ Name, Version, Repository, Condition string } `yaml:"dependencies"`
+	}
+	raw, err := charts.Files.ReadFile("url-shortener-infra/Chart.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unmarshalYAML(t, raw, &meta)
+	if len(meta.Dependencies) != 1 || meta.Dependencies[0].Name != "cnpg-database" ||
+		meta.Dependencies[0].Version != "2.29.0" ||
+		meta.Dependencies[0].Repository != "oci://ghcr.io/truvity/charts" ||
+		meta.Dependencies[0].Condition != "postgres.platformOwned" {
+		t.Errorf("the infrastructure chart depends on %+v, want cnpg-database 2.29.0 from oci://ghcr.io/truvity/charts when postgres.platformOwned", meta.Dependencies)
+	}
+	lock, err := charts.Files.ReadFile("url-shortener-infra/Chart.lock")
+	if err != nil {
+		t.Fatal("url-shortener-infra has no committed Chart.lock: run `helm dependency update` in it")
+	}
+	if !strings.Contains(string(lock), "version: 2.29.0") {
+		t.Errorf("url-shortener-infra's Chart.lock does not pin cnpg-database 2.29.0:\n%s", lock)
+	}
+}
+
 // C16, C15: a chart that follows the convention renders its configuration
 // verbatim, derives every port from it, restarts on a change to it, and
 // carries only the environment it declares — in the default render and in one

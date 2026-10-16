@@ -71,7 +71,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	for _, chart := range []string{"url-shortener", "testdata/service-example"} {
+	for _, chart := range []string{"url-shortener", "url-shortener-infra", "testdata/service-example"} {
 		dir := filepath.Join(root, chart)
 		// An archive resolved on this machine is ignored by git and so absent
 		// in CI; whatever the embed picked up is replaced by what the lock says.

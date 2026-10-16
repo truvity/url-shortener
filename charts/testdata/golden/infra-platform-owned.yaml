@@ -1,9 +1,10 @@
 ---
-# Source: url-shortener-infra/templates/infra.yaml
+# Source: url-shortener-infra/charts/cnpg-database/templates/roles.yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
   name: example-pg-role-url-shortener-app
+  namespace: default
   labels:
     app.kubernetes.io/instance: example
     app.kubernetes.io/name: url-shortener-infra
@@ -14,26 +15,31 @@ spec:
   name: url_shortener_app
   ensure: present
   login: true
-  connectionLimit: -1
   inherit: true
+  connectionLimit: -1
   passwordSecret:
     name: example-pg-runtime
   databaseRoleReclaimPolicy: retain
 
 ---
-# Source: url-shortener-infra/templates/credential.yaml
+# Source: url-shortener-infra/charts/cnpg-database/templates/roles.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: example-pg-runtime
+  namespace: default
   labels:
-    app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: example
+    app.kubernetes.io/name: url-shortener-infra
+    example.io/project: url-shortener
 spec:
+  # Generated once and never refreshed: a refresh would mint a new password
+  # and lock out every pod holding the old one.
   refreshInterval: "0"
   target:
     name: example-pg-runtime
     template:
+      # basic-auth is what the operator reads a managed role's credential from.
       type: kubernetes.io/basic-auth
       data:
         username: "url_shortener_app"
@@ -46,14 +52,16 @@ spec:
           name: example-pg-runtime
 
 ---
-# Source: url-shortener-infra/templates/credential.yaml
+# Source: url-shortener-infra/charts/cnpg-database/templates/roles.yaml
 apiVersion: generators.external-secrets.io/v1alpha1
 kind: Password
 metadata:
   name: example-pg-runtime
+  namespace: default
   labels:
-    app.kubernetes.io/name: url-shortener-infra
     app.kubernetes.io/instance: example
+    app.kubernetes.io/name: url-shortener-infra
+    example.io/project: url-shortener
 spec:
   length: 32
   digits: 5

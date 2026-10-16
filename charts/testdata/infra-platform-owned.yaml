@@ -1,5 +1,6 @@
 # The platform owns the database: no Cluster is rendered, the runtime role
-# is a role object of its own, and the password is still generated here.
+# is a role object of its own, and the password is still generated, both by
+# the cnpg-database chart from the values below (the release is `example`).
 installName: example-install
 postgres:
   platformOwned: true
@@ -8,3 +9,17 @@ postgres:
     generate: true
   labels:
     example.io/project: url-shortener
+cnpg-database:
+  clusterName: example-pg
+  roles:
+    - name: url_shortener_app
+      connectionLimit: -1
+      inherit: true
+      databaseRoleReclaimPolicy: retain
+      labels:
+        app.kubernetes.io/name: url-shortener-infra
+        app.kubernetes.io/instance: example
+        example.io/project: url-shortener
+      generatedPassword:
+        secretName: example-pg-runtime
+        length: 32
