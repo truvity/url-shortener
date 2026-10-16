@@ -70,6 +70,14 @@ func hashLongURL(longURL string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// read runs a read-only unit of work inside the retry. A read is idempotent,
+// so running it again after the connection broke can only return a later
+// answer. A missing row (gorm.ErrRecordNotFound) is an answer, not a broken
+// connection: it is not retryable and passes through untouched.
+func (c *Client) read(ctx context.Context, fn func(context.Context) error) error {
+	return c.do(ctx, fn)
+}
+
 // PutURL stores a URL entry (idempotent)
 // Note: Stats are NOT created here - they are created lazily by IncrementClickCount (upsert)
 // when the first redirect happens, so a reader of the counters needs no
@@ -124,7 +132,9 @@ func (c *Client) PutURL(ctx context.Context, urlKey, longURL string, expiresAt *
 // GetURL retrieves URL info by url_key
 func (c *Client) GetURL(ctx context.Context, urlKey string) (*URLInfo, error) {
 	var url models.URL
-	err := c.db.WithContext(ctx).Where("url_key = ?", urlKey).First(&url).Error
+	err := c.read(ctx, func(ctx context.Context) error {
+		return c.db.WithContext(ctx).Where("url_key = ?", urlKey).First(&url).Error
+	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -156,16 +166,21 @@ func (c *Client) GetURL(ctx context.Context, urlKey string) (*URLInfo, error) {
 // it. Created-at would read better and is not unique, so two rows sharing a
 // timestamp would either repeat or vanish at a page boundary.
 func (c *Client) ListURLs(ctx context.Context, limit int, after string, includeDeleted bool) ([]URLInfo, error) {
-	query := c.db.WithContext(ctx).Model(&models.URL{}).Order("url_key asc").Limit(limit)
-	if after != "" {
-		query = query.Where("url_key > ?", after)
-	}
-	if !includeDeleted {
-		query = query.Where("deleted_at IS NULL")
-	}
-
 	var urls []models.URL
-	if err := query.Find(&urls).Error; err != nil {
+	// The query is built inside the unit: a gorm chain that has been run
+	// carries its clauses, so a second run of the same value is not the
+	// same query.
+	if err := c.read(ctx, func(ctx context.Context) error {
+		query := c.db.WithContext(ctx).Model(&models.URL{}).Order("url_key asc").Limit(limit)
+		if after != "" {
+			query = query.Where("url_key > ?", after)
+		}
+		if !includeDeleted {
+			query = query.Where("deleted_at IS NULL")
+		}
+		urls = nil
+		return query.Find(&urls).Error
+	}); err != nil {
 		return nil, fmt.Errorf("failed to list URLs: %w", err)
 	}
 
@@ -198,7 +213,9 @@ func (c *Client) ListURLs(ctx context.Context, limit int, after string, includeD
 // rather than shown a success.
 func (c *Client) GetURLByLongURL(ctx context.Context, longURL string) (*URLInfo, error) {
 	var url models.URL
-	err := c.db.WithContext(ctx).Where("id = ?", hashLongURL(longURL)).First(&url).Error
+	err := c.read(ctx, func(ctx context.Context) error {
+		return c.db.WithContext(ctx).Where("id = ?", hashLongURL(longURL)).First(&url).Error
+	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -237,7 +254,9 @@ func (c *Client) FindURLByLongURL(ctx context.Context, longURL string) (*URLInfo
 	id := hashLongURL(longURL)
 
 	var url models.URL
-	err := c.db.WithContext(ctx).Where("id = ?", id).First(&url).Error
+	err := c.read(ctx, func(ctx context.Context) error {
+		return c.db.WithContext(ctx).Where("id = ?", id).First(&url).Error
+	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -270,7 +289,9 @@ func (c *Client) GetClickCount(ctx context.Context, urlKey string) (int64, error
 	id := hashLongURL(urlInfo.LongURL)
 
 	var stat models.Stat
-	err = c.db.WithContext(ctx).Where("id = ?", id).First(&stat).Error
+	err = c.read(ctx, func(ctx context.Context) error {
+		return c.db.WithContext(ctx).Where("id = ?", id).First(&stat).Error
+	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, nil
 	}

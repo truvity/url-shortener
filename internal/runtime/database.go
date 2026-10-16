@@ -28,6 +28,19 @@ var startupRetry = pgclient.RetryPolicy{
 	Budget:       3 * time.Minute,
 }
 
+// What a call in flight waits for the database to come back: every ~2 s for
+// up to 30 s, however many tries that is. The client's default (5 tries) is
+// spent in about 1.5 s of back-off plus the failed connects, and a CloudNativePG
+// switchover takes 10 to 30 s, so a count that ends first fails requests the
+// time budget would have saved. The count is only a safety net here; the
+// budget is what ends the wait.
+var requestRetry = pgclient.RetryPolicy{
+	Attempts:     1000,
+	InitialDelay: 200 * time.Millisecond,
+	MaxDelay:     2 * time.Second,
+	Budget:       30 * time.Second,
+}
+
 // DatabaseConfig reads the connection from the libpq environment the
 // platform's client library defines (PGHOST, PGDATABASE, PGUSER,
 // PGSSLROOTCERT, CNPG_CLIENT_PASSWORD_FILE and the CNPG_CLIENT_* tuning),
@@ -93,16 +106,16 @@ func (d *Database) Do(ctx context.Context, fn func(context.Context) error) error
 // RequestRetry is the patience of a call in flight, which is not the
 // patience of a process starting. The start-up policy waits minutes; a
 // request that waits that long has long been abandoned by its caller. When
-// the environment tuned the retry, that wins; otherwise the client's own
-// default (5 tries, 30 s) applies.
+// the environment tuned the retry, that wins; otherwise requestRetry
+// applies (see there for why it is not the client's 5-try default).
 func RequestRetry(ctx context.Context, cfg pgclient.Config, log *slog.Logger) pgclient.RetryPolicy {
 	p := cfg.Retry
 	if p.Attempts == startupRetry.Attempts && p.InitialDelay == startupRetry.InitialDelay &&
 		p.MaxDelay == startupRetry.MaxDelay && p.Budget == startupRetry.Budget {
-		p = pgclient.DefaultRetryPolicy()
+		p = requestRetry
 	}
 	p.OnRetry = func(attempt int, err error, delay time.Duration) {
-		log.WarnContext(ctx, "database write interrupted, retrying",
+		log.WarnContext(ctx, "database call interrupted, retrying",
 			slog.Int("attempt", attempt),
 			slog.Any("error", err),
 			slog.Duration("delay", delay))

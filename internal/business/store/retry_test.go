@@ -273,3 +273,53 @@ func TestUpdateURLSurvivesASwitchover(t *testing.T) {
 	require.NotNil(t, info)
 	require.Equal(t, 2, d.count("UPDATE"))
 }
+
+// Reads are idempotent and run inside the retry: a switchover under a lookup
+// costs a retry, not a failed request. 57P01 is what an in-flight statement
+// sees when the old primary is shut down.
+func TestReadsSurviveASwitchover(t *testing.T) {
+	reads := map[string]func(c *store.Client) error{
+		"GetURL": func(c *store.Client) error { _, err := c.GetURL(t.Context(), "abc"); return err },
+		"GetURLByLongURL": func(c *store.Client) error {
+			_, err := c.GetURLByLongURL(t.Context(), "https://example.test")
+			return err
+		},
+		"FindURLByLongURL": func(c *store.Client) error {
+			_, err := c.FindURLByLongURL(t.Context(), "https://example.test")
+			return err
+		},
+		"ListURLs":     func(c *store.Client) error { _, err := c.ListURLs(t.Context(), 10, "k", false); return err },
+		"GetURLString": func(c *store.Client) error { _, err := c.GetURLString(t.Context(), "abc"); return err },
+	}
+	for name, read := range reads {
+		t.Run(name, func(t *testing.T) {
+			failed := false
+			c, d := newClient(t, func(_ int, _ string) ([][]driver.Value, int64, error) {
+				if !failed {
+					failed = true
+					return nil, 0, switchover()
+				}
+				return row(false), 0, nil
+			})
+			require.NoError(t, read(c))
+			require.Equal(t, 2, d.count("SELECT"), "the read was not run again")
+		})
+	}
+}
+
+// A missing row is an answer: one query, no retry, nil for the caller.
+func TestReadOfAMissingRowIsNotRetried(t *testing.T) {
+	c, d := newClient(t, func(int, string) ([][]driver.Value, int64, error) { return nil, 0, nil })
+	info, err := c.GetURL(t.Context(), "abc")
+	require.NoError(t, err)
+	require.Nil(t, info)
+	require.Equal(t, 1, d.count("SELECT"))
+}
+
+// A read that keeps failing ends after the attempts with the error.
+func TestReadGivesUpAfterTheAttempts(t *testing.T) {
+	c, d := newClient(t, func(int, string) ([][]driver.Value, int64, error) { return nil, 0, switchover() })
+	_, err := c.GetURL(t.Context(), "abc")
+	require.Error(t, err)
+	require.Equal(t, 4, d.count("SELECT"))
+}

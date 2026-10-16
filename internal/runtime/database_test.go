@@ -134,8 +134,11 @@ func TestRequestRetryIsNotTheStartupRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := runtime.RequestRetry(t.Context(), cfg, slog.New(slog.DiscardHandler))
-	if got.Budget != 30*time.Second || got.Attempts != 5 {
-		t.Errorf("the request retry is %+v, want the client default (5 tries, 30s)", got)
+	if got.Budget != 30*time.Second || got.Attempts < 100 {
+		t.Errorf("the request retry is %+v, want a 30s budget that the count does not end first", got)
+	}
+	if got.InitialDelay == 500*time.Millisecond {
+		t.Errorf("the request retry is the start-up one: %+v", got)
 	}
 
 	e := verifyFull()
