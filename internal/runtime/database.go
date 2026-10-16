@@ -14,7 +14,7 @@ import (
 )
 
 // The start-up patience this service has always had: 0.5 s doubling to 10 s,
-// for up to 3 minutes. The client's own default (5 tries, 30 s) is a good
+// for up to 3 minutes. The client's own default (45 s) is the right
 // ceiling for a call in flight and too short for a process that starts while
 // the database is reloading, which is routine and must not become a restart
 // loop with a back-off of its own.
@@ -26,19 +26,6 @@ var startupRetry = pgclient.RetryPolicy{
 	InitialDelay: 500 * time.Millisecond,
 	MaxDelay:     10 * time.Second,
 	Budget:       3 * time.Minute,
-}
-
-// What a call in flight waits for the database to come back: every ~2 s for
-// up to 30 s, however many tries that is. The client's default (5 tries) is
-// spent in about 1.5 s of back-off plus the failed connects, and a CloudNativePG
-// switchover takes 10 to 30 s, so a count that ends first fails requests the
-// time budget would have saved. The count is only a safety net here; the
-// budget is what ends the wait.
-var requestRetry = pgclient.RetryPolicy{
-	Attempts:     1000,
-	InitialDelay: 200 * time.Millisecond,
-	MaxDelay:     2 * time.Second,
-	Budget:       30 * time.Second,
 }
 
 // DatabaseConfig reads the connection from the libpq environment the
@@ -106,13 +93,15 @@ func (d *Database) Do(ctx context.Context, fn func(context.Context) error) error
 // RequestRetry is the patience of a call in flight, which is not the
 // patience of a process starting. The start-up policy waits minutes; a
 // request that waits that long has long been abandoned by its caller. When
-// the environment tuned the retry, that wins; otherwise requestRetry
-// applies (see there for why it is not the client's 5-try default).
+// the environment tuned the retry, that wins; otherwise the client's own
+// default applies (pgclient.DefaultRetryPolicy: no try cap, 0.2 to 2 s
+// back-off, a 45 s budget), which outlasts a CloudNativePG switchover (10 to
+// 30 s). A caller's own deadline still ends the wait sooner.
 func RequestRetry(ctx context.Context, cfg pgclient.Config, log *slog.Logger) pgclient.RetryPolicy {
 	p := cfg.Retry
 	if p.Attempts == startupRetry.Attempts && p.InitialDelay == startupRetry.InitialDelay &&
 		p.MaxDelay == startupRetry.MaxDelay && p.Budget == startupRetry.Budget {
-		p = requestRetry
+		p = pgclient.DefaultRetryPolicy()
 	}
 	p.OnRetry = func(attempt int, err error, delay time.Duration) {
 		log.WarnContext(ctx, "database call interrupted, retrying",

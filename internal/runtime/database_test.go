@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/truvity/cnpg/v2/clients/go/pgclient"
+
 	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
 )
 
@@ -134,20 +136,23 @@ func TestRequestRetryIsNotTheStartupRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := runtime.RequestRetry(t.Context(), cfg, slog.New(slog.DiscardHandler))
-	if got.Budget != 30*time.Second || got.Attempts < 100 {
-		t.Errorf("the request retry is %+v, want a 30s budget that the count does not end first", got)
+	want := pgclient.DefaultRetryPolicy()
+	want.OnRetry = got.OnRetry
+	if got.Attempts != want.Attempts || got.InitialDelay != want.InitialDelay ||
+		got.MaxDelay != want.MaxDelay || got.Budget != want.Budget {
+		t.Errorf("the request retry is %+v, want the client's default %+v", got, want)
 	}
 	if got.InitialDelay == 500*time.Millisecond {
 		t.Errorf("the request retry is the start-up one: %+v", got)
 	}
 
 	e := verifyFull()
-	e["CNPG_CLIENT_RETRY_BUDGET"] = "45s"
+	e["CNPG_CLIENT_RETRY_BUDGET"] = "20s"
 	cfg, err = runtime.DatabaseConfig(env(e))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := runtime.RequestRetry(t.Context(), cfg, slog.New(slog.DiscardHandler)); got.Budget != 45*time.Second {
+	if got := runtime.RequestRetry(t.Context(), cfg, slog.New(slog.DiscardHandler)); got.Budget != 20*time.Second {
 		t.Errorf("the environment's retry budget was ignored: %+v", got)
 	}
 }
