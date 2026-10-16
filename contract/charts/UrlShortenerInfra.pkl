@@ -18,7 +18,7 @@ cloud: Cloud?
 
 postgres: Postgres
 
-/// The values of the cnpg-database chart, which renders the runtime role of a platform-owned database. Validated by that chart's own schema; the chart holds clusterName, the role and its Secret to `postgres`.
+/// The values of the cnpg-database chart, which renders the runtime role's credential (and the role itself where the platform owns the database). Defaults to no role. Validated by that chart's own schema; the chart holds clusterName, the role and its Secret to `postgres`.
 `cnpg-database`: Mapping<String, Any>?
 
 events: Events

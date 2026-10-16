@@ -144,7 +144,8 @@ postgres:
   # INTO that same name -- which is why the name is still required either
   # way: this decides who writes it, not what it is called.
   #
-  # Off by default because it is a dependency an install may not have.
+  # Off by default because it is a dependency an install may not have. On, it
+  # also needs the role's entry under `cnpg-database.roles` (see there).
   runtimePassword:
     generate: false
     length: 32
@@ -163,7 +164,7 @@ postgres:
 
   # The database is the platform's, not this chart's. True renders NO
   # Cluster: the chart renders a role object for the runtime role (and
-  # keeps the password generator below, if asked) against a database whose
+  # keeps the password generator under `cnpg-database`, if asked) against a database whose
   # name is still `<release>-pg`, which the platform's own cluster chart
   # creates. instances, storage, scheduling, backup and serverTLS describe
   # the Cluster and have no effect in this mode. The bootstrap database and
@@ -231,50 +232,51 @@ postgres:
     secretName: ""
     caSecretName: ""
 
-# The runtime role of a PLATFORM-OWNED database (`postgres.platformOwned`),
-# rendered by the cnpg-database chart this chart depends on. Nothing here is
-# read when the platform does not own the database: the Cluster this chart
-# renders then declares the role itself.
+# The runtime role's credential, rendered by the cnpg-database chart this chart
+# depends on (always on; with no `roles` it renders nothing).
 #
-# These are the values of the install the platform runs today, as DEFAULTS:
-# release `url-shortener-infra`, the role `url_shortener_app`, the Secret
-# `url-shortener-pg-runtime`.
-# A platform that installs under another release name, resolves another role
-# (`postgres.tenantScopedNames`, `postgres.runtimeRole`), names another Secret
-# or wants more labels on the role states the block itself: a subchart's values
-# are resolved before any template runs, so they cannot be computed from this
-# chart's, and a list is replaced as a whole, not merged. templates/guard.yaml
-# fails the render, naming the value to set, when this block and `postgres`
-# disagree, so a mismatch is an error and never a second role or Secret.
+# Nothing here is a default for a role: a subchart's values are resolved before
+# any template runs, so they cannot be computed from `postgres`, and a list is
+# replaced as a whole, not merged. Whoever needs the chart to render the role
+# states the one entry, and templates/guard.yaml fails the render, naming the
+# value to set, when it and `postgres` disagree. Never a second role or Secret.
 #
 #   clusterName   `<release>-pg`, the Cluster the platform's chart creates.
-#   roles         exactly one entry, the runtime role: `name` the resolved
-#                 `postgres.runtimeRole`; `labels` carry the chart's own two
-#                 (`app.kubernetes.io/name`, and `/instance` = the release) and
-#                 whatever else the platform wants on the DatabaseRole and the
-#                 generated-password objects (`postgres.labels` does NOT reach
-#                 them: a default cannot hold a platform's label keys, and a
-#                 subchart's values cannot read `postgres`); `generatedPassword` names
-#                 the Secret (`postgres.runtimePasswordSecret`) when
+#                 Checked only where the platform owns the database; this
+#                 chart's own Cluster renders no object that reads it.
+#   roles         empty, or exactly one entry, the runtime role:
+#                 `name` the resolved `postgres.runtimeRole`; `labels` carry the
+#                 chart's own two (`app.kubernetes.io/name`, and `/instance` =
+#                 the release) and whatever else the platform wants on the
+#                 objects (`postgres.labels` does NOT reach them);
+#                 `generatedPassword` names the Secret
+#                 (`postgres.runtimePasswordSecret`) when
 #                 `postgres.runtimePassword.generate`, otherwise
-#                 `passwordSecret` does.
+#                 `passwordSecret` does (platform-owned only).
+#
+#     platform-owned database   the entry renders the DatabaseRole, and with
+#                               `generatedPassword` the Password generator and
+#                               the ExternalSecret.
+#     this chart's own Cluster  the Cluster declares the managed role, so the
+#                               entry says `databaseRole: false` and renders
+#                               the Password generator and the ExternalSecret
+#                               only, and only with
+#                               `postgres.runtimePassword.generate`.
+#
+#     - name: url_shortener_app
+#       databaseRole: false           # this chart's own Cluster only
+#       labels:
+#         app.kubernetes.io/name: url-shortener-infra
+#         app.kubernetes.io/instance: <release>
+#       generatedPassword:
+#         secretName: <postgres.runtimePasswordSecret>
+#         length: 32
 #
 # The password is generated ONCE (the ExternalSecret's refresh interval is
 # "0"), so moving a live install to this chart changes no Secret.
 cnpg-database:
   clusterName: url-shortener-infra-pg
-  roles:
-    - name: url_shortener_app
-      connectionLimit: -1
-      inherit: true
-      # The role owns grants the migration made: never dropped.
-      databaseRoleReclaimPolicy: retain
-      labels:
-        app.kubernetes.io/name: url-shortener-infra
-        app.kubernetes.io/instance: url-shortener-infra
-      generatedPassword:
-        secretName: url-shortener-pg-runtime
-        length: 32
+  roles: []
 
 events:
   # The stream's name and its two subjects are NOT here. Both are

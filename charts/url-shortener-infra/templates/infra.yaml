@@ -27,6 +27,13 @@ instances, storage, scheduling, backup and serverTLS describe the Cluster
 and are ignored in this mode.
 */}}
 {{- else }}
+{{- /*
+Where THIS chart renders the Cluster, the Cluster declares the managed role
+below, and the generated password for it (`postgres.runtimePassword.generate`)
+is the cnpg-database chart's with `databaseRole: false`: the Password
+generator and the once-only ExternalSecret, no DatabaseRole beside the
+managed role. templates/guard.yaml holds that entry to `postgres`.
+*/}}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:

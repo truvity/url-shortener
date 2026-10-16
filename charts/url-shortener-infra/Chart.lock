@@ -1,6 +1,6 @@
 dependencies:
 - name: cnpg-database
   repository: oci://ghcr.io/truvity/charts
-  version: 2.29.0
-digest: sha256:379eb996e18d27cd04481997773244919da4c8caa3aa5cd39efac649e4aec95e
-generated: "2026-10-16T02:14:44.352982535+02:00"
+  version: 2.31.0
+digest: sha256:ca29064c1bb628368d3f65c466e5c4a2eac74f9d06b0861810ed35c60b8a28db
+generated: "2026-10-16T16:44:11.327616229+02:00"

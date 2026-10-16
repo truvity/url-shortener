@@ -1,11 +1,22 @@
 {{- /*
-The one place the two halves of a platform-owned database are held to each
-other.
+The one place the two halves of the runtime role are held to each other.
 
-The runtime role of a platform-owned database is rendered by the
-cnpg-database chart (on exactly when `postgres.platformOwned` is), from the
-values under `cnpg-database`: the defaults in values.yaml, which are the live
-install's, or the platform's own.
+The runtime role's credential, and in a platform-owned database the role
+itself, are rendered by the cnpg-database chart, from the values under
+`cnpg-database`. This chart renders no Password generator, no ExternalSecret
+and no DatabaseRole of its own, in either mode:
+
+  platform-owned   (`postgres.platformOwned`) the platform's Cluster declares
+                   nothing about the role, so cnpg-database renders the
+                   DatabaseRole, and with `generatedPassword` the Password
+                   generator and the ExternalSecret beside it.
+  this chart's own the Cluster this chart renders declares the managed role
+                   itself, so the role entry says `databaseRole: false` and
+                   cnpg-database renders only the Password generator and the
+                   ExternalSecret (and only when
+                   `postgres.runtimePassword.generate`; with it off the Secret
+                   is somebody else's and `roles` stays empty).
+
 A subchart's values cannot be computed from this chart's (Helm resolves them
 before a template runs), so the role's name, its Secret and the cluster it
 belongs to are stated TWICE: here under `postgres`, which everything else in
@@ -29,6 +40,9 @@ nothing mounts. So the render refuses unless they agree. It renders nothing.
 {{- $r := index $roles 0 }}
 {{- if ne ($r.name | default "") $role }}
 {{- fail (printf "cnpg-database.roles[0].name must be the runtime role %q (got %q)" $role ($r.name | default "")) }}
+{{- end }}
+{{- if and (hasKey $r "databaseRole") (not $r.databaseRole) }}
+{{- fail "cnpg-database.roles[0].databaseRole is false while postgres.platformOwned is true: nothing else would declare the role" }}
 {{- end }}
 {{- $have := $r.labels | default dict }}
 {{- if ne (index $have "app.kubernetes.io/instance") .Release.Name }}
@@ -54,4 +68,36 @@ nothing mounts. So the render refuses unless they agree. It renders nothing.
 {{- fail (printf "cnpg-database.roles[0].passwordSecret must be postgres.runtimePasswordSecret %q (got %q)" $secret ($r.passwordSecret | default "")) }}
 {{- end }}
 {{- end }}
+{{- else if $pg.runtimePassword.generate }}
+{{- /* This chart's own Cluster declares the role; cnpg-database renders only
+the generated password. */}}
+{{- $role := include "url-shortener-infra.resolvedAppRole" . }}
+{{- $secret := required "postgres.runtimePasswordSecret is the NAME this generates INTO; the chart still does not invent one" $pg.runtimePasswordSecret }}
+{{- $roles := $cnpg.roles | default list }}
+{{- if ne (len $roles) 1 }}
+{{- fail (printf "cnpg-database.roles must hold exactly the runtime role %q while postgres.runtimePassword.generate is true (got %d roles)" $role (len $roles)) }}
+{{- end }}
+{{- $r := index $roles 0 }}
+{{- if ne ($r.name | default "") $role }}
+{{- fail (printf "cnpg-database.roles[0].name must be the runtime role %q (got %q)" $role ($r.name | default "")) }}
+{{- end }}
+{{- if or (not (hasKey $r "databaseRole")) $r.databaseRole }}
+{{- fail "cnpg-database.roles[0].databaseRole must be false: this chart's Cluster declares the role, and a DatabaseRole beside it would be two owners" }}
+{{- end }}
+{{- $have := $r.labels | default dict }}
+{{- if ne (index $have "app.kubernetes.io/instance") .Release.Name }}
+{{- fail (printf "cnpg-database.roles[0].labels must carry app.kubernetes.io/instance: %s, this release's name (got %v)" .Release.Name (index $have "app.kubernetes.io/instance")) }}
+{{- end }}
+{{- if ne (index $have "app.kubernetes.io/name") "url-shortener-infra" }}
+{{- fail "cnpg-database.roles[0].labels must carry app.kubernetes.io/name: url-shortener-infra" }}
+{{- end }}
+{{- $gp := $r.generatedPassword | default dict }}
+{{- if ne ($gp.secretName | default "") $secret }}
+{{- fail (printf "cnpg-database.roles[0].generatedPassword.secretName must be postgres.runtimePasswordSecret %q (got %q)" $secret ($gp.secretName | default "")) }}
+{{- end }}
+{{- if ne (int ($gp.length | default 32)) (int $pg.runtimePassword.length) }}
+{{- fail (printf "cnpg-database.roles[0].generatedPassword.length must be postgres.runtimePassword.length %v (got %v)" $pg.runtimePassword.length ($gp.length | default 32)) }}
+{{- end }}
+{{- else if $cnpg.roles }}
+{{- fail "cnpg-database.roles is set while postgres.runtimePassword.generate is false and the platform does not own the database: nothing for it to render" }}
 {{- end }}

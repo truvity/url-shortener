@@ -40,7 +40,7 @@ func renderInfra(t *testing.T, args ...string) (string, error) {
 //
 // Regenerate with `just golden` after reading the diff, never before.
 func TestWhatTheInfraChartRenders(t *testing.T) {
-	for _, name := range []string{"infra-minimal", "infra-everything", "infra-platform-owned"} {
+	for _, name := range []string{"infra-minimal", "infra-everything", "infra-platform-owned", "infra-generated-password"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := renderInfra(t, "-f", filepath.Join("testdata", name+".yaml"))
 			if err != nil {
@@ -510,8 +510,9 @@ func TestByDefaultNothingGeneratesTheSecret(t *testing.T) {
 // a deliberate act with a restart beside it, not a timer.
 func TestGeneratingMintsUnderTheExactNameGiven(t *testing.T) {
 	out, err := renderInfra(t,
+		"-f", filepath.Join("testdata", "infra-generated-password.yaml"),
 		"--set", "postgres.runtimePasswordSecret=us-devel-pg-runtime",
-		"--set", "postgres.runtimePassword.generate=true",
+		"--set", "cnpg-database.roles[0].generatedPassword.secretName=us-devel-pg-runtime",
 	)
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
@@ -585,9 +586,9 @@ func TestThePlatformOwnedInfraChartRefusesTwoAccountsOfTheRole(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"a release the defaults do not describe",
-			infraDefaults("--set", "postgres.platformOwned=true"),
-			"cnpg-database.clusterName must be"},
+		{"a platform-owned database with no role stated",
+			infraDefaults("--set", "postgres.platformOwned=true", "--set", "cnpg-database.clusterName=example-pg"),
+			"cnpg-database.roles must hold exactly"},
 		{"another release in the instance label",
 			[]string{"-f", good, "--set", "cnpg-database.roles[0].labels.app\\.kubernetes\\.io/instance=other"},
 			"app.kubernetes.io/instance"},
@@ -620,40 +621,80 @@ func TestThePlatformOwnedInfraChartRefusesTwoAccountsOfTheRole(t *testing.T) {
 	}
 }
 
-// The defaults ARE the live install: a platform that sets nothing under
-// `cnpg-database` and installs under the release name it always has gets the
-// role, the generator and the ExternalSecret, named as they have always been.
-func TestThePlatformOwnedInfraChartNeedsNothingFromThePlatformForTheLiveInstall(t *testing.T) {
-	cmd := exec.Command("helm", "template", "url-shortener-infra", chartDir(t, "url-shortener-infra"),
-		"--set", "postgres.platformOwned=true",
-		"--set", "postgres.runtimePasswordSecret=url-shortener-pg-runtime",
-		"--set", "postgres.runtimePassword.generate=true",
-		"--set", "postgres.labels.extra=one")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("the chart does not render with the live install's values: %v\n%s", err, out)
-	}
-	for _, want := range []string{"name: url-shortener-infra-pg-role-url-shortener-app", "name: url-shortener-pg-runtime"} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("the render lacks %q:\n%s", want, out)
-		}
-	}
-}
-
 // Where the platform does not own the database the chart renders the Cluster
-// and the credential itself, and the cnpg-database chart renders nothing.
-func TestTheInfraChartLeavesCnpgDatabaseOffUnlessThePlatformOwnsTheDatabase(t *testing.T) {
-	out, err := renderInfra(t, infraDefaults("--set", "postgres.runtimePassword.generate=true")...)
+// itself, which declares the managed role, and cnpg-database renders only the
+// password for it: the generator and the ExternalSecret, never a DatabaseRole
+// beside the Cluster's managed role.
+func TestTheInfraChartRendersOnlyThePasswordWhereItOwnsTheDatabase(t *testing.T) {
+	out, err := renderInfra(t, "-f", filepath.Join("testdata", "infra-generated-password.yaml"))
 	if err != nil {
 		t.Fatalf("the chart does not render: %v\n%s", err, out)
 	}
 	if strings.Contains(out, "kind: DatabaseRole") {
 		t.Errorf("a DatabaseRole was rendered beside the Cluster's managed role:\n%s", out)
 	}
-	for _, want := range []string{"kind: Cluster", "kind: Password", "kind: ExternalSecret"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("the render lacks %q:\n%s", want, out)
+	for _, kind := range []string{"kind: Cluster", "kind: Password", "kind: ExternalSecret"} {
+		if n := strings.Count(out, "\n"+kind+"\n"); n != 1 {
+			t.Errorf("%q is rendered %d times, want once:\n%s", kind, n, out)
 		}
+	}
+	if !strings.Contains(out, `refreshInterval: "0"`) {
+		t.Errorf("the generated password would be refreshed, and a refresh mints a new one:\n%s", out)
+	}
+}
+
+// With no password to generate, cnpg-database renders nothing at all: the
+// Secret is somebody else's.
+func TestTheInfraChartRendersNothingFromCnpgDatabaseWithoutAGeneratedPassword(t *testing.T) {
+	out, err := renderInfra(t, infraDefaults()...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, out)
+	}
+	for _, kind := range []string{"DatabaseRole", "Password", "ExternalSecret"} {
+		if strings.Contains(out, "kind: "+kind+"\n") {
+			t.Errorf("a %s was rendered although nothing asked for a generated password:\n%s", kind, out)
+		}
+	}
+}
+
+// The same two accounts of the role, held to each other where this chart owns
+// the database and generates the password.
+func TestTheInfraChartRefusesTwoAccountsOfTheRoleItGenerates(t *testing.T) {
+	good := filepath.Join("testdata", "infra-generated-password.yaml")
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"a generator with no role stated",
+			infraDefaults("--set", "postgres.runtimePassword.generate=true"),
+			"cnpg-database.roles must hold exactly"},
+		{"a DatabaseRole beside the Cluster's managed role",
+			[]string{"-f", good, "--set", "cnpg-database.roles[0].databaseRole=true"},
+			"databaseRole must be false"},
+		{"another release in the instance label",
+			[]string{"-f", good, "--set", "cnpg-database.roles[0].labels.app\\.kubernetes\\.io/instance=other"},
+			"app.kubernetes.io/instance"},
+		{"another secret",
+			[]string{"-f", good, "--set", "postgres.runtimePasswordSecret=elsewhere"},
+			"generatedPassword.secretName must be"},
+		{"another length",
+			[]string{"-f", good, "--set", "postgres.runtimePassword.length=40"},
+			"generatedPassword.length must be"},
+		{"a role nobody asked for",
+			[]string{"-f", good, "--set", "postgres.runtimePassword.generate=false"},
+			"cnpg-database.roles is set while"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := renderInfra(t, c.args...)
+			if err == nil {
+				t.Fatalf("the chart rendered although the two accounts of the role disagree:\n%s", out)
+			}
+			if !strings.Contains(out, c.want) {
+				t.Errorf("the refusal does not say %q:\n%s", c.want, out)
+			}
+		})
 	}
 }
 

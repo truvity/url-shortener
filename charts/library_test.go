@@ -160,7 +160,8 @@ func TestTheApplicationChartResolvesTheLibraryFromItsLock(t *testing.T) {
 
 // The infrastructure chart renders its platform-owned runtime role through
 // the cnpg-database chart, pinned to one version in Chart.yaml and in the
-// committed Chart.lock, and only when the platform owns the database. The pin
+// committed Chart.lock, unconditionally: it renders the runtime role's credential in
+// both modes, and nothing at all without a `roles` entry. The pin
 // is exact: a range would let a release of that chart move what a live
 // DatabaseRole renders without a change here.
 func TestTheInfraChartPinsCnpgDatabase(t *testing.T) {
@@ -173,17 +174,17 @@ func TestTheInfraChartPinsCnpgDatabase(t *testing.T) {
 	}
 	unmarshalYAML(t, raw, &meta)
 	if len(meta.Dependencies) != 1 || meta.Dependencies[0].Name != "cnpg-database" ||
-		meta.Dependencies[0].Version != "2.29.0" ||
+		meta.Dependencies[0].Version != "2.31.0" ||
 		meta.Dependencies[0].Repository != "oci://ghcr.io/truvity/charts" ||
-		meta.Dependencies[0].Condition != "postgres.platformOwned" {
-		t.Errorf("the infrastructure chart depends on %+v, want cnpg-database 2.29.0 from oci://ghcr.io/truvity/charts when postgres.platformOwned", meta.Dependencies)
+		meta.Dependencies[0].Condition != "" {
+		t.Errorf("the infrastructure chart depends on %+v, want cnpg-database 2.31.0 from oci://ghcr.io/truvity/charts, unconditionally", meta.Dependencies)
 	}
 	lock, err := charts.Files.ReadFile("url-shortener-infra/Chart.lock")
 	if err != nil {
 		t.Fatal("url-shortener-infra has no committed Chart.lock: run `helm dependency update` in it")
 	}
-	if !strings.Contains(string(lock), "version: 2.29.0") {
-		t.Errorf("url-shortener-infra's Chart.lock does not pin cnpg-database 2.29.0:\n%s", lock)
+	if !strings.Contains(string(lock), "version: 2.31.0") {
+		t.Errorf("url-shortener-infra's Chart.lock does not pin cnpg-database 2.31.0:\n%s", lock)
 	}
 }
 

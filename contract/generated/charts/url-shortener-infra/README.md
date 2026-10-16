@@ -34,7 +34,7 @@
 | `postgres.backup.serverName` | string | `""` |  |
 | `postgres.serverTLS.secretName` | string | `""` |  |
 | `postgres.serverTLS.caSecretName` | string | `""` |  |
-| `cnpg-database` | map of any |  | The values of the cnpg-database chart, which renders the runtime role of a platform-owned database. Validated by that chart's own schema; the chart holds clusterName, the role and its Secret to `postgres`. |
+| `cnpg-database` | map of any |  | The values of the cnpg-database chart, which renders the runtime role's credential (and the role itself where the platform owns the database). Defaults to no role. Validated by that chart's own schema; the chart holds clusterName, the role and its Secret to `postgres`. |
 | `events.storage` | "memory" \| "file" | `"memory"` |  |
 | `events.url` | NonEmptyString | `"nats://nats.nats.svc:4222"` |  |
 | `events.account` | string | `""` |  |
