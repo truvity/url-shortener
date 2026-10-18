@@ -188,8 +188,8 @@
 | `images.prober.digest` | string | `""` |  |
 | `images.identity-check.registry` | NonEmptyString | `"ghcr.io"` |  |
 | `images.identity-check.repository` | NonEmptyString | `"truvity/k8s/identity-check"` |  |
-| `images.identity-check.tag` | string | `"0.31.0"` |  |
-| `images.identity-check.digest` | string | `"sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"` |  |
+| `images.identity-check.tag` | string | `"0.34.0"` |  |
+| `images.identity-check.digest` | string | `"sha256:9fc40a066f5455eb807f0826f7083b0ead46924956af3c8ed5e2c381233d1a38"` |  |
 | `pullPolicy` | PullPolicy | `"IfNotPresent"` |  |
 | `otel.endpoint` | string | `""` |  |
 | `otel.protocol` | OtelProtocol | `"http/protobuf"` |  |

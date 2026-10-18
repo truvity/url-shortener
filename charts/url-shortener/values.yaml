@@ -221,15 +221,15 @@ images:
   # Read only on a primary install, by service-lib's identity check
   # (templates/identity-check.yaml). Not built here: the command and its image
   # belong to truvity/k8s (cmd/identity-check), so this release stamps nothing
-  # into it. Pinned to the truvity/k8s v0.31.0 release (multi-arch index).
-  identity-check: {registry: ghcr.io, repository: truvity/k8s/identity-check, tag: "0.31.0", digest: "sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"}
+  # into it. Pinned to the truvity/k8s v0.34.0 release (multi-arch index).
+  identity-check: {registry: ghcr.io, repository: truvity/k8s/identity-check, tag: "0.34.0", digest: "sha256:9fc40a066f5455eb807f0826f7083b0ead46924956af3c8ed5e2c381233d1a38"}
 
 # The identity check (templates/identity-check.yaml, decision 0013).
 identityCheck:
   # The AWS account the check requires the pod to run in: 12 digits, quoted
   # (a string, so leading zeros survive), or empty to check nothing about the account.
-  # Needs the identity-check image from truvity/k8s v0.34.0 or later; the
-  # pin above (v0.31.0) predates the flag, so move it before setting this.
+  # Needs the identity-check image from truvity/k8s v0.34.0 or later, which
+  # the pin above is.
   expectAccount: ""
 
 pullPolicy: IfNotPresent
