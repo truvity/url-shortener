@@ -133,6 +133,7 @@
 | `web.faro.sampleRate` | Ratio | `1` |  |
 | `drain.seconds` | PositiveInt | `20` |  |
 | `drain.preStopSeconds` | NonNegativeInt | `5` |  |
+| `identityCheck.expectAccount` | string | `""` | The AWS account (12 digits) the identity check requires the pod to run in. Empty checks nothing about the account. Needs an identity-check image from truvity/k8s v0.34.0 or later. |
 | `disruption.enabled` | boolean |  | Absent follows `availability`: a budget renders for `high` only. |
 | `disruption.maxUnavailable` | NonNegativeInt | `1` |  |
 | `tls.mode` | TlsMode | `"off"` | The release-wide default for the components that serve an authenticated boundary. `strict` is accepted here only where `redirect` is overridden below: redirect is gateway-fronted and can never be strict, so the render refuses it when inherited. To make only the URL service strict, set `permissive` (or `off`) here and `tls.components.urls.mode: strict`. |

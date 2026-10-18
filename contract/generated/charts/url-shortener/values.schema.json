@@ -1122,6 +1122,18 @@
         }
       }
     },
+    "identityCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expectAccount": {
+          "type": "string",
+          "description": "The AWS account (12 digits) the identity check requires the pod to run in. Empty checks nothing about the account. Needs an identity-check image from truvity/k8s v0.34.0 or later.",
+          "default": ""
+        }
+      },
+      "description": "The identity check that runs before a primary install's workloads."
+    },
     "disruption": {
       "type": "object",
       "additionalProperties": false,

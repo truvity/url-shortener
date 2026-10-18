@@ -8,7 +8,12 @@ url-shortener-infra renders, after the Pod Identity association
 (`url-shortener.identityInInfra`): that is the case where an association is
 created moments before this release, and where the account already exists
 when a hook needs it. Nothing else switches it.
+
+`identityCheck.expectAccount`, when set, is the AWS account the pod must run
+in (12 digits); the check then fails, and so does the install, on a pod that
+was admitted with an identity from another account. Empty passes no
+`-expect-account`.
 */}}
 {{- $log := include "url-shortener.platform" (dict "root" $ "component" "log") | fromJson }}
-{{ include "service-lib.identityCheck" (dict "context" $ "name" "log" "platform" $log "cloudIdentity" (not (not (include "url-shortener.identityInInfra" .)))) }}
+{{ include "service-lib.identityCheck" (dict "context" $ "name" "log" "platform" $log "cloudIdentity" (not (not (include "url-shortener.identityInInfra" .))) "expectAccount" (.Values.identityCheck | default dict).expectAccount) }}
 {{- end }}

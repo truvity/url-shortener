@@ -224,6 +224,14 @@ images:
   # into it. Pinned to the truvity/k8s v0.31.0 release (multi-arch index).
   identity-check: {registry: ghcr.io, repository: truvity/k8s/identity-check, tag: "0.31.0", digest: "sha256:248ace99e043f4e4c6ddda5e4c5347f289f791be0417f7df6c1a83d2d6f725ec"}
 
+# The identity check (templates/identity-check.yaml, decision 0013).
+identityCheck:
+  # The AWS account the check requires the pod to run in: 12 digits, quoted
+  # (a string, so leading zeros survive), or empty to check nothing about the account.
+  # Needs the identity-check image from truvity/k8s v0.34.0 or later; the
+  # pin above (v0.31.0) predates the flag, so move it before setting this.
+  expectAccount: ""
+
 pullPolicy: IfNotPresent
 
 # Telemetry, as OpenTelemetry's own environment variables (decision 0006).

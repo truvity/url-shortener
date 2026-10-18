@@ -58,6 +58,9 @@ web: Web?
 
 drain: Drain?
 
+/// The identity check that runs before a primary install's workloads.
+identityCheck: IdentityCheck?
+
 disruption: Disruption?
 
 tls: Tls?
@@ -468,6 +471,11 @@ class Drain {
   seconds: V.PositiveInt = 20
 
   preStopSeconds: V.NonNegativeInt = 5
+}
+
+class IdentityCheck {
+  /// The AWS account (12 digits) the identity check requires the pod to run in. Empty checks nothing about the account. Needs an identity-check image from truvity/k8s v0.34.0 or later.
+  expectAccount: String(isEmpty || matches(Regex("^[0-9]{12}$"))) = ""
 }
 
 class Disruption {

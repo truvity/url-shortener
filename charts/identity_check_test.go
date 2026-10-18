@@ -222,3 +222,55 @@ func TestNoSelectorMatchesTheIdentityCheckPod(t *testing.T) {
 		t.Fatal("no Service, budget or Deployment was rendered, so no selector was checked")
 	}
 }
+
+func identityCheckArgs(t *testing.T, out string) []any {
+	t.Helper()
+	jobs := identityCheckJobs(t, out)
+	if len(jobs) != 1 {
+		t.Fatalf("want one identity check, got %d", len(jobs))
+	}
+	containers, _ := at(t, jobs[0], "spec", "template", "spec", "containers").([]any)
+	if len(containers) != 1 {
+		t.Fatalf("want one container, got %d", len(containers))
+	}
+	args, _ := containers[0].(map[string]any)["args"].([]any)
+	return args
+}
+
+// expectAccount reaches the command as -expect-account, and only when set.
+func TestExpectAccountIsPassedToTheCheckOnlyWhenSet(t *testing.T) {
+	out, err := render(t, primaryApp()...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+	if args := identityCheckArgs(t, out); len(args) != 0 {
+		t.Errorf("args = %v without expectAccount, want none", args)
+	}
+
+	// Built, not spelled: this repository is public and its canary refuses a
+	// literal twelve-digit run, even a placeholder.
+	account := strings.Repeat("1", 12)
+	out, err = render(t, primaryApp("--set-string", "identityCheck.expectAccount="+account)...)
+	if err != nil {
+		t.Fatalf("render: %v\n%s", err, out)
+	}
+	args := identityCheckArgs(t, out)
+	if len(args) != 2 || args[0] != "-expect-account" || args[1] != account {
+		t.Errorf("args = %v, want [-expect-account %s]", args, account)
+	}
+}
+
+// A malformed account is refused at render time, not by a Job that fails six
+// times.
+func TestAMalformedExpectAccountFailsTheRender(t *testing.T) {
+	for _, bad := range []string{"1111", "11112222333a", "1111222233334"} {
+		out, err := render(t, primaryApp("--set-string", "identityCheck.expectAccount="+bad)...)
+		if err == nil {
+			t.Errorf("expectAccount %q rendered; want a failure\n%s", bad, out)
+			continue
+		}
+		if !strings.Contains(out, "expectAccount") {
+			t.Errorf("expectAccount %q failed without saying why:\n%s", bad, out)
+		}
+	}
+}
