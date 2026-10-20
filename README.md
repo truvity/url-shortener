@@ -54,12 +54,27 @@ visible in one place:
   [`schemas/`](schemas) before anything is constructed. A test asserts each
   type and its schema describe the same fields, which is what stops a
   renamed key becoming a default nobody chose.
-- **Secrets are named, not carried.** The database URL has no password in
-  it; it names the environment variable that does. There is a test that a
-  password written into the file is refused, and that the refusal does not
-  repeat it.
+- **Secrets are named, not carried.** There is no database URL anywhere:
+  the connection is the libpq environment the platform's PostgreSQL client
+  reads (`PGHOST`, `PGDATABASE`, `PGUSER`, `PGSSLROOTCERT`, and the password
+  as a mounted file, `CNPG_CLIENT_PASSWORD_FILE`), `verify-full` only. A
+  configuration file that still carries a `database` block is refused by
+  name, and so is a password written into any block, without the refusal
+  repeating it; both have tests.
 - **Probes on their own listener.** Liveness checks nothing; readiness
-  checks what the component needs in order to serve.
+  checks what the component needs in order to serve. For the Go services that hold a database
+  it is the database client's `Health` (`SELECT 1` through the real path:
+  Service, TLS, password), and the probe listener is up before the database
+  is dialled, so a database that is away makes the process not ready, not
+  restarted.
+- **The database client's retry is the library's.** The services use
+  `github.com/truvity/cnpg/v2/clients/go/pgclient` with its default policy
+  for a call in flight: no attempt cap, 0.2 to 2 s back-off, a 45 s budget,
+  which outlasts a switchover (10 to 30 s). Only start-up is more patient (up
+  to 3 minutes, `internal/runtime/database.go`), so a process that starts
+  while the database reloads does not loop through restarts;
+  `CNPG_CLIENT_RETRY_*` in the environment overrides either. A unit of work
+  that is safe to run twice goes through `Database.Do`.
 - **One log level, JSON, on stderr.** stdout is the program's product; a
   service usually has none, and these produce none.
 - **SIGTERM drains.** Both servers, and both consumers, which finish the
@@ -99,11 +114,13 @@ configuration contract's first rule made real: a key the chart sets and the
 binary stopped reading is a test failure in the pull request, not a default
 nobody chose in a cluster.
 
-Four negative fixtures in
+Negative fixtures in
 [`charts/testdata/invalid/`](charts/testdata/invalid), one per refusal: an
 unknown key, a route naming no parent, an install that supplies no address
-for its database and broker, and a log level the binary would reject. Each
-fails for its own reason, checked.
+for its database and broker, a log level the binary would reject, a database
+TLS mode the client would refuse (`require`, an unknown one, `verify-full`
+without a root), no database root, and per-component settings that clash or
+name no component. Each fails for its own reason, checked.
 
 ## Browser telemetry
 
