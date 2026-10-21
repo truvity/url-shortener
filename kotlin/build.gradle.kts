@@ -38,9 +38,9 @@ dependencies {
     // and a schema is JSON and one parser for both means one set of
     // surprises. The canon names Jackson rather than a Kotlin-native
     // serialiser: every Java library in reach already speaks it.
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.3")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.3")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.3")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.4")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.4")
     implementation("com.networknt:json-schema-validator:1.5.9")
 
     testImplementation(kotlin("test"))
