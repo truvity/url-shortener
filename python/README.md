@@ -15,6 +15,6 @@ name = cfg["database"]["passwordSecret"]  # the NAME, never a value
 password = secret(name)  # reads the env source only
 ```
 
-See [`docs/contracts/config.md`](../docs/contracts/config.md) for the
-contract this implements, and [`docs/canon/python.md`](../docs/canon/python.md)
+See [`docs/contracts/config.md`](https://github.com/truvity/policy/blob/master/docs/contracts/config.md) for the
+contract this implements, and [`docs/canon/python.md`](https://github.com/truvity/policy/blob/master/docs/canon/python.md)
 for the library list.

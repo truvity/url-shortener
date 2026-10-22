@@ -40,7 +40,7 @@ ARG TARGETARCH
 # context keeping its path, and the local build runs the same
 # configuration. One build of this image rather than two that can disagree.
 #
-COPY examples/url-shortener/log/build/site-packages-$TARGETARCH /app
+COPY log/build/site-packages-$TARGETARCH /app
 
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \

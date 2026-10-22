@@ -208,16 +208,16 @@ archive:
 # `helm install` from a checkout gets. A published chart always carries
 # digests.
 images:
-  migrate: {registry: ghcr.io, repository: truvity/policy/url-shortener/migrate, tag: "", digest: ""}
-  redirect: {registry: ghcr.io, repository: truvity/policy/url-shortener/redirect, tag: "", digest: ""}
-  urls: {registry: ghcr.io, repository: truvity/policy/url-shortener/urls, tag: "", digest: ""}
-  stat: {registry: ghcr.io, repository: truvity/policy/url-shortener/stat, tag: "", digest: ""}
-  log: {registry: ghcr.io, repository: truvity/policy/url-shortener/log, tag: "", digest: ""}
-  web: {registry: ghcr.io, repository: truvity/policy/url-shortener/web, tag: "", digest: ""}
+  migrate: {registry: ghcr.io, repository: truvity/url-shortener/migrate, tag: "", digest: ""}
+  redirect: {registry: ghcr.io, repository: truvity/url-shortener/redirect, tag: "", digest: ""}
+  urls: {registry: ghcr.io, repository: truvity/url-shortener/urls, tag: "", digest: ""}
+  stat: {registry: ghcr.io, repository: truvity/url-shortener/stat, tag: "", digest: ""}
+  log: {registry: ghcr.io, repository: truvity/url-shortener/log, tag: "", digest: ""}
+  web: {registry: ghcr.io, repository: truvity/url-shortener/web, tag: "", digest: ""}
   # Read only when `prober.enabled`, so an install with the prober off never
   # has to name a digest for an image it does not run (the release still
   # stamps it).
-  prober: {registry: ghcr.io, repository: truvity/policy/url-shortener/prober, tag: "", digest: ""}
+  prober: {registry: ghcr.io, repository: truvity/url-shortener/prober, tag: "", digest: ""}
   # Read only on a primary install, by service-lib's identity check
   # (templates/identity-check.yaml). Not built here: the command and its image
   # belong to truvity/k8s (cmd/identity-check), so this release stamps nothing
@@ -586,7 +586,7 @@ route:
 # components serve, and it takes no Kubernetes API access.
 #
 # The end-to-end SUITE is not a workload of this chart: it runs from the
-# product's own CI against an ephemeral environment (examples/url-shortener/e2e).
+# product's own CI against an ephemeral environment (e2e).
 prober:
   enabled: false
   interval: 10s

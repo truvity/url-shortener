@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/api"
+	"github.com/truvity/url-shortener/internal/api"
 )
 
 func TestSpanIsNamedForTheRouteThatServedTheRequest(t *testing.T) {

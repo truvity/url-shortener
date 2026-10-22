@@ -747,7 +747,7 @@ wheels = [
 [[package]]
 name = "truvity-policy"
 version = "0.0.0"
-source = { directory = "../../../python" }
+source = { directory = "../python" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
@@ -834,7 +834,7 @@ requires-dist = [
     { name = "nats-py", specifier = ">=2.9" },
     { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.50b0" },
     { name = "structlog", specifier = ">=24.4" },
-    { name = "truvity-policy", extras = ["telemetry"], directory = "../../../python" },
+    { name = "truvity-policy", extras = ["telemetry"], directory = "../python" },
 ]
 
 [package.metadata.requires-dev]

@@ -8,7 +8,7 @@ syntax = "proto3";
 
 package urlshortener.v1;
 
-option go_package = "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1";
+option go_package = "github.com/truvity/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1";
 
 message GetVersionRequest {}
 message GetVersionResponse {

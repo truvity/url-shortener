@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/api"
+	"github.com/truvity/url-shortener/internal/api"
 )
 
 func TestClientIP(t *testing.T) {

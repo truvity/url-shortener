@@ -6,13 +6,13 @@
 // It exists because a fresh install with no traffic always looks green. The
 // Kargo gate a bake window is judged against needs steady signal before,
 // during and after a rollout, and this is that signal — deliberately a
-// SEPARATE workload from examples/url-shortener/e2e/suite's Job: the suite
+// SEPARATE workload from e2e/suite's Job: the suite
 // proves a release IS healthy, once, and exits; this proves it STAYS
 // healthy, for as long as it runs. See docs/guides/testing.md.
 //
 // The journeys themselves are not reimplemented here. They are the exact
-// same requests examples/url-shortener/e2e/suite makes, factored into
-// examples/url-shortener/e2e/journey so the two callers cannot drift on
+// same requests e2e/suite makes, factored into
+// e2e/journey so the two callers cannot drift on
 // what a journey even is.
 //
 // Like every binary here, the whole graph is constructed in main, in order,
@@ -40,10 +40,10 @@ import (
 	policytelemetry "github.com/truvity/policy/telemetry"
 	"github.com/truvity/policy/transport"
 
-	"github.com/truvity/policy/examples/url-shortener/e2e/journey"
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
-	"github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/e2e/journey"
+	"github.com/truvity/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 func main() {
@@ -96,7 +96,7 @@ func run() error {
 		}
 	}()
 
-	meter := otel.Meter("github.com/truvity/policy/examples/url-shortener/e2e/cmd/prober")
+	meter := otel.Meter("github.com/truvity/url-shortener/e2e/cmd/prober")
 	journeys, err := meter.Int64Counter("probe.journey",
 		metric.WithDescription("Synthetic-traffic journeys this prober ran, by outcome. A Prometheus reader sees this as probe_journey_total."),
 		metric.WithUnit("{journey}"))
@@ -130,7 +130,7 @@ func run() error {
 	}
 
 	// Two clients, over the SAME kind of client the e2e suite uses — see
-	// examples/url-shortener/e2e/suite/client_test.go and
+	// e2e/suite/client_test.go and
 	// redirect_test.go — except that with an identity loaded, both present
 	// the mounted certificate and verify the ANSWERING peer's identity
 	// instead of its name (transport.Identity.Client's own doc comment).
@@ -215,7 +215,7 @@ type prober struct {
 
 	// How long, and how often, the "stat" journey polls for the click
 	// count to move before it gives up — the same shape
-	// examples/url-shortener/e2e/suite's own `eventually` polls with, for
+	// e2e/suite's own `eventually` polls with, for
 	// the same reason: the counter moves through the broker, not the
 	// request that triggered it, so a single read racing the consumer is
 	// not a failure of the product.
@@ -381,7 +381,7 @@ func record[T any](ctx context.Context, p *prober, name string, fn func() (T, er
 }
 
 // randomSuffix draws a short, readable suffix for one pass's long URL — the
-// prober's own answer to examples/url-shortener/e2e/suite's randomSuffix,
+// prober's own answer to e2e/suite's randomSuffix,
 // which needs a *testing.T this process does not have.
 func randomSuffix() string {
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"

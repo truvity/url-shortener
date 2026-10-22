@@ -45,7 +45,7 @@ func RequestMetrics(component string) fiber.Handler {
 }
 
 func requestMetrics(provider metric.MeterProvider, component string) fiber.Handler {
-	meter := provider.Meter("github.com/truvity/policy/examples/url-shortener")
+	meter := provider.Meter("github.com/truvity/url-shortener")
 	duration, err := meter.Float64Histogram(RequestDurationMetric,
 		metric.WithUnit("s"),
 		metric.WithDescription("Duration of HTTP server requests."),

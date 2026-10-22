@@ -545,7 +545,7 @@ class PodSecurity {
 class ImagesMigrate {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/migrate"
+  repository: V.NonEmptyString = "truvity/url-shortener/migrate"
 
   tag: String = ""
 
@@ -555,7 +555,7 @@ class ImagesMigrate {
 class ImagesRedirect {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/redirect"
+  repository: V.NonEmptyString = "truvity/url-shortener/redirect"
 
   tag: String = ""
 
@@ -565,7 +565,7 @@ class ImagesRedirect {
 class ImagesUrls {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/urls"
+  repository: V.NonEmptyString = "truvity/url-shortener/urls"
 
   tag: String = ""
 
@@ -575,7 +575,7 @@ class ImagesUrls {
 class ImagesStat {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/stat"
+  repository: V.NonEmptyString = "truvity/url-shortener/stat"
 
   tag: String = ""
 
@@ -585,7 +585,7 @@ class ImagesStat {
 class ImagesLog {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/log"
+  repository: V.NonEmptyString = "truvity/url-shortener/log"
 
   tag: String = ""
 
@@ -595,7 +595,7 @@ class ImagesLog {
 class ImagesWeb {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/web"
+  repository: V.NonEmptyString = "truvity/url-shortener/web"
 
   tag: String = ""
 
@@ -605,7 +605,7 @@ class ImagesWeb {
 class ImagesProber {
   registry: V.NonEmptyString = "ghcr.io"
 
-  repository: V.NonEmptyString = "truvity/policy/url-shortener/prober"
+  repository: V.NonEmptyString = "truvity/url-shortener/prober"
 
   tag: String = ""
 

@@ -3,16 +3,15 @@
 // proving, from OUTSIDE every process, that the claim every one of
 // telemetry/attributes.go, ts/src/attributes.ts,
 // python/src/truvity_policy/telemetry.py and
-// examples/url-shortener/stat/.../SpanAttributeAllowlist.kt make on their
+// stat/.../SpanAttributeAllowlist.kt make on their
 // own ("an attribute nobody allow-listed is exported") actually held for a
 // real trace, not just for the unit tests each of those files carries
 // beside it.
 //
-// It is a package of its own, not code living inside
-// examples/url-shortener/e2e/suite alongside trace_test.go, for the same
-// reason e2e/traceauth is: suite's TestMain (main_test.go) skips the WHOLE
-// package unless E2E_NAMESPACE is set — the right behaviour for a test
-// that needs a cluster, and the wrong one for what this package checks,
+// It is a package of its own, not code inside e2e/suite, because suite's
+// TestMain skips the WHOLE package unless E2E_URL is set — the right
+// behaviour for a test that needs a cluster, and the wrong one for what this
+// package checks,
 // which needs neither: a parsed trace's tags matching a table is a
 // hermetic claim, provable with a JSON fixture on every `just check`,
 // cluster or not (traceattrs_test.go).
@@ -66,7 +65,7 @@ type Trace struct {
 
 // Response is the small subset of Jaeger's own JSON query API (GET
 // {tracesURL}/api/traces/{traceID}) this package, and
-// examples/url-shortener/e2e/suite's trace_test.go, both read — from the
+// e2e/suite's trace_test.go, both read — from the
 // SAME fetch; see trace_test.go's own comment on why there is only one.
 type Response struct {
 	Data []Trace `json:"data"`
@@ -102,8 +101,7 @@ func processNames(trace Trace) map[string]string {
 // attribute keys that component's own telemetry setup adds on top of
 // policytelemetry.DefaultAllowedAttributes — matched against a span's
 // process.serviceName by substring, the same way
-// examples/url-shortener/e2e/suite/trace_test.go's own anyContains already
-// matches service names, because charts/url-shortener/templates/_helpers.tpl's
+// a trace check matches service names, because charts/url-shortener/templates/_helpers.tpl's
 // url-shortener.telemetryEnv renders OTEL_SERVICE_NAME as
 // "<release>-<component>", never the bare component alone.
 //

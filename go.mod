@@ -1,22 +1,12 @@
-module github.com/truvity/policy/examples/url-shortener
+module github.com/truvity/url-shortener
 
 go 1.27.0
 
-toolchain go1.27.2
-
-// The example always builds against the contracts in this checkout, not
-// against a published version of them. A change to a schema or a loader that
-// would break a service breaks this one in the pull request that made it,
-// which is the whole reason the example lives here.
-replace github.com/truvity/policy => ../..
+toolchain go1.27.3
 
 require (
 	connectrpc.com/connect v1.21.1
 	connectrpc.com/otelconnect v0.10.0
-	github.com/aws/aws-sdk-go-v2 v1.47.3
-	github.com/aws/aws-sdk-go-v2/config v1.33.9
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/jackc/pgx/v5 v5.11.0
@@ -24,8 +14,7 @@ require (
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
 	github.com/truvity/cnpg/v2 v2.33.1
-	github.com/truvity/gemaal v0.24.3
-	github.com/truvity/policy v0.9.3
+	github.com/truvity/policy v1.54.2
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/metric v1.47.0
 	go.opentelemetry.io/otel/sdk v1.47.0
@@ -39,24 +28,11 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.22 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.6 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.6 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.7 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.10.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.38.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 // indirect
-	github.com/aws/smithy-go v1.28.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/go-chi/chi/v5 v5.3.2 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/fiber/v2 v2.52.14 // indirect
@@ -77,6 +53,8 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/nkeys v0.4.16 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.24.1 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -85,6 +63,8 @@ require (
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
+	github.com/truvity/ocictl v0.8.0 // indirect
+	github.com/urfave/cli/v3 v3.11.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.75.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -112,4 +92,9 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect
 	google.golang.org/grpc v1.83.2 // indirect
+	oras.land/oras-go/v2 v2.6.2 // indirect
 )
+
+// helmctl (truvity/ocictl) packages the charts from the images a release
+// pushed; bin/helmctl runs it from here, so its version is this line's.
+tool github.com/truvity/ocictl/cmd/helmctl

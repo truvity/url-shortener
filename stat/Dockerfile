@@ -23,6 +23,6 @@ USER 65532:65532
 # context keeping its path, and the local build runs the same
 # configuration. One build of this image rather than two that can disagree.
 #
-COPY examples/url-shortener/stat/build/libs/stat.jar /app/stat.jar
+COPY stat/build/libs/stat.jar /app/stat.jar
 
 ENTRYPOINT ["java", "-jar", "/app/stat.jar"]

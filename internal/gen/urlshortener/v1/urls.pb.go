@@ -975,7 +975,7 @@ const file_urlshortener_v1_urls_proto_rawDesc = "" +
 	"\x06Delete\x12\x1e.urlshortener.v1.DeleteRequest\x1a\x1f.urlshortener.v1.DeleteResponse\x12L\n" +
 	"\aRestore\x12\x1f.urlshortener.v1.RestoreRequest\x1a .urlshortener.v1.RestoreResponse\x12L\n" +
 	"\aResolve\x12\x1f.urlshortener.v1.ResolveRequest\x1a .urlshortener.v1.ResolveResponse\x12X\n" +
-	"\vRecordClick\x12#.urlshortener.v1.RecordClickRequest\x1a$.urlshortener.v1.RecordClickResponseB^Z\\github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1b\x06proto3"
+	"\vRecordClick\x12#.urlshortener.v1.RecordClickRequest\x1a$.urlshortener.v1.RecordClickResponseBNZLgithub.com/truvity/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1b\x06proto3"
 
 var (
 	file_urlshortener_v1_urls_proto_rawDescOnce sync.Once

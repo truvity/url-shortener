@@ -9,8 +9,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1"
-	"github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
+	v1 "github.com/truvity/url-shortener/internal/gen/urlshortener/v1"
+	"github.com/truvity/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
 )
 
 // countingUrls is a urls service whose click count for any key follows a

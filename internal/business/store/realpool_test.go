@@ -17,7 +17,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
+	"github.com/truvity/url-shortener/internal/business/store"
 )
 
 // These tests use the REAL path the service uses -- a pgx pool handed to

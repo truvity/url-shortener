@@ -50,7 +50,7 @@ uv export --quiet --frozen --no-dev --no-emit-project --no-hashes \
 
 # The two first-party wheels: the shared loader and this component. Pure
 # Python, so one build serves every architecture.
-uv build --quiet --wheel --out-dir build/dist ../../../python
+uv build --quiet --wheel --out-dir build/dist ../python
 uv build --quiet --wheel --out-dir build/dist .
 
 for arch in $ARCHES; do

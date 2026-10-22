@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/truvity/policy/conformance"
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/internal/config"
 )
 
 // The always-on prober is a workload of the application chart, off by default

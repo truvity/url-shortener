@@ -24,6 +24,6 @@ USER 65532:65532
 # that is deliberate: the release stages this file into GoReleaser's build
 # context keeping its path, and the local build runs with the same context.
 # One build of this image rather than two that can disagree.
-COPY examples/url-shortener/web/dist /app
+COPY web/dist /app
 
 ENTRYPOINT ["node", "/app/server/main.js"]

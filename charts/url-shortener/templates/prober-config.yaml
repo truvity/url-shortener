@@ -2,7 +2,7 @@
 {{- if .Values.prober.enabled }}
 {{/*
 The prober's own configuration file: exactly the file the binary validates
-against its own schema at start-up (examples/url-shortener/schemas/prober.json),
+against its own schema at start-up (schemas/prober.json),
 checked by chart_test.go's TestWhatTheProberRendersIsWhatTheBinaryAccepts.
 
 A separate template from templates/prober.yaml so that file's own

@@ -19,8 +19,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
-	v1 "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1"
+	"github.com/truvity/url-shortener/internal/business/store"
+	v1 "github.com/truvity/url-shortener/internal/gen/urlshortener/v1"
 )
 
 // KeyLength is how long a short code is. The column holds exactly this many

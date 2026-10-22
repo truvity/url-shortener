@@ -14,7 +14,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/models"
+	"github.com/truvity/url-shortener/internal/models"
 )
 
 // appSchemas are the schemas this product owns. They are named here and

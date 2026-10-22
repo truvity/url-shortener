@@ -53,7 +53,7 @@ export function moveMaps(served: string, out: string): number {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   // Run from web/ by `yarn build`; the repository root is three levels up,
   // which is where the release (run from the root) looks for dist-sourcemaps.
-  const out = process.env.SOURCEMAPS_DIR ?? "../../../dist-sourcemaps";
+  const out = process.env.SOURCEMAPS_DIR ?? "../dist-sourcemaps";
   const moved = moveMaps("dist/assets", out);
   assertNoMaps("dist");
   process.stderr.write(`moved ${moved} source maps to ${out}; dist/ has none\n`);

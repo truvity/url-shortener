@@ -18,7 +18,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
+	"github.com/truvity/url-shortener/internal/business/store"
 )
 
 // script stands in for the server. It sees every statement and answers with

@@ -11,7 +11,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 type row struct {

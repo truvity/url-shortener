@@ -14,7 +14,7 @@ package urlshortener.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1";
+option go_package = "github.com/truvity/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1";
 
 // A shortened URL, as this service reports it.
 message Url {

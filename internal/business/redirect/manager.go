@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/events"
+	"github.com/truvity/url-shortener/internal/events"
 )
 
 type (

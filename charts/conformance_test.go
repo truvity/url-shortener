@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/truvity/policy/examples/url-shortener/charts"
+	"github.com/truvity/url-shortener/charts"
 )
 
 // forbiddenInTemplates are constructs that behave differently — or not at

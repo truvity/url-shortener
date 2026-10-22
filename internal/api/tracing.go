@@ -31,7 +31,7 @@ import (
 // It exports nothing by itself: with no endpoint configured the global
 // provider is a no-op and this costs an allocation and a map lookup.
 func Tracing() fiber.Handler {
-	tracer := otel.Tracer("github.com/truvity/policy/examples/url-shortener")
+	tracer := otel.Tracer("github.com/truvity/url-shortener")
 	propagator := otel.GetTextMapPropagator()
 
 	return func(c fiber.Ctx) error {

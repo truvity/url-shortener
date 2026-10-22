@@ -5,4 +5,4 @@ rootProject.name = "stat"
 // to resolve instead: no release ships the Kotlin loader (kotlin/README.md,
 // "Status"), so a consumer outside this repository builds it from a
 // checkout of the tag it pins.
-includeBuild("../../../kotlin")
+includeBuild("../kotlin")

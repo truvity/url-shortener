@@ -14,12 +14,15 @@ appVersion: "0.0.0"
 # renders the keys of every step up to it and compares no version.
 annotations:
   delivery.truvity.io/interface: "15"
-# The platform pieces of every component come from the library chart at the
-# repository root, charts/service-lib. It is resolved, never copied:
-# `helm dependency build` (which `helmctl package` runs itself when a declared
-# dependency is missing from charts/) reads the committed Chart.lock and puts
-# the archive under charts/, which is ignored.
+# The platform pieces of every component come from the library chart
+# `service-lib`, which truvity/policy publishes beside its Go module under the
+# same version: the pin here is that version, exactly, and the Go module pin
+# in go.mod moves with it (a test holds the two together, and renovate.json
+# groups them). It is resolved, never copied: `helm dependency build` (which
+# `helmctl package` runs itself when a declared dependency is missing from
+# charts/) reads the committed Chart.lock and puts the archive under charts/,
+# which is ignored.
 dependencies:
   - name: service-lib
-    version: 0.0.0
-    repository: file://../../../../charts/service-lib
+    version: 1.54.2
+    repository: oci://ghcr.io/truvity/charts

@@ -10,7 +10,7 @@ import (
 
 	policycharts "github.com/truvity/policy/charts"
 	"github.com/truvity/policy/conformance"
-	"github.com/truvity/policy/examples/url-shortener/charts"
+	"github.com/truvity/url-shortener/charts"
 )
 
 // The library chart, and the convention it carries (decision 0009, rules C15
@@ -128,13 +128,20 @@ func TestTheLibraryIsALibrary(t *testing.T) {
 }
 
 // A chart that depends on the library resolves it, it does not carry it: the
-// dependency is a `file://` path to charts/service-lib, Chart.lock is
-// committed, and what is resolved under charts/ is ignored by git.
-// `helmctl package` runs `helm dependency build` itself when the declared
-// dependency is missing, and refuses a lock that disagrees with Chart.Yaml,
-// so a library that only arrived at package time is a library that arrives.
+// dependency is the archive truvity/policy publishes at ONE exact version,
+// Chart.lock is committed, and what is resolved under charts/ is ignored by
+// git. `helmctl package` runs `helm dependency build` itself when the
+// declared dependency is missing, and refuses a lock that disagrees with
+// Chart.Yaml, so a library that only arrived at package time is a library
+// that arrives.
+//
+// The version is also the version of the policy Go module in go.mod: the
+// chart tests embed that module's copy of the library, the release resolves
+// the published one, and the two are the same bytes only while the pins agree.
 func TestTheApplicationChartResolvesTheLibraryFromItsLock(t *testing.T) {
-	for _, chart := range []string{"url-shortener"} {
+	want := policyModuleVersion(t)
+
+	for _, chart := range []string{"url-shortener", "testdata/service-example"} {
 		var meta struct {
 			Dependencies []struct{ Name, Version, Repository string } `yaml:"dependencies"`
 		}
@@ -144,16 +151,18 @@ func TestTheApplicationChartResolvesTheLibraryFromItsLock(t *testing.T) {
 		}
 		unmarshalYAML(t, raw, &meta)
 		if len(meta.Dependencies) != 1 || meta.Dependencies[0].Name != "service-lib" ||
-			meta.Dependencies[0].Repository != "file://../../../../charts/service-lib" {
-			t.Errorf("%s depends on %+v, want service-lib at file://../../../../charts/service-lib", chart, meta.Dependencies)
+			meta.Dependencies[0].Repository != "oci://ghcr.io/truvity/charts" ||
+			meta.Dependencies[0].Version != want {
+			t.Errorf("%s depends on %+v, want service-lib %s from oci://ghcr.io/truvity/charts (the policy module's version in go.mod)",
+				chart, meta.Dependencies, want)
 		}
 
 		lock, err := charts.Files.ReadFile(chart + "/Chart.lock")
 		if err != nil {
 			t.Fatalf("%s has no committed Chart.lock: run `helm dependency update` in it", chart)
 		}
-		if !strings.Contains(string(lock), "file://../../../../charts/service-lib") {
-			t.Errorf("%s's Chart.lock does not name the library", chart)
+		if !strings.Contains(string(lock), "oci://ghcr.io/truvity/charts") || !strings.Contains(string(lock), "version: "+want) {
+			t.Errorf("%s's Chart.lock does not pin service-lib %s:\n%s", chart, want, lock)
 		}
 	}
 }

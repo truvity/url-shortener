@@ -1395,7 +1395,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/migrate"
+              "default": "truvity/url-shortener/migrate"
             },
             "tag": {
               "type": "string",
@@ -1408,7 +1408,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/migrate",
+            "repository": "truvity/url-shortener/migrate",
             "tag": "",
             "digest": ""
           }
@@ -1425,7 +1425,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/redirect"
+              "default": "truvity/url-shortener/redirect"
             },
             "tag": {
               "type": "string",
@@ -1438,7 +1438,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/redirect",
+            "repository": "truvity/url-shortener/redirect",
             "tag": "",
             "digest": ""
           }
@@ -1455,7 +1455,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/urls"
+              "default": "truvity/url-shortener/urls"
             },
             "tag": {
               "type": "string",
@@ -1468,7 +1468,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/urls",
+            "repository": "truvity/url-shortener/urls",
             "tag": "",
             "digest": ""
           }
@@ -1485,7 +1485,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/stat"
+              "default": "truvity/url-shortener/stat"
             },
             "tag": {
               "type": "string",
@@ -1498,7 +1498,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/stat",
+            "repository": "truvity/url-shortener/stat",
             "tag": "",
             "digest": ""
           }
@@ -1515,7 +1515,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/log"
+              "default": "truvity/url-shortener/log"
             },
             "tag": {
               "type": "string",
@@ -1528,7 +1528,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/log",
+            "repository": "truvity/url-shortener/log",
             "tag": "",
             "digest": ""
           }
@@ -1545,7 +1545,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/web"
+              "default": "truvity/url-shortener/web"
             },
             "tag": {
               "type": "string",
@@ -1558,7 +1558,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/web",
+            "repository": "truvity/url-shortener/web",
             "tag": "",
             "digest": ""
           }
@@ -1575,7 +1575,7 @@
             "repository": {
               "type": "string",
               "minLength": 1,
-              "default": "truvity/policy/url-shortener/prober"
+              "default": "truvity/url-shortener/prober"
             },
             "tag": {
               "type": "string",
@@ -1588,7 +1588,7 @@
           },
           "default": {
             "registry": "ghcr.io",
-            "repository": "truvity/policy/url-shortener/prober",
+            "repository": "truvity/url-shortener/prober",
             "tag": "",
             "digest": ""
           }
@@ -1627,43 +1627,43 @@
       "default": {
         "migrate": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/migrate",
+          "repository": "truvity/url-shortener/migrate",
           "tag": "",
           "digest": ""
         },
         "redirect": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/redirect",
+          "repository": "truvity/url-shortener/redirect",
           "tag": "",
           "digest": ""
         },
         "urls": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/urls",
+          "repository": "truvity/url-shortener/urls",
           "tag": "",
           "digest": ""
         },
         "stat": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/stat",
+          "repository": "truvity/url-shortener/stat",
           "tag": "",
           "digest": ""
         },
         "log": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/log",
+          "repository": "truvity/url-shortener/log",
           "tag": "",
           "digest": ""
         },
         "web": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/web",
+          "repository": "truvity/url-shortener/web",
           "tag": "",
           "digest": ""
         },
         "prober": {
           "registry": "ghcr.io",
-          "repository": "truvity/policy/url-shortener/prober",
+          "repository": "truvity/url-shortener/prober",
           "tag": "",
           "digest": ""
         },

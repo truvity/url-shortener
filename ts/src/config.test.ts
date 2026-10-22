@@ -8,12 +8,17 @@
  * contract that exists twice.
  */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { ConfigError, configPath, type Kind, load, loadKind, secret, validate } from "./config.js";
 
-const fixtures = fileURLToPath(new URL("../../config/testdata/", import.meta.url));
+// The fixtures are truvity/policy's, at the version go.mod pins: the Justfile
+// hands over the module directory (POLICY_DIR) so no copy is kept here.
+const policyDir = process.env.POLICY_DIR;
+if (!policyDir) {
+  throw new Error("POLICY_DIR is not set: run the tests through `just ts` or `just test`");
+}
+const fixtures = `${policyDir}/config/testdata/`;
 const schema = JSON.parse(readFileSync(`${fixtures}shortener.schema.json`, "utf8")) as object;
 const fixture = (name: string) => `${fixtures}${name}`;
 

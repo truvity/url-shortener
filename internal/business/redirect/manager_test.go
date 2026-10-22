@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/business/redirect"
-	"github.com/truvity/policy/examples/url-shortener/internal/events"
+	"github.com/truvity/url-shortener/internal/business/redirect"
+	"github.com/truvity/url-shortener/internal/events"
 )
 
 type (

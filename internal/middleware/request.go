@@ -9,8 +9,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/api"
-	"github.com/truvity/policy/examples/url-shortener/internal/events"
+	"github.com/truvity/url-shortener/internal/api"
+	"github.com/truvity/url-shortener/internal/events"
 )
 
 type (
