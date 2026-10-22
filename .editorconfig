@@ -1,0 +1,33 @@
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.go]
+indent_style = tab
+
+[*.{yaml,yml,json,jsonc}]
+indent_size = 2
+
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_size = 2
+
+[*.{kt,kts}]
+indent_size = 4
+
+[*.py]
+indent_size = 4
+
+[Justfile]
+indent_style = space
+indent_size = 4
+
+# A trailing double space is a Markdown hard line break, not stray
+# whitespace, so the default trim above must not touch it.
+[*.md]
+trim_trailing_whitespace = false

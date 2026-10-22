@@ -1,0 +1,114 @@
+# The integration suite: the two charts installed into this repository's CI
+# namespace on the devel cluster, and called through their public host. See
+# docs/integration-testing.md for the shape (the two doors).
+#
+# WHO CAN START THIS, and why that is not decided in this file:
+#
+#   - It runs on a push of `master`, a push of a release tag, or a manual
+#     dispatch. Never on `pull_request`, `pull_request_target`, `workflow_run`
+#     or `issue_comment`: nothing a stranger can trigger.
+#   - Even a run that somebody with write access starts from a branch of this
+#     repository (a dispatch of a branch, a push of a branch with this file
+#     edited) gets nothing, because the cluster's side pins what it admits:
+#     this repository, public, a push of master or of a v* tag or a dispatch of
+#     master, each from THIS file at that ref. The token exchange is refused
+#     otherwise.
+#   - A pull request from a fork gets no id-token from GitHub at all.
+#   - `if:` below is courtesy (a fork of this repository has no business
+#     here); it is not a control, because a pull request edits this file.
+#
+# The estate's particulars (the cluster's endpoint and authority, the access
+# issuer, the installs domain, the test bucket) are repository VARIABLES, not
+# text in this repository, whose leak canary refuses them.
+#
+# Pinned by COMMIT SHA, never a tag.
+name: Integration
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One installation at a time, queued rather than cancelled: a cancelled job is
+# killed past its cleanup, and the next run's sweep is only the backstop.
+concurrency:
+  group: integration
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    if: github.repository == 'truvity/url-shortener'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # The images go to the repository's own ghcr.io packages (the job's own token).
+      packages: write
+      # The two exchanges at the access issuer: k8s:devel and devel:url-shortener.
+      id-token: write
+    env:
+      DEVEL_API_SERVER: ${{ vars.DEVEL_API_SERVER }}
+      DEVEL_API_CA: ${{ vars.DEVEL_API_CA }}
+      SLUIS_ISSUER: ${{ vars.SLUIS_ISSUER }}
+      E2E_INSTALLS_DOMAIN: ${{ vars.E2E_INSTALLS_DOMAIN }}
+      E2E_ARCHIVE_BUCKET: ${{ vars.E2E_ARCHIVE_BUCKET }}
+      E2E_ARCHIVE_REGION: ${{ vars.E2E_ARCHIVE_REGION }}
+      # Set to "true" once the gateway's JWT policy on the installs ListenerSet
+      # is switched on: the suite then also asserts that an unauthenticated
+      # call is refused.
+      E2E_EXPECT_GATE: ${{ vars.E2E_EXPECT_GATE }}
+      # The release is unique per run and attempt (e2e/devel).
+    steps:
+      - uses: truvity/ci-actions/public-runners@eae9926515d96296eeed99aa358d2957a89647e8 # v3.3.1
+        with:
+          runners: ubuntu-latest
+          visibility: ${{ github.event.repository.visibility }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # GoReleaser derives its changelog from history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: truvity/ci-actions/setup-devbox@eae9926515d96296eeed99aa358d2957a89647e8 # v3.3.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: ko-build/setup-ko@61b4d1d396f5b2e7d6bb6fefdce3dc38d1a13445 # v0.10
+
+      # dockers_v2 builds multi-platform images with buildx; the default docker
+      # driver cannot.
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Log in to GHCR
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+
+      # Door one's kubeconfig; the credential in it is `sluisctl kube-token`,
+      # which exchanges this job's OIDC token.
+      - name: The kubeconfig
+        run: |
+          devbox run -- hack/kubeconfig.sh "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      # The images (pushed to ghcr.io as ci-<sha>) and the charts packaged from
+      # the digests that build wrote, exactly as a release does.
+      - name: Build
+        run: devbox run -- just snapshot
+
+      - name: Install
+        run: devbox run -- just e2e-install
+
+      - name: Suite
+        run: devbox run -- just e2e-test
+
+      # `always()` holds on cancellation, where a shell trap does not.
+      - name: Uninstall
+        if: always()
+        run: devbox run -- just e2e-uninstall

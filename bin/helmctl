@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# helmctl wrapper — deterministic Helm chart packaging/push (truvity/ocictl).
+# Version-pinned by the go.mod `tool github.com/truvity/ocictl/cmd/helmctl`.
+
+set -euo pipefail
+
+exec go run github.com/truvity/ocictl/cmd/helmctl "$@"

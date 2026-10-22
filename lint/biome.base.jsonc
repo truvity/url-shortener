@@ -1,0 +1,62 @@
+// The Biome base every TypeScript/JavaScript package in a repository's own
+// `biome.json` extends — docs/canon/node.md: "Linting and formatting |
+// Biome | one tool for both, so formatting is never a second opinion."
+//
+// Biome resolves `extends` relative to the child config, so a package's own
+// config is:
+//
+//   { "extends": ["../lint/biome.base.jsonc"] }
+//
+// (or the correct relative path to wherever this repository's `lint/`
+// lives). See lint/README.md for the mechanics — this file is one of a
+// set of configurations a repository copies, not references, because only
+// a copy commits to a schema version this repository itself pins.
+//
+// `formatter.lineWidth` is 109, not Biome's 80 default and not a round
+// number: it is the longest line this repository's own hand-written
+// TypeScript already had before Biome ever touched it (ts/src/config.test.ts,
+// checked when this file was written). No single width makes an unformatted
+// codebase format to itself exactly — this one already mixes single lines
+// past 120 columns with calls deliberately wrapped well under 100 — but 109
+// is the value that minimises the reflow: narrower re-wraps lines nobody
+// asked to change, and wider re-joins calls that were wrapped on purpose.
+// `organizeImports` stays OFF: this repository's own imports are not
+// consistently ordered (node built-ins before or after a package, by file),
+// so turning it on would be asserting a convention nobody has followed
+// rather than encoding one that already holds.
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 109
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  }
+}

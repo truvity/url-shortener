@@ -19,8 +19,8 @@ if [ "$#" -lt 5 ]; then
 fi
 old_ref=$1 release=$2 ns=$3 old_values=$4 new_values=$5 allow=${6:-}
 
-repo="$(cd "$(dirname "$0")/../../.." && pwd)"
-chart=examples/url-shortener/charts/url-shortener-infra
+repo="$(cd "$(dirname "$0")/.." && pwd)"
+chart=charts/url-shortener-infra
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

@@ -1,0 +1,15 @@
+# The build context is the REPOSITORY ROOT for every image here, because
+# GoReleaser stages files into its context keeping their paths and a
+# Dockerfile can only be written for one context.
+#
+# So the context has to be narrowed here rather than per component: deny
+# everything, then admit exactly the three build outputs the Dockerfiles
+# copy. A pattern that stops matching does not fail loudly — it sends more
+# of the repository to the builder, or copies nothing and fails with a
+# checksum error naming a path that is plainly on disk.
+*
+
+!log/build/site-packages-*
+!stat/build/libs/stat.jar
+!web/dist
+!e2e/build
