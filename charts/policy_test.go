@@ -40,9 +40,17 @@ func policyModuleVersion(t *testing.T) string {
 	}
 
 	for _, dep := range info.Deps {
-		if dep.Path == "github.com/truvity/policy" {
-			return strings.TrimPrefix(dep.Version, "v")
+		if dep.Path != "github.com/truvity/policy" {
+			continue
 		}
+
+		// Built in a workspace against a checkout of policy (its own CI's
+		// downstream canary does that): there is no version to compare.
+		if dep.Replace != nil || dep.Version == "(devel)" || dep.Version == "" {
+			t.Skip("the policy module is a local checkout (a workspace or a replace): no version to hold the chart pin to")
+		}
+
+		return strings.TrimPrefix(dep.Version, "v")
 	}
 
 	t.Fatal("github.com/truvity/policy is not a dependency of this build")
