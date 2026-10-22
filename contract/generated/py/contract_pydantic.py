@@ -470,7 +470,7 @@ class Prober(ServiceConfig):
     model_config = ConfigDict(extra="forbid")
     #: How often the loop repeats one full pass of every journey, as a Go duration string, for example "10s".
     interval: GoDuration
-    #: Marks every long URL and key this prober invents, the same role examples/url-shortener/e2e/suite's own testDataPrefix plays for the e2e suite: a person reading the urls table or the archive bucket by hand can tell synthetic traffic from a real caller's at a glance.
+    #: Marks every long URL and key this prober invents, the same role e2e/suite's own testDataPrefix plays for the e2e suite: a person reading the urls table or the archive bucket by hand can tell synthetic traffic from a real caller's at a glance.
     keyPrefix: NonEmptyString | None = None
     #: How long the "stat" journey keeps watching a link's click count AFTER it first reads exactly 1, as a Go duration string, and fails if it moves again. A consumer that fails to acknowledge a message has it redelivered after its ack wait, so a click counted twice looks right at the first read and wrong one ack wait later; this window has to outlast at least one redelivery, so it defaults to twice the consumer's 30s ack wait ("60s"). "0s" turns the hold off.
     statSettle: GoDuration | None = None

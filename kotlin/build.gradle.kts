@@ -56,9 +56,17 @@ dependencies {
 // directory of files: generating Kotlin source would mean a second
 // representation to keep in step, and `just drift` would have a fourth thing
 // to check. There is one copy, and it is made at build time from the source
-// of truth.
+// of truth: truvity/policy's `schemas/` at the version go.mod pins (the
+// Justfile hands over the module directory as POLICY_DIR).
+val policyDir: String = System.getenv("POLICY_DIR")
+    ?: throw GradleException("POLICY_DIR is not set: run gradle through `just build` or `just test`")
+
 val carrySchemas by tasks.registering(Copy::class) {
-    from(rootProject.layout.projectDirectory.dir("../schemas"))
+    from(File(policyDir, "schemas"))
+    // The module cache is read-only; a copy that kept those bits could not be
+    // overwritten by the next build.
+    filePermissions { unix("rw-r--r--") }
+    dirPermissions { unix("rwxr-xr-x") }
     into(layout.buildDirectory.dir("carried-schemas/schemas"))
     include("**/*.json")
 }

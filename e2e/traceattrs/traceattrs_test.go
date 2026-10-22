@@ -43,7 +43,7 @@ const allowedOnlyTrace = `{
             {"key": "http.response.status_code", "value": 200},
             {"key": "error", "value": false},
             {"key": "span.kind", "value": "server"},
-            {"key": "otel.scope.name", "value": "github.com/truvity/policy/examples/url-shortener"},
+            {"key": "otel.scope.name", "value": "github.com/truvity/url-shortener"},
             {"key": "otel.scope.version", "value": "1.0.0"},
             {"key": "internal.span.format", "value": "otlp"}
           ]

@@ -1,7 +1,7 @@
 {
   "name": "@truvity/policy",
   "version": "0.0.0",
-  "description": "Load a service's configuration: read one file, validate it against a schema, decode it, and stop.",
+  "description": "Load a service's configuration: read one file, validate it against a schema, decode it, and stop. (Not published: the example's web front end consumes it through a portal link.)",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -20,13 +20,9 @@
   "engines": {
     "node": ">=24"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "public"
-  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/truvity/policy.git",
+    "url": "git+https://github.com/truvity/url-shortener.git",
     "directory": "ts"
   },
   "scripts": {
@@ -77,5 +73,6 @@
     "@opentelemetry/sdk-trace-node": {
       "optional": true
     }
-  }
+  },
+  "private": true
 }

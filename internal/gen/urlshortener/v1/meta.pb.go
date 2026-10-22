@@ -140,7 +140,7 @@ const file_urlshortener_v1_meta_proto_rawDesc = "" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit2d\n" +
 	"\vMetaService\x12U\n" +
 	"\n" +
-	"GetVersion\x12\".urlshortener.v1.GetVersionRequest\x1a#.urlshortener.v1.GetVersionResponseB^Z\\github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1b\x06proto3"
+	"GetVersion\x12\".urlshortener.v1.GetVersionRequest\x1a#.urlshortener.v1.GetVersionResponseBNZLgithub.com/truvity/url-shortener/internal/gen/urlshortener/v1;urlshortenerv1b\x06proto3"
 
 var (
 	file_urlshortener_v1_meta_proto_rawDescOnce sync.Once

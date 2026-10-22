@@ -27,7 +27,7 @@
     "keyPrefix": {
       "type": "string",
       "minLength": 1,
-      "description": "Marks every long URL and key this prober invents, the same role examples/url-shortener/e2e/suite's own testDataPrefix plays for the e2e suite: a person reading the urls table or the archive bucket by hand can tell synthetic traffic from a real caller's at a glance."
+      "description": "Marks every long URL and key this prober invents, the same role e2e/suite's own testDataPrefix plays for the e2e suite: a person reading the urls table or the archive bucket by hand can tell synthetic traffic from a real caller's at a glance."
     },
     "statSettle": {
       "type": "string",

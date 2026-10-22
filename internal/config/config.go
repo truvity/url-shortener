@@ -12,7 +12,7 @@ import (
 
 	"github.com/truvity/policy/config"
 
-	urlshortener "github.com/truvity/policy/examples/url-shortener"
+	urlshortener "github.com/truvity/url-shortener"
 )
 
 // Read returns one of this service's schemas by file name.
@@ -155,8 +155,8 @@ type (
 	// own, no database, no broker — it walks the same journeys a caller
 	// does, over the same two Services `urls` and `redirect` already
 	// serve, so a bake window has signal to read even when nothing real is
-	// happening. See examples/url-shortener/e2e/journey and
-	// examples/url-shortener/e2e/cmd/prober.
+	// happening. See e2e/journey and
+	// e2e/cmd/prober.
 	//
 	// It DOES carry a `tls` block, on exactly the same terms as the
 	// counter's own schema (stat.json): a client either presents an

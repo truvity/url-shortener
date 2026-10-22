@@ -2,11 +2,11 @@
 // short link, resolve it, read its click count back — written ONCE and
 // shared by two callers that ask different questions of the same requests:
 //
-//   - examples/url-shortener/e2e/suite runs each journey a handful of times
+//   - e2e/suite runs each journey a handful of times
 //     against a real install and asserts it behaved correctly (this IS a
 //     short link, this redirect IS a 302 to the right place, this counter
 //     DID move by exactly two);
-//   - examples/url-shortener/e2e/cmd/prober runs the same three, forever,
+//   - e2e/cmd/prober runs the same three, forever,
 //     against a release nobody is otherwise calling, so there is signal to
 //     read before, during and after a rollout even when no real traffic
 //     exists yet.
@@ -25,15 +25,18 @@
 package journey
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1"
-	"github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
+	v1 "github.com/truvity/url-shortener/internal/gen/urlshortener/v1"
+	"github.com/truvity/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
 )
 
 // The three journeys' own names — shared between the e2e suite's own
@@ -76,7 +79,7 @@ func ClickCount(ctx context.Context, client urlshortenerv1connect.UrlsServiceCli
 // http.ErrUseLastResponse: following the redirect would answer "what is at
 // the long URL", a different question from "did the redirect service answer
 // 302 with the right Location" — see
-// examples/url-shortener/e2e/suite/redirect_test.go's noRedirectClient for
+// e2e/suite/redirect_test.go's noRedirectClient for
 // the same rule stated where the suite first needed it.
 //
 // A non-302 status is not an error return: a caller that wants a journey to
@@ -141,4 +144,80 @@ func ListViaWeb(ctx context.Context, httpClient *http.Client, webBase string) ([
 	}
 
 	return keys, nil
+}
+
+// CreateViaWeb shortens longURL through the FRONT END's POST /api/urls, the
+// call the page makes, and returns the key. It is the create journey for a
+// caller that reaches a release only through its public host: the URL
+// service is not routed, the front end is, and it makes the same
+// UrlsService/Create call itself.
+func CreateViaWeb(ctx context.Context, httpClient *http.Client, webBase, longURL string) (string, error) {
+	body, err := json.Marshal(map[string]string{"longUrl": longURL})
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webBase+"/api/urls", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("build the create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+
+		return "", fmt.Errorf("the front end answered %d to a create, wanted %d: %s", resp.StatusCode, http.StatusCreated, detail)
+	}
+
+	var created struct {
+		Key     string `json:"key"`
+		LongURL string `json:"longUrl"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		return "", fmt.Errorf("decode the created link: %w", err)
+	}
+
+	if created.Key == "" {
+		return "", fmt.Errorf("the front end created a link with no key")
+	}
+
+	return created.Key, nil
+}
+
+// ClickCountViaWeb reads key's click count through the front end's
+// GET /api/url: the counter's effect, seen from outside (stat has no Service
+// to ask).
+func ClickCountViaWeb(ctx context.Context, httpClient *http.Client, webBase, key string) (int64, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, webBase+"/api/url?key="+url.QueryEscape(key), http.NoBody)
+	if err != nil {
+		return 0, fmt.Errorf("build the lookup request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("the front end answered %d to a lookup, wanted %d", resp.StatusCode, http.StatusOK)
+	}
+
+	var got struct {
+		Clicks int64 `json:"clicks"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		return 0, fmt.Errorf("decode the lookup: %w", err)
+	}
+
+	return got.Clicks, nil
 }

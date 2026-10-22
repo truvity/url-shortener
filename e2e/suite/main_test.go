@@ -1,3 +1,19 @@
+// Package suite is the end-to-end suite, in the shape of the two doors
+// (package devel): it calls a deployed release only through its PUBLIC host,
+// with a `devel:url-shortener` token, and the cluster only through the
+// Kubernetes API (rollout status, pod logs).
+//
+// It is inert unless E2E_URL is set, so `go test ./...` -- and therefore
+// `just test` -- never touches a network or a cluster. `e2ectl env` prints
+// the variables for the release it installed; the integration workflow and
+// `just e2e-test` set them.
+//
+// What it does not do, on purpose: reach the database, the broker or the
+// bucket. A suite that can only do what a customer can do cannot pass
+// because of something a customer cannot reach, and runs from anywhere that
+// holds the two credentials -- a GitHub-hosted runner included. The database
+// questions (the migration, the two roles) are asked of a local PostgreSQL in
+// internal/migration; the archive is asked of the archiver's own log.
 package suite
 
 import (
@@ -5,102 +21,135 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/truvity/url-shortener/e2e/devel"
 )
 
-// shared is resolved once, in TestMain, and read by every test — never
-// mutated after that point, so tests may run in any order or in parallel.
-var shared env
+const (
+	envURL       = "E2E_URL"
+	envNamespace = "E2E_NAMESPACE"
+	envRelease   = "E2E_RELEASE"
+)
 
-// TestMain is the ONE gate: unless E2E_NAMESPACE is set, this package runs
-// no tests and touches no network, so `go test ./...` — and therefore
-// `just test` — stays hermetic (docs/guides/testing.md, "Traps"). Set it,
-// and this binary is the same one meant to run against the kind box today,
-// a private repository's shared cluster, or a cluster after a promotion —
-// only the environment differs.
+// shared is resolved once in TestMain and read by every test; never mutated
+// after that, so tests may run in any order or in parallel.
+var shared struct {
+	base      string
+	namespace string
+	release   string
+	tokens    *devel.TokenSource
+}
+
 func TestMain(m *testing.M) {
-	namespace, run := namespaceFromEnv()
-	if !run {
-		fmt.Fprintf(os.Stderr, "suite: %s is not set — skipping the cluster suite\n", envNamespace)
+	base := strings.TrimSuffix(strings.TrimSpace(os.Getenv(envURL)), "/")
+	if base == "" {
+		fmt.Fprintf(os.Stderr, "suite: %s is not set -- skipping the cluster suite\n", envURL)
 		os.Exit(0)
 	}
 
-	resolved, err := resolveEnvWithTimeout(namespace, 30*time.Second)
+	cfg, err := devel.FromEnv()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "suite: %v\n", err)
 		os.Exit(1)
 	}
-	shared = resolved
 
-	// The suite's PRE-FLIGHT gate — see readiness_test.go's
-	// waitForPromotedRollout for the race this closes. Run here, before
-	// m.Run(), so it bounds every test in this package rather than only
-	// whichever one Go happens to run first.
-	if err := waitForPromotedRollout(context.Background(), shared); err != nil {
+	shared.base = base
+	shared.namespace = cfg.Namespace
+	shared.release = cfg.Release
+	shared.tokens = devel.NewTokenSource(cfg.Issuer)
+
+	// The pre-flight gate: helm --wait returns before the gateway serves the
+	// route, so the first test must not be what finds out.
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	err = devel.WaitPublic(ctx, base, shared.tokens)
+
+	cancel()
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "suite: %v\n", err)
 		os.Exit(1)
 	}
 
-	code := m.Run()
-
-	shared.cluster.CloseForwards()
-
-	os.Exit(code)
+	os.Exit(m.Run())
 }
 
-// testDataPrefix marks every long URL and key this suite invents, so a
-// person reading the archive bucket or the urls table by hand can tell this
-// suite's rows from a real deployment's at a glance.
+// testDataPrefix marks every long URL this suite invents, so a person reading
+// the table by hand can tell this suite's rows from a real use at a glance.
 const testDataPrefix = "e2e-suite"
 
-// randomSuffix draws a short, readable suffix for one test's data — long
-// enough that two runs against the SAME standing tenant (a private
-// repository's shared cluster, where nothing tears the install down between
-// runs) never collide on the URL identity Create dedupes by.
-func randomSuffix(t *testing.T) string {
+// testLongURL is a long URL unique to this test.
+func testLongURL(t *testing.T) string {
 	t.Helper()
 
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+
 	out := make([]byte, 10)
+
 	for i := range out {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
 		if err != nil {
 			t.Fatalf("draw a random suffix: %v", err)
 		}
+
 		out[i] = alphabet[n.Int64()]
 	}
-	return string(out)
+
+	return fmt.Sprintf("https://example.com/%s/%s", testDataPrefix, out)
 }
 
-// testLongURL is a long URL unique to this test, carrying testDataPrefix so
-// it is recognisable wherever it ends up — the urls table, the archive
-// bucket, a trace.
-func testLongURL(t *testing.T) string {
-	t.Helper()
-	return fmt.Sprintf("https://example.com/%s/%s", testDataPrefix, randomSuffix(t))
-}
-
-// eventually polls check, bounded by patience, and fails the test with the
-// last error once patience runs out — the shape every asynchronous
-// assertion in this suite shares: the redirect answers and is done, so what
-// it triggers (the counter, the archive) is proved by waiting, not by
-// asserting once.
+// eventually polls check, bounded by patience, and fails with the last error
+// once patience runs out: the redirect answers and is done, so what it
+// triggers (the counter, the archive) is proved by waiting, not by asserting
+// once.
 func eventually(t *testing.T, patience time.Duration, check func() error) {
 	t.Helper()
 
 	deadline := time.Now().Add(patience)
+
 	var last error
+
 	for {
-		if err := check(); err == nil {
+		if last = check(); last == nil {
 			return
-		} else {
-			last = err
 		}
+
 		if time.Now().After(deadline) {
 			t.Fatalf("did not become true within %s: %v", patience, last)
 		}
+
 		time.Sleep(time.Second)
 	}
+}
+
+// bearer adds a fresh token to every request, minting again when the held one
+// is near its end (the suite outlives a 15-minute token).
+type bearer struct {
+	next http.RoundTripper
+}
+
+func (b bearer) RoundTrip(req *http.Request) (*http.Response, error) {
+	token, err := shared.tokens.Token(req.Context())
+	if err != nil {
+		return nil, err
+	}
+
+	req = req.Clone(req.Context())
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	return b.next.RoundTrip(req)
+}
+
+// httpClient is the one client every call to the release goes through.
+func httpClient(follow bool) *http.Client {
+	c := &http.Client{Timeout: 30 * time.Second, Transport: bearer{next: http.DefaultTransport}}
+	if !follow {
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	}
+
+	return c
 }

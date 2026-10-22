@@ -8,7 +8,7 @@ import (
 
 	"github.com/truvity/policy/conformance"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/internal/config"
 )
 
 // Each binary's type and its schema describe the same fields.

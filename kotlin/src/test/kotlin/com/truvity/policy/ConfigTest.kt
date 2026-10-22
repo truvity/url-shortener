@@ -18,7 +18,9 @@ import kotlin.test.assertTrue
  * another accepts is a configuration that passes a chart's tests and crashes
  * the service.
  */
-private val FIXTURES: Path = Path.of("..", "config", "testdata")
+// truvity/policy's fixtures at the version go.mod pins; the Justfile hands over
+// the module directory (POLICY_DIR), so no copy is kept here.
+private val FIXTURES: Path = Path.of(System.getenv("POLICY_DIR") ?: error("POLICY_DIR is not set: run the tests through `just test`"), "config", "testdata")
 
 private fun fixture(name: String): String = FIXTURES.resolve(name).toString()
 

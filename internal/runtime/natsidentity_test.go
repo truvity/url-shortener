@@ -3,7 +3,7 @@ package runtime_test
 import (
 	"testing"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 // Asking for the identity when the service has none is refused here, in words

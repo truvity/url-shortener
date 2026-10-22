@@ -9,6 +9,7 @@ runtime reads it, which is what the contract actually promises.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,9 @@ import yaml
 
 from truvity_policy import ConfigError, load, secret, validate
 
-FIXTURES = Path(__file__).resolve().parents[2] / "config" / "testdata"
+# truvity/policy's fixtures at the version go.mod pins; the Justfile hands over
+# the module directory (POLICY_DIR), so no copy is kept here.
+FIXTURES = Path(os.environ["POLICY_DIR"]) / "config" / "testdata"
 
 
 def fixture(name: str) -> str:

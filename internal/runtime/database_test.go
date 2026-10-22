@@ -10,7 +10,7 @@ import (
 
 	"github.com/truvity/cnpg/v2/clients/go/pgclient"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 func env(m map[string]string) func(string) string {

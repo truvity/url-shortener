@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/api"
+	"github.com/truvity/url-shortener/internal/api"
 )
 
 func TestNewVersionHandler(t *testing.T) {

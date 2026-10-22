@@ -7,7 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
+	"github.com/truvity/url-shortener/internal/business/store"
 )
 
 // A caller cannot raise the page ceiling, and asking to is not an error.

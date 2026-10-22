@@ -2,12 +2,13 @@ package charts_test
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"testing"
 
 	"github.com/truvity/policy/conformance"
-	"github.com/truvity/policy/examples/url-shortener/charts"
+	"github.com/truvity/url-shortener/charts"
 
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -22,7 +23,7 @@ const annotation = "delivery.truvity.io/interface"
 func registrySteps(t *testing.T) map[int]bool {
 	t.Helper()
 
-	raw, err := os.ReadFile("../../../docs/contracts/delivery-interface.md")
+	raw, err := os.ReadFile(filepath.Join(policyDir(t), "docs", "contracts", "delivery-interface.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

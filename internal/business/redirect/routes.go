@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/api"
+	"github.com/truvity/url-shortener/internal/api"
 )
 
 // RegisterHumaRoutes registers all Huma API routes for the redirect component

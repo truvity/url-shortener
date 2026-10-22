@@ -15,8 +15,8 @@ import (
 	policycharts "github.com/truvity/policy/charts"
 	"github.com/truvity/policy/conformance"
 
-	"github.com/truvity/policy/examples/url-shortener/charts"
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/charts"
+	"github.com/truvity/url-shortener/internal/config"
 
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -25,15 +25,19 @@ import (
 // returns the path to the one named.
 //
 // They are laid out at the repository's OWN relative paths
-// (`examples/url-shortener/charts/<chart>`, with the library at
-// `charts/service-lib`), because a chart depends on the library through a
-// `file://` path relative to itself; then `helm dependency build` resolves it
-// from the committed Chart.lock, exactly as `helmctl package` does for a
-// release. What renders is therefore the library as it stands in the tree.
+// (`charts/<chart>`), with their dependencies already resolved from the
+// committed Chart.lock, exactly as `helmctl package` does for a release: the
+// library chart `service-lib` is the archive truvity/policy published at the
+// pinned version, pulled once per test run from ghcr.io (anonymously; the
+// package is public).
 //
 // The embeds are what make this test honest: Go's cache keys on the files the
 // TEST package reads, not on what helm reads, so a template edit would
 // otherwise leave a cached PASS behind and the contract would go unchecked.
+//
+// "service-lib" names the library as the policy Go module embeds it (the
+// same bytes as the published archive, apart from the version a release
+// stamps), for the few tests that look at the library itself.
 func chartDir(t *testing.T, chart string) string {
 	t.Helper()
 	top := t.TempDir()
@@ -41,10 +45,10 @@ func chartDir(t *testing.T, chart string) string {
 		t.Fatal(err)
 	}
 	if chart == "service-lib" {
-		return filepath.Join(top, "charts", "service-lib")
+		return filepath.Join(top, "library", "service-lib")
 	}
 
-	return filepath.Join(top, "examples", "url-shortener", "charts", chart)
+	return filepath.Join(top, "charts", chart)
 }
 
 // resolvedTree is the charts laid out and their dependencies resolved, once
@@ -62,12 +66,12 @@ func TestMain(m *testing.M) {
 	code := 1
 	defer func() { _ = os.RemoveAll(top); os.Exit(code) }()
 
-	root := filepath.Join(top, "examples", "url-shortener", "charts")
+	root := filepath.Join(top, "charts")
 	if err := os.CopyFS(root, charts.Files); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	if err := os.CopyFS(filepath.Join(top, "charts"), policycharts.Library); err != nil {
+	if err := os.CopyFS(filepath.Join(top, "library"), policycharts.Library); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 // While a dependency is away the process is alive and not ready: liveness

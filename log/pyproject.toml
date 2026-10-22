@@ -30,7 +30,7 @@ dev = [
 # Inside the repository the loader is the checkout, the way the Go modules
 # use `replace`. A consumer outside it installs the published wheel; see
 # python/README.md for where that comes from.
-truvity-policy = { path = "../../../python" }
+truvity-policy = { path = "../python" }
 
 [tool.uv]
 python-preference = "only-system"

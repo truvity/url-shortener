@@ -21,9 +21,9 @@ import (
 
 	policytelemetry "github.com/truvity/policy/telemetry"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
-	"github.com/truvity/policy/examples/url-shortener/internal/migration"
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/internal/migration"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 func main() {
@@ -112,7 +112,7 @@ func run() error {
 // is recorded on the span itself, or a trace of a Job that failed reads as
 // one that succeeded.
 func withSpan(ctx context.Context, name string, step func(context.Context) error) error {
-	ctx, span := otel.Tracer("github.com/truvity/policy/examples/url-shortener").Start(ctx, name)
+	ctx, span := otel.Tracer("github.com/truvity/url-shortener").Start(ctx, name)
 	defer span.End()
 
 	if err := step(ctx); err != nil {

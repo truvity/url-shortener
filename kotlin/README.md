@@ -19,7 +19,7 @@ val password = secret(cfg.at("/database/passwordSecret").asText())  // the NAME 
 fixtures as the other loaders — and **not published**. No release ships a
 jar; a consumer builds it from a checkout of the tag it pins (Gradle's
 `includeBuild`, as
-[the example's counter](../examples/url-shortener/stat/settings.gradle.kts)
+[the example's counter](../stat/settings.gradle.kts)
 does). Publishing it is a release-workflow change nobody has needed yet.
 
 ## Two things that are different here, and why
@@ -38,6 +38,6 @@ JDK that *compiles* is declared as a toolchain rather than inherited from
 whichever JVM Gradle's daemon happens to be running on — those are not the
 same thing, and Gradle ships with its own.
 
-See [`docs/contracts/config.md`](../docs/contracts/config.md) for the
-contract this implements, and [`docs/canon/kotlin.md`](../docs/canon/kotlin.md)
+See [`docs/contracts/config.md`](https://github.com/truvity/policy/blob/master/docs/contracts/config.md) for the
+contract this implements, and [`docs/canon/kotlin.md`](https://github.com/truvity/policy/blob/master/docs/canon/kotlin.md)
 for the library list.

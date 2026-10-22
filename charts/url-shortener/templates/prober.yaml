@@ -2,7 +2,7 @@
 {{- if .Values.prober.enabled }}
 {{/*
 Always-on synthetic traffic (docs/guides/testing.md): a Deployment of ONE
-replica running examples/url-shortener/e2e/cmd/prober against this release's
+replica running e2e/cmd/prober against this release's
 own `urls` and `redirect` Services. See templates/prober-config.yaml for the
 file it mounts and how it addresses them.
 

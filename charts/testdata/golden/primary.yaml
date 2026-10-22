@@ -319,7 +319,7 @@ spec:
               app.kubernetes.io/component: redirect
       containers:
         - name: redirect
-          image: ghcr.io/truvity/policy/url-shortener/redirect:0.0.0
+          image: ghcr.io/truvity/url-shortener/redirect:0.0.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -466,7 +466,7 @@ spec:
               app.kubernetes.io/component: urls
       containers:
         - name: urls
-          image: ghcr.io/truvity/policy/url-shortener/urls:0.0.0
+          image: ghcr.io/truvity/url-shortener/urls:0.0.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -613,7 +613,7 @@ spec:
               app.kubernetes.io/component: web
       containers:
         - name: web
-          image: ghcr.io/truvity/policy/url-shortener/web:0.0.0
+          image: ghcr.io/truvity/url-shortener/web:0.0.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -726,7 +726,7 @@ spec:
               app.kubernetes.io/component: stat
       containers:
         - name: stat
-          image: ghcr.io/truvity/policy/url-shortener/stat:0.0.0
+          image: ghcr.io/truvity/url-shortener/stat:0.0.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -839,7 +839,7 @@ spec:
               app.kubernetes.io/component: log
       containers:
         - name: log
-          image: ghcr.io/truvity/policy/url-shortener/log:0.0.0
+          image: ghcr.io/truvity/url-shortener/log:0.0.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -1021,7 +1021,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: migrate
-          image: ghcr.io/truvity/policy/url-shortener/migrate:0.0.0
+          image: ghcr.io/truvity/url-shortener/migrate:0.0.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

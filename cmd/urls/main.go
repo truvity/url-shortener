@@ -33,11 +33,11 @@ import (
 	policytelemetry "github.com/truvity/policy/telemetry"
 	"github.com/truvity/policy/transport"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
-	"github.com/truvity/policy/examples/url-shortener/internal/business/urls"
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
-	"github.com/truvity/policy/examples/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/business/store"
+	"github.com/truvity/url-shortener/internal/business/urls"
+	"github.com/truvity/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/internal/gen/urlshortener/v1/urlshortenerv1connect"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 const component = "urls"

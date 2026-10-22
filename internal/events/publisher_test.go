@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/events"
+	"github.com/truvity/url-shortener/internal/events"
 )
 
 type capture struct {

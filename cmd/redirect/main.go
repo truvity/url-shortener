@@ -28,13 +28,13 @@ import (
 
 	policytelemetry "github.com/truvity/policy/telemetry"
 
-	"github.com/truvity/policy/examples/url-shortener/internal/api"
-	"github.com/truvity/policy/examples/url-shortener/internal/business/redirect"
-	"github.com/truvity/policy/examples/url-shortener/internal/business/store"
-	"github.com/truvity/policy/examples/url-shortener/internal/config"
-	"github.com/truvity/policy/examples/url-shortener/internal/events"
-	"github.com/truvity/policy/examples/url-shortener/internal/middleware"
-	"github.com/truvity/policy/examples/url-shortener/internal/runtime"
+	"github.com/truvity/url-shortener/internal/api"
+	"github.com/truvity/url-shortener/internal/business/redirect"
+	"github.com/truvity/url-shortener/internal/business/store"
+	"github.com/truvity/url-shortener/internal/config"
+	"github.com/truvity/url-shortener/internal/events"
+	"github.com/truvity/url-shortener/internal/middleware"
+	"github.com/truvity/url-shortener/internal/runtime"
 )
 
 func main() {

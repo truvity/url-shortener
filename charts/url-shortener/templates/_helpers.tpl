@@ -23,10 +23,8 @@ name/instance/component alone: a selector that included this would stop
 matching the incumbent replicas the moment a rollout changed it, which is
 the opposite of what a rolling update needs.
 
-This is also the ONE label examples/url-shortener/e2e's own suite reads
-off a live pod to prove a test is judging the version that was actually
-promoted — see e2e/suite/readiness_test.go's waitForPromotedRollout and the
-E2E_APP_VERSION a product's own CI hands the suite.
+This is also the ONE label a verification reads off a live pod to prove it
+is judging the version that was actually promoted.
 */}}
 {{- define "url-shortener.labels" -}}
 app.kubernetes.io/name: url-shortener
