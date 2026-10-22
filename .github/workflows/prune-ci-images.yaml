@@ -1,0 +1,59 @@
+# Weekly housekeeping: the integration run pushes every image as ci-<sha> into
+# the same ghcr.io packages a release publishes to, and nothing else removes
+# them. This keeps the newest 30 ci-<sha> versions of each image and deletes
+# the rest. A version with any other tag (a release's semver, latest) and an
+# untagged version (a platform manifest of a multi-platform image) are never
+# touched: see hack/prune-ci-images.sh, whose selection rule is tested.
+#
+# Hosted runner, the job's own GITHUB_TOKEN with `packages: write` and nothing
+# else (the checkout needs no token: the repository is public). Deleting a
+# version needs the package's "Manage Actions access" role for this repository
+# to be Admin, not only Write; if the token is refused, that is the setting.
+name: Prune CI images
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Print what would be deleted, delete nothing
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: prune-ci-images
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    if: github.repository == 'truvity/url-shortener'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      packages: write
+    steps:
+      # The script and its tool (gh, jq) are on the hosted image; the
+      # repository is checked out without credentials and without the token's
+      # contents scope.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: hack
+
+      - name: Selection rule
+        run: bash hack/prune-ci-images.test.sh
+
+      - name: Prune
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP: "30"
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            bash hack/prune-ci-images.sh --dry-run
+          else
+            bash hack/prune-ci-images.sh
+          fi
