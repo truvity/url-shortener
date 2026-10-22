@@ -1,0 +1,93 @@
+# The plain check: the shared workflow (truvity/ci-workflows) runs each Justfile
+# recipe as its OWN parallel job, reported under its own name.
+#
+# This is the ONLY workflow a pull request runs, and it is built to be run by
+# strangers: GitHub-HOSTED runners, a read-only token, no secret, no id-token,
+# and nothing in it reaches a cluster or a credential. A pull request from a
+# fork cannot change that by editing this file, because the controls that
+# matter are not in it: the fork-run approval policy, the repository's
+# default token permissions, and the identity provider's pinned group, which
+# admits integration.yaml on master and nothing else.
+#
+# Pinned by COMMIT SHA, never a tag — tags move, and this code runs for
+# anyone who opens a pull request.
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recipes:
+    uses: truvity/ci-workflows/.github/workflows/check.yaml@51bc0eb7d5d89931d336219f87bde091deaf48ed # v5.4.0
+    with:
+      # Required: the component contract (C1-C13) is judged, shown in the
+      # job summary, and fails this job when a rule fails.
+      policy-conformance: true
+      policy-conformance-strict: true
+      # `vuln` is not here: it runs in security.yaml, on a schedule, where a
+      # new advisory is reported without turning every pull request red.
+      recipes: '["build", "test", "lint", "drift", "leak-canary"]'
+      # GitHub's own cache (hosted runners reach no other): the Go build and
+      # module caches and Gradle's dependency cache, one cache per recipe,
+      # saved once per change of go.sum, a build.gradle.kts or devbox.lock.
+      cache-paths: |
+        ~/.cache/go-build
+        ~/go/pkg/mod
+        ~/.gradle/caches
+      cache-key-files: |
+        **/go.sum
+        **/build.gradle.kts
+        **/settings.gradle.kts
+        devbox.lock
+
+  # The TypeScript loader and the front end install from a registry, which is
+  # why they are not in `check`: the gate must need nothing but the checkout.
+  ts:
+    uses: truvity/ci-workflows/.github/workflows/check.yaml@51bc0eb7d5d89931d336219f87bde091deaf48ed # v5.4.0
+    with:
+      recipes: '["ts"]'
+
+  # The committed renders, against the Kubernetes API's own schemas. It asks a
+  # question the chart tests do not: they check that a rendered file is one the
+  # BINARY accepts, and would pass just as happily for a Deployment with a
+  # misspelled field, because the API server ignores one rather than refusing it.
+  charts:
+    uses: truvity/ci-workflows/.github/workflows/check.yaml@51bc0eb7d5d89931d336219f87bde091deaf48ed # v5.4.0
+    with:
+      recipes: '["charts"]'
+
+  # The shadow phase of decision 0010 (the data contracts in Pkl). Two recipes,
+  # each its own job: `shadow-generated` is STRICT (the committed artifacts
+  # generated from the contract are current) and `shadow-diff` is REPORT-ONLY.
+  # Neither is in `check`: they fetch Pkl and the contracts' packages from
+  # GitHub, and the gate needs nothing but the checkout.
+  shadow:
+    uses: truvity/ci-workflows/.github/workflows/check.yaml@51bc0eb7d5d89931d336219f87bde091deaf48ed # v5.4.0
+    with:
+      recipes: '["shadow-generated", "shadow-diff"]'
+
+  # Stable name for branch protection: the matrix reports as "recipes / lint"
+  # and so on, so a required context called "check" would never arrive and
+  # every pull request would hang waiting for it. The integration suite is NOT
+  # here: it is integration.yaml's, and runs after merge.
+  check:
+    needs: [recipes, ts, charts, shadow]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          [ "${{ needs.recipes.result }}" = "success" ] &&
+          [ "${{ needs.ts.result }}" = "success" ] &&
+          [ "${{ needs.charts.result }}" = "success" ] &&
+          [ "${{ needs.shadow.result }}" = "success" ]

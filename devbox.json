@@ -1,0 +1,49 @@
+{
+  "packages": {
+    "go":            "1.27.0",
+    "golangci-lint": "2.13.1",
+    "govulncheck":   "1.7.0",
+    "gopls":         "0.23.0",
+    "just":          "1.58.0",
+    "just-lsp":      "0.6.2",
+    "lefthook":      "2.1.10",
+    "nodejs": {
+      "version":        "26",
+      "disable_plugin": true
+    },
+    "yarn-berry":            "4.14.1",
+    "kind":                  "0.32.0",
+    "kubectl":               "1.36.3",
+    "kubernetes-helm":       "4.2.4",
+    "ko":                    "0.19.1",
+    "openssl":               "3.6.0",
+    "python":                "3.14.4",
+    "uv":                    "0.12.5",
+    "goreleaser":            "2.17.1",
+    "buf":                   "1.72.0",
+    "protoc-gen-go":         "1.36.12",
+    "protoc-gen-connect-go": "1.20.0",
+    "temurin-bin":           "21.0.8",
+    "gradle":                "8.14.4",
+    "protoc-gen-es":         "2.12.0",
+    "postgresql_18": {
+      "version":        "18.4",
+      "disable_plugin": true
+    },
+    "https://github.com/truvity/sluis/releases/download/v1.74.0/sluisctl_1.74.0_nix-flake.tar.gz#sluisctl": "",
+    "kubeconform":           "0.8.0",
+    "biome":                 "2.5.14",
+    "editorconfig-checker":  "4.0.2"
+  },
+  "env": {
+    "CGO_ENABLED":  "0",
+    "GOEXPERIMENT": "jsonv2",
+    "PATH":         "$DEVBOX_PROJECT_ROOT/bin:$PATH"
+  },
+  "shell": {
+    "init_hook": [
+      "lefthook install >/dev/null 2>&1 || true"
+    ],
+    "scripts": {}
+  }
+}

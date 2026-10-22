@@ -1,0 +1,77 @@
+# Devbox
+.devbox/
+
+# Build output. `just lint` refuses any file large enough to be one that
+# slipped past this list: a binary in a public repository's history is in
+# every clone forever.
+#
+# `bin/helmctl` is the one exception: it is a checked-in wrapper script, not
+# a build output — see docs/guides/testing.md and ocictl's own
+# docs/consuming.md for why a tool pinned by `go.mod`'s `tool` directive is
+# invoked through a committed `exec go run` wrapper rather than installed.
+bin/*
+!bin/helmctl
+# `bin/pkl` likewise: a checked-in wrapper that downloads and verifies a pinned
+# release, not a binary.
+!bin/pkl
+/dist/
+coverage.out
+
+# Node, for the TypeScript loader
+node_modules/
+*/node_modules/
+*/dist/
+# Yarn's own state, which is not the lockfile. It reappears in the working
+# tree after any install and is not part of any change.
+.yarn/
+*/.yarn/
+
+# What the Python component's image copies. Assembled by hack/build.sh from
+# the committed lock, so it is a build output like any other.
+log/build/
+
+# What the e2e verification image copies: the compiled test binary and a
+# pinned kubectl, assembled by e2e/hack/build.sh outside the image.
+e2e/build/
+
+# Python, for the third loader. The lock IS committed — `uv sync --frozen`
+# is what makes the gate hermetic — but nothing the interpreter or the
+# tools write is.
+.venv/
+*/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Gradle's own state and output. The wrapper is deliberately absent: the
+# environment manifest declares gradle, so a second copy downloaded by a
+# checked-in wrapper script would be the same "which one actually runs"
+# question the Node toolchain already answered.
+kotlin/build/
+kotlin/.gradle/
+
+# Written by the environment manifest's JDK plugin, pinning Gradle's daemon
+# to an absolute nix store path. Machine-specific by construction, and inert
+# anyway — the Gradle project is in kotlin/, and a properties file outside a
+# project directory is not read for it.
+/gradle.properties
+stat/build/
+stat/.gradle/
+
+# What `helm dependency build` resolves into a chart: archives of the
+# dependencies a Chart.lock names. The lock is committed; what it resolves to is
+# not, because the library lives at charts/service-lib and a copy is a second
+# version of it.
+charts/*/charts/
+charts/testdata/*/charts/
+
+# Source maps, moved out of the web image by the page build; pushed by the
+# release with smctl, never committed or imaged.
+/dist-sourcemaps/

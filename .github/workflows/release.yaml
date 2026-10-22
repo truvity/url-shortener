@@ -1,0 +1,48 @@
+# Tag-triggered release: the images and the two charts, from ONE job (the
+# charts are packaged from the digests the image build wrote, so the order
+# cannot be got wrong). Hosted runner, GHCR through the repository's own
+# GITHUB_TOKEN. The loaders (ts/, python/, kotlin/) are not released.
+#
+# Cut by a person with the release-tags bypass; AUTO_RELEASE is not armed
+# for this repository.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+# Never cancel a running publish — a half-published artifact set is worse than
+# a queued wait, and a version that failed halfway is burned.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+    uses: truvity/ci-workflows/.github/workflows/release-public.yaml@51bc0eb7d5d89931d336219f87bde091deaf48ed # v5.4.0
+    with:
+      # ONE job builds and pushes the images, then packages the charts from the
+      # digests it produced; a chart whose images.* are not all digest-pinned is
+      # refused outright.
+      chart-images: goreleaser
+      image-repo: ghcr.io/truvity/url-shortener
+      require-image-digests: true
+      # The pair, released under ONE version. They are two charts and not a
+      # chart and an extra: Helm runs every hook before anything else in the
+      # same release, so the chart that migrates a database cannot be the
+      # chart that creates it. The library chart `service-lib` is truvity/policy's
+      # and is released there.
+      charts: '["url-shortener", "url-shortener-infra"]'
+      chart-root: charts
+      # The page's source maps, pushed right after GoReleaser in the same job
+      # to ghcr.io/<owner>/sourcemaps/url-shortener:<release version>. OFF
+      # until the repository variable SOURCEMAPS_ENABLED is `true`.
+      sourcemaps-image: ${{ vars.SOURCEMAPS_ENABLED == 'true' && 'web' || '' }}
+      sourcemaps-app: url-shortener

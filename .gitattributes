@@ -1,0 +1,8 @@
+# Normalise line endings: this repository is read and edited on every
+# platform, and a CRLF that reaches a shell script or a golden render is a
+# failure nobody can see in a diff.
+* text=auto eol=lf
+
+# Generated and vendored files, so a diff shows the change and not the
+# regeneration.
+devbox.lock linguist-generated=true

@@ -1,0 +1,13 @@
+# Everything a run executes, and everything that decides what a run may reach,
+# needs its owners. The integration workflow holds an OIDC identity into a
+# cluster, so a change to it is a change to who can reach that cluster.
+/.github/                  @truvity/role-devops
+/.goreleaser.yaml          @truvity/role-devops
+/Justfile                  @truvity/role-devops
+/hack/                     @truvity/role-devops
+/e2e/                      @truvity/role-devops
+/devbox.json               @truvity/role-devops
+/devbox.lock               @truvity/role-devops
+/renovate.json             @truvity/role-devops
+/go.mod                    @truvity/role-devops
+/bin/                      @truvity/role-devops

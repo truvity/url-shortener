@@ -1,0 +1,173 @@
+# The release, as two tools and nothing of ours between them.
+#
+# GoReleaser builds and pushes every image and writes dist/artifacts.json;
+# helmctl (truvity/ocictl) reads that file, bakes the digests into the
+# charts and pushes them. There is no script in this path, and there is
+# nothing to pass between jobs, because it is one job.
+#
+# That is not tidiness. A digest exists only once the image is built, and
+# this repository used to publish the charts in a job that ran FIRST — so
+# they reached the registry with their image values empty and could not
+# render a Deployment. Every test passed; each supplied images of its own.
+# Here the order is not a convention that can be got wrong: the charts are
+# packaged from a file that does not exist until the images are pushed.
+#
+# A RELEASE IS ALWAYS MULTI-ARCHITECTURE, because a published artifact is
+# consumed by machines whose architecture the publisher does not know. The
+# platform lists below are that promise, and `just goreleaser-config` is
+# the test that none of them is quietly shortened.
+#
+# It costs almost nothing, and the image shape is why: not one Dockerfile
+# has a RUN line (asserted by the same test). The Go binaries are
+# cross-compiled by ko, the Python dependency trees are resolved per
+# architecture by uv, and the jar and the JavaScript bundle are the same
+# bytes everywhere — so building for arm64 on an x86 machine copies files
+# rather than executing them, and needs no second runner and no qemu.
+version: 2
+
+# Each component's own build tool, producing what its Dockerfile copies.
+# These are the peers of `go build`, not release machinery: gradle compiles
+# the jar, uv resolves a dependency tree per architecture, yarn bundles the
+# JavaScript. GoReleaser runs them; nothing here publishes anything.
+before:
+  hooks:
+    - bash log/hack/build.sh
+    - gradle --project-dir stat bootJar --console=plain --quiet
+    - yarn --cwd ts install --immutable
+    - yarn --cwd ts build
+    - yarn --cwd web install --immutable
+    # The page is built ONCE, for this release's version (Faro's app.release,
+    # and the tag the source maps are pushed under). The build moves the hidden
+    # source maps out of the tree the web image copies into ./dist-sourcemaps,
+    # each at its served path, where the release workflow's `smctl push`
+    # reads them. See docs/guides/source-maps.md.
+    # (`env` because a before hook is one command, not a shell line.)
+    - env VITE_APP_VERSION={{ .Version }} yarn --cwd web build
+
+builds:
+  - id: migrate
+    main: ./cmd/migrate
+    binary: migrate
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+  - id: redirect
+    main: ./cmd/redirect
+    binary: redirect
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+  - id: urls
+    main: ./cmd/urls
+    binary: urls
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+  # Always-on synthetic traffic -- an ordinary Go binary like the three
+  # above, so it is a `kos:` entry rather than another Dockerfile.
+  - id: prober
+    main: ./e2e/cmd/prober
+    binary: prober
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+# The Go components need no Dockerfile at all: ko builds the image from the
+# package, cross-compiling rather than emulating.
+#
+# The destination is KO_DOCKER_REPO and `base_import_paths` appends the
+# command's own name, so these become <repo>/migrate, <repo>/redirect and
+# <repo>/urls. NOT `repositories:` with `bare` — ko reads KO_DOCKER_REPO
+# from the environment and it SILENTLY WINS over a repository named here.
+# A release published all three to the bare default that way and only
+# failed afterwards, writing an SBOM to a repository nobody meant to use.
+#
+# `base_image` is pinned by digest, and it is HERE that it matters: this
+# block does not read .ko.yaml, so without it the
+# base is goreleaser's own default, `latest` alone — a different image on
+# every release. The digest is the multi-architecture index; renovate.json's
+# custom manager moves this and .ko.yaml together.
+kos:
+  - id: migrate
+    build: migrate
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    base_import_paths: true
+    base_image: cgr.dev/chainguard/static:latest@sha256:41e17ed83c594a64a9396b6ab96dd26d5ddc290dacf4c177464712ff21ad534f
+  - id: redirect
+    build: redirect
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    base_import_paths: true
+    base_image: cgr.dev/chainguard/static:latest@sha256:41e17ed83c594a64a9396b6ab96dd26d5ddc290dacf4c177464712ff21ad534f
+  - id: urls
+    build: urls
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    base_import_paths: true
+    base_image: cgr.dev/chainguard/static:latest@sha256:41e17ed83c594a64a9396b6ab96dd26d5ddc290dacf4c177464712ff21ad534f
+  - id: prober
+    build: prober
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    base_import_paths: true
+    base_image: cgr.dev/chainguard/static:latest@sha256:41e17ed83c594a64a9396b6ab96dd26d5ddc290dacf4c177464712ff21ad534f
+
+# The other three carry a runtime somebody else builds, so they have a
+# Dockerfile — one FROM and one COPY each.
+#
+# `extra_files` stages a path into the build context KEEPING IT, so the
+# COPY lines are written from the repository root. That is also how they
+# are built locally (`just example-images` runs this same configuration in
+# snapshot mode), so there is one build of these images and not two that
+# can disagree.
+dockers_v2:
+  - id: log
+    images: ["{{ .Env.IMAGE_REPO }}/log"]
+    dockerfile: log/Dockerfile
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    extra_files:
+      - log/build/site-packages-amd64
+      - log/build/site-packages-arm64
+  - id: stat
+    images: ["{{ .Env.IMAGE_REPO }}/stat"]
+    dockerfile: stat/Dockerfile
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    extra_files:
+      - stat/build/libs/stat.jar
+  - id: web
+    images: ["{{ .Env.IMAGE_REPO }}/web"]
+    dockerfile: web/Dockerfile
+    platforms: [linux/amd64, linux/arm64]
+    tags: ["{{ .Env.IMAGE_TAG }}"]
+    extra_files:
+      - web/dist
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^chore"
+      - "^ci"
+      - "^docs"
+      - "^test"
+
+# Three loops, one configuration, and the only difference between them is
+# where the images go and whether a GitHub release is cut:
+#
+#   local     IMAGE_REPO=<a registry you can push to>  IMAGE_TAG=dev     release off
+#   CI        IMAGE_REPO=ghcr.io/truvity/url-shortener  IMAGE_TAG=ci-<sha>  release off
+#   release   IMAGE_REPO=ghcr.io/truvity/url-shortener  IMAGE_TAG=<ver>     release on
+#
+# ONE destination per repository: this one is public, so ghcr.io, for the
+# integration run and the release alike (the former under a ci-<sha> tag).
+#
+# NEVER `--snapshot`. It is the one mode that also stops the images being
+# pushed, so it builds something no cluster can pull -- which is the same
+# class of mistake as publishing a chart before its images. Local and CI
+# pass `--skip=validate` instead, so a commit that is not a tag may build.
+release:
+  github: {}
+  disable: "{{ .Env.GITHUB_RELEASE_DISABLED }}"

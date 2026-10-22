@@ -1,0 +1,12 @@
+# The one check worth paying for on every commit: this repository is public,
+# and a particular that reaches a push cannot be unpublished. Everything else
+# is `just check`, which CI runs.
+pre-commit:
+  jobs:
+    - name: leak canary
+      run: just leak-canary
+      # A machine without the toolchain (an automation that only edits
+      # dependency pins) would fail every commit on a missing command rather
+      # than on a finding. Skip there; keep the hook wherever `just` exists.
+      skip:
+        - run: "! command -v just"

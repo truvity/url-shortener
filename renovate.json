@@ -1,0 +1,61 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>truvity/ci-workflows"
+  ],
+  "description": "devbox.json and devbox.lock are ignored because the devbox parity job (truvity/ci-workflows docs/devbox-update.md) owns them: it moves the devbox packages, the lockfile and the go directive together in one pull request, and a Renovate bump of either file alone would leave the three disagreeing.",
+  "ignorePaths": [
+    "devbox.json",
+    "devbox.lock"
+  ],
+  "packageRules": [
+    {
+      "description": "The go directive is owned by the devbox parity job (truvity/ci-workflows docs/devbox-update.md): it aligns go.mod with the Go devbox ships and the Go golangci-lint was built with, in the same pull request as devbox.lock. Renovate leaves `go` alone so the three can never disagree; devbox.json and devbox.lock are ignored above for the same reason.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepNames": [
+        "go"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "The yarn release is owned by the devbox (its yarn writes the lockfile format the hardened install accepts): a packageManager bump to a newer yarn rewrites yarn.lock to a format the devbox's yarn refuses. It moves with devbox, never on its own.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "packageManager"
+      ],
+      "matchDepNames": [
+        "yarn"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "truvity/policy's Go module and its library chart `service-lib` are the same release: the chart tests embed the module's copy of the library and the charts resolve the published archive, and a test holds the two versions equal. One pull request moves both (the chart pin, its Chart.lock and go.mod), never automerged: a contract change deserves a reader. A major version of the module is a manual import rewrite.",
+      "matchPackageNames": [
+        "github.com/truvity/policy",
+        "service-lib",
+        "ghcr.io/truvity/charts/service-lib"
+      ],
+      "groupName": "truvity/policy (Go module and service-lib chart)",
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Go images' base, pinned by tag AND digest in the two places ko reads it: goreleaser's `kos:` block (the release) and .ko.yaml (a local `ko build`). The Dockerfiles' FROM lines need no rule: the dockerfile manager already moves a `:latest@sha256:` digest.",
+      "managerFilePatterns": [
+        "/(^|/)\\.goreleaser\\.yaml$/",
+        "/(^|/)\\.ko\\.yaml$/"
+      ],
+      "matchStrings": [
+        "(?:base_image|defaultBaseImage): (?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "prConcurrentLimit": 5
+}
