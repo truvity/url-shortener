@@ -1,13 +1,25 @@
 # url-shortener
 
-The worked example: a real service, held to the contracts in this
-repository, so that "the contracts are complete" is something you can run
-rather than something this repository claims.
+## Who it is for
+
+The worked example: a real service, held to the contracts in
+[truvity/policy](https://github.com/truvity/policy), so that "the contracts
+are complete" is something you can run rather than something that repository
+claims. It lived in policy's `examples/url-shortener` until 2026-10-22; the
+configuration loaders for TypeScript, Python and Kotlin (`ts/`, `python/`,
+`kotlin/`) moved with it and are no longer published, only consumed here. The
+contracts, the shared schemas, the fixtures and the `service-lib` library chart
+stay in policy, at the version `go.mod` pins. Paths like `docs/contracts/…`
+in comments and below name policy's documentation.
 
 It shortens URLs. Someone asks for `/r/abc12345`, it answers with a redirect
 and says what happened; something else counts that.
 
-## What is here
+## The model
+
+What the service is made of, and how each part satisfies the contracts, follows.
+
+### What is here
 
 | Component | Kind | Does |
 |---|---|---|
@@ -37,14 +49,14 @@ Three of these are not written in Go, and that is the point of them rather
 than a detail. Each reads a configuration file this chart rendered,
 validated against a schema it carries itself; each serves the same probes on
 the same port; each drains on SIGTERM within the same number the chart gives
-the platform; and each deployment is the same [library template](../../charts/service-lib/templates/_workload.tpl)
+the platform; and each deployment is the same [library template](https://github.com/truvity/policy/blob/master/charts/service-lib/templates/_workload.tpl)
 that never mentions the language. A platform that had to
 know which language a workload was written in would be a platform every new
 language has to be added to.
 
-## How it satisfies the contracts
+### How it satisfies the contracts
 
-Every rule in [the service contract](../../docs/contracts/service.md) is
+Every rule in [the service contract](https://github.com/truvity/policy/blob/master/docs/contracts/service.md) is
 visible in one place:
 
 - **The graph is in `main`.** Read `cmd/redirect/main.go` top to bottom and
@@ -90,7 +102,7 @@ visible in one place:
 - **Events carry their type in a header**, and the body is the detail. See
   below.
 
-## Two things worth reading the code for
+### Two things worth reading the code for
 
 **The publisher interface has one method.** The framework this example
 replaced offered four — publish one, publish many, shut down, health-check —
@@ -105,7 +117,7 @@ request as a redirect and counted a click for an empty URL. Keeping the body
 as the detail keeps every existing consumer working; moving the type to a
 header means it cannot silently go missing again.
 
-## The chart is held to the same schema
+### The chart is held to the same schema
 
 `charts/url-shortener` renders one configuration file per binary, and
 `charts/chart_test.go` pulls each one out of the render and validates it with
@@ -122,7 +134,7 @@ TLS mode the client would refuse (`require`, an unknown one, `verify-full`
 without a root), no database root, and per-component settings that clash or
 name no component. Each fails for its own reason, checked.
 
-## Browser telemetry
+### Browser telemetry
 
 The page can report errors, web vitals and traces to a Grafana Faro collector
 (for example Grafana Alloy's `faro.receiver`). It is **off by default**: with no
@@ -166,22 +178,22 @@ release version the bundle was built for, baked in at build time
 (`VITE_APP_VERSION`, set by the release; `dev` for any other build), which is
 also the tag its source maps are pushed under. The maps are built hidden, kept
 out of the image and pushed as an OCI artifact when the release is configured
-to; see [docs/guides/source-maps.md](../../docs/guides/source-maps.md).
+to; see [docs/guides/source-maps.md](https://github.com/truvity/policy/blob/master/docs/guides/source-maps.md).
 
-## Two charts, and the library they render with
+### Two charts, and the library they render with
 
 | Chart | Installs | Who installs it |
 |---|---|---|
 | [`url-shortener`](charts/url-shortener) | the six components, their configuration, probes, rollout and route, the migration Job, and an optional always-on prober | whoever installs the example |
 | [`url-shortener-infra`](charts/url-shortener-infra) | what one install owns: its database and roles, its stream, and — at `tier: primary` — its store and the identity that reaches it | the same caller, once per install, with the same release name |
 
-A third, [`service-lib`](../../charts/service-lib), is a **library chart** and is
+A third, [`service-lib`](https://github.com/truvity/policy/blob/master/charts/service-lib), is a **library chart** and is
 installed by nobody: it renders what every component of the first chart shares
 (a Deployment, a ServiceAccount of its own, a Service, the probes, the mounts,
 the telemetry and secret variables) from a `platform` block and a `config`
 block, with every port derived from the component's own configuration file. It
-lives at the repository root, is released beside the others, and
-`url-shortener` resolves it through its `Chart.lock`; [the chart guide](../../docs/guides/charts.md)
+is released from policy under the same version as its Go module, and
+`url-shortener` resolves that archive from ghcr.io through its `Chart.lock`; [the chart guide](https://github.com/truvity/policy/blob/master/docs/guides/charts.md)
 says how, and [`charts/testdata/service-example`](charts/testdata/service-example)
 is the smallest chart that follows it exactly. `url-shortener` is the one
 exception the convention names, a product chart that derives each component's
@@ -190,10 +202,10 @@ configuration from the release.
 The database and the stream are a **second chart**, not a flag, because the
 application's migration runs as a pre-install hook: a chart that created its
 own database could never migrate it. [platform.md
-§11](../../docs/contracts/platform.md) has the whole argument and places
+§11](https://github.com/truvity/policy/blob/master/docs/contracts/platform.md) has the whole argument and places
 every resource by scope.
 
-## Dashboards
+### Dashboards
 
 The chart ships the product's own dashboard (`charts/url-shortener/dashboards/overview.json`) as grafana-operator objects: a `GrafanaFolder` (`url-shortener`) and a `GrafanaDashboard`. The operator of each cluster places them in the one shared Grafana, under that cluster's folder (`<cluster> / url-shortener`); people there are Viewers and change a dashboard by pull request to the JSON. It has no traces panel and no panel that sums across namespaces, so it works for someone who sees one namespace.
 
@@ -209,19 +221,84 @@ observability:
       logs: <uid of the logs datasource>
 ```
 
-## Running it
 
-From the repository root, with a container runtime:
+## Install and a worked example
+
+Unit and chart tests need no cluster:
 
 ```sh
-just cluster-all   # the box, the release build, the install, and every suite
+devbox shell      # or direnv: the toolchain is the lock file's
+just check        # build, test, lint, drift, leak-canary
+just ts           # the TypeScript loader and the front end (needs a registry)
+just charts       # the committed renders against the Kubernetes schemas (needs the network)
 ```
 
-or one step at a time — `just cluster` stands up the box
-([`hack/kind/`](../../hack/kind/README.md): servers only, no operator),
-`just example-snapshot` builds the images and packages the charts exactly as
-a release does, `just example-fixture` provisions what the infrastructure
-chart would, `just example-install` installs the packaged application chart,
-and `just example-smoke` and `just example-prober`
-prove it works. The suite itself is Go, under [`e2e/suite`](e2e/suite), and
-runs from the product's own CI: no chart carries it.
+The integration suite installs the two charts into this repository's CI
+namespace on the devel cluster and calls the release only through its public
+host: see [docs/integration-testing.md](docs/integration-testing.md). It runs
+in `.github/workflows/integration.yaml` on pushes to `master`, on release
+tags and on manual dispatch, never on a pull request from a fork; a person with
+access runs the same steps with `just e2e`.
+
+## Consumers
+
+Nobody imports this repository: its Go module is a leaf. The delivery pipeline
+installs its two charts (`url-shortener`, `url-shortener-infra`) from
+`ghcr.io/truvity/charts`, by version, with the images pinned by digest. The
+loaders (`ts/`, `python/`, `kotlin/`) are consumed by the components here and
+by nothing else; they are not published.
+
+## Neighbours
+
+- [truvity/policy](https://github.com/truvity/policy): the contracts, the
+  shared schemas and fixtures, and the `service-lib` library chart this
+  repository is built on, at the version `go.mod` pins.
+- [truvity/ci-workflows](https://github.com/truvity/ci-workflows): the shared
+  workflows `.github/workflows/` calls.
+
+## Documentation
+
+- [docs/integration-testing.md](docs/integration-testing.md): the integration
+  suite, its two doors, and who can start it.
+- The components' own READMEs: [kotlin](kotlin/README.md),
+  [python](python/README.md), [log](log/src/url_shortener_log/README.md).
+- The contracts: [truvity/policy `docs/`](https://github.com/truvity/policy/tree/master/docs).
+
+## The rule that makes this repository public
+
+Mechanism only; particulars are the consuming estate's. No account id, role,
+bucket, registry host, cluster name or internal host name is written in a file
+here, and `just leak-canary` refuses them. What the integration suite needs of
+an estate (the cluster's endpoint, the access issuer, the installs domain, a
+test bucket) arrives as repository variables. A pull request from a fork runs
+the plain check on a GitHub-hosted runner with a read-only token and no secret;
+nothing it can edit starts a run that reaches a cluster.
+
+## Status
+
+Extracted from `truvity/policy`'s `examples/url-shortener` on 2026-10-22 with
+its history (tags dropped). It is a reference implementation, held to the
+contracts, and is deployed as the `url-shortener` project of the estate that
+maintains it.
+
+## Development
+
+Everything runs through devbox (`devbox shell`, or direnv) and the Justfile;
+`just --list` shows the recipes and CI runs the same ones. `just check` is the
+gate. Loaders and charts read truvity/policy's schemas, fixtures and contracts
+from its Go module at the version in `go.mod` (`POLICY_DIR`, set by the
+Justfile); `service-lib` and the policy module move together, and a test holds
+them equal. Generated code (the RPC code, the loaders' schemas, the charts'
+values schemas) is committed and `just drift` fails on a stale copy.
+
+## Releasing
+
+A `v*` tag releases the images (ghcr.io, multi-architecture, digest-pinned)
+and the two charts under one version, from `.github/workflows/release.yaml`
+on a GitHub-hosted runner. Tags are cut by hand; automatic patch releases are
+not armed. A release version must be higher than the last chart published for
+this project, or the delivery pipeline never sees it.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
