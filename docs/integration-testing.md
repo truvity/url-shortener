@@ -64,6 +64,15 @@ charts are packaged by `helmctl` from what was pushed and installed from the
 file, never pushed. `e2ectl uninstall` runs under `if: always()`, and the next
 run sweeps what a killed one left.
 
+## Housekeeping
+
+The run's images stay in the repository's ghcr.io packages as `ci-<sha>`.
+`.github/workflows/prune-ci-images.yaml` runs weekly (and on dispatch, with a
+dry-run option) on a hosted runner with `packages: write` only, and deletes all
+but the newest 30 `ci-<sha>` versions of each image. It never touches a version
+with any other tag or an untagged one. Deleting needs the package's Actions
+access role for this repository to be Admin.
+
 ## No estate particulars in this repository
 
 The repository is public and its leak canary refuses the estate's host names.

@@ -48,6 +48,8 @@ test:
     # The Kotlin loader and the counter.
     cd kotlin && gradle test --console=plain --quiet
     cd stat && gradle test --console=plain --quiet
+    # The rule that selects which CI image versions the weekly job deletes.
+    bash hack/prune-ci-images.test.sh
 
 # Report known vulnerabilities in what this module depends on. Its own
 # workflow (security.yaml), never the gate.
