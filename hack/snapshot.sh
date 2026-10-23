@@ -28,6 +28,11 @@ export IMAGE_REPO="${IMAGE_REPO:-ghcr.io/truvity/url-shortener}"
 export KO_DOCKER_REPO="$IMAGE_REPO"
 export IMAGE_TAG="${IMAGE_TAG:-ci-$(git rev-parse --short=12 HEAD)}"
 export GITHUB_RELEASE_DISABLED=true
+# GoReleaser refuses a repository with no tags (this one had none until its
+# first release, and a shallow checkout has none). It never creates this tag:
+# it only needs a version to stamp, and `--skip=validate` below lets it differ
+# from HEAD. A real tag, when HEAD has one, still wins.
+export GORELEASER_CURRENT_TAG="${GORELEASER_CURRENT_TAG:-v0.0.0-${IMAGE_TAG}}"
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
