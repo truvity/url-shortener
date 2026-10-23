@@ -229,3 +229,18 @@ func TestArchivedLine(t *testing.T) {
 		t.Fatalf("a real archived line was refused: %v", err)
 	}
 }
+
+func TestCountArchived(t *testing.T) {
+	prefix := "ci-example/us-r42-a1/"
+	logs := strings.Join([]string{
+		`{"event":"archived","key":"` + prefix + `a","records":1}`,
+		`{"event":"archived","key":"` + prefix + `b","records":0}`,
+		`{"event":"archived","key":"ci-example/other/c","records":4}`,
+		`{"msg":"archived","key":"` + prefix + `d","records":2}`,
+		`junk`,
+	}, "\n")
+
+	if got := devel.CountArchived(logs, prefix); got != 2 {
+		t.Errorf("counted %d, want 2 (an empty batch and another release's object do not count)", got)
+	}
+}

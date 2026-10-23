@@ -3,6 +3,7 @@ package suite
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -76,25 +77,66 @@ func TestDeploymentsAreReady(t *testing.T) {
 // the archiver itself: its log says `archived` with the object's key (under
 // this release's prefix) and the number of records, which it writes only
 // after the put succeeded.
+//
+// Every request to the release is a record, the readiness probes' included, so
+// the test first waits for the archiver to go quiet (longer than its batch
+// window), counts what it has archived, makes ONE redirect, and wants one more.
 func TestLogArchivesTheRecord(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	started := time.Now()
+	prefix := shared.namespace + "/" + shared.release + "/"
+	logs := func() (string, error) {
+		out, err := kubectl(ctx, "logs", "deployment/"+shared.release+"-log", "--tail=1000").Output()
+
+		return string(out), err
+	}
+
+	last, stable := -1, time.Time{}
+
+	eventually(t, 2*time.Minute, func() error {
+		out, err := logs()
+		if err != nil {
+			return err
+		}
+
+		n := devel.CountArchived(out, prefix)
+		if n != last {
+			last, stable = n, time.Now()
+		}
+
+		if time.Since(stable) < 8*time.Second {
+			return errNotQuiet
+		}
+
+		return nil
+	})
+
+	baseline := last
 
 	if _, err := createAndRedirect(ctx, t); err != nil {
 		t.Fatalf("create and resolve a link for the archiver to record: %v", err)
 	}
 
-	eventually(t, 120*time.Second, func() error {
-		out, err := kubectl(ctx, "logs", "deployment/"+shared.release+"-log", "--since-time="+started.UTC().Format(time.RFC3339), "--tail=500").Output()
+	eventually(t, 2*time.Minute, func() error {
+		out, err := logs()
 		if err != nil {
 			return err
 		}
 
-		return devel.ArchivedLine(string(out), shared.namespace+"/"+shared.release+"/")
+		if n := devel.CountArchived(out, prefix); n <= baseline {
+			return fmt.Errorf("%d archived line(s), still the %d from before the redirect", n, baseline)
+		}
+
+		return nil
 	})
 }
+
+const errNotQuiet = archiveError("the archiver is still archiving")
+
+type archiveError string
+
+func (e archiveError) Error() string { return string(e) }
 
 func createAndRedirect(ctx context.Context, t *testing.T) (string, error) {
 	t.Helper()
@@ -107,4 +149,18 @@ func createAndRedirect(ctx context.Context, t *testing.T) (string, error) {
 	_ = followRedirect(ctx, t, key)
 
 	return key, nil
+}
+
+// dumpLogs prints the tail of each component's log into the test output: read
+// only, through the Kubernetes API, for a failure that needs explaining.
+func dumpLogs(t *testing.T, components ...string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	for _, c := range components {
+		out, err := kubectl(ctx, "logs", "deployment/"+shared.release+"-"+c, "--tail=40").CombinedOutput()
+		t.Logf("---- %s ----\n%s(err: %v)", c, out, err)
+	}
 }
