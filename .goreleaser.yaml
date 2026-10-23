@@ -32,7 +32,11 @@ version: 2
 before:
   hooks:
     - bash log/hack/build.sh
-    - gradle --project-dir stat bootJar --console=plain --quiet
+    # The Kotlin loader the counter builds against carries truvity/policy's
+    # shared schemas, taken from the policy module in go.mod: POLICY_DIR is its
+    # directory (the Justfile exports it for `just`; a release runs goreleaser
+    # without it). `bash -c` because a before hook is one command, not a shell line.
+    - bash -c 'POLICY_DIR="$(hack/policy-dir.sh)" gradle --project-dir stat bootJar --console=plain --quiet'
     - yarn --cwd ts install --immutable
     - yarn --cwd ts build
     - yarn --cwd web install --immutable
