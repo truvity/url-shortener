@@ -13,9 +13,9 @@
 #   hack/kubeconfig.sh [path]     default: $KUBECONFIG, else ./kubeconfig
 set -euo pipefail
 
-: "${DEVEL_API_SERVER:?not set: the cluster's API endpoint}"
-: "${DEVEL_API_CA:?not set: the cluster's certificate authority, base64}"
-: "${SLUIS_ISSUER:?not set: the access issuer's URL}"
+: "${DEVEL_API_SERVER:?not set: the API endpoint of the cluster}"
+: "${DEVEL_API_CA:?not set: the certificate authority of the cluster, base64}"
+: "${SLUIS_ISSUER:?not set: the URL of the access issuer}"
 
 out="${1:-${KUBECONFIG:-kubeconfig}}"
 umask 077
