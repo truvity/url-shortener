@@ -94,6 +94,14 @@ func TestStatMovesTheCounter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
+	// When the counter does not move, what the three components on the path
+	// said is the first thing anybody asks for.
+	t.Cleanup(func() {
+		if t.Failed() {
+			dumpLogs(t, "redirect", "stat", "urls")
+		}
+	})
+
 	client := httpClient(true)
 
 	key, err := journey.CreateViaWeb(ctx, client, shared.base, testLongURL(t))
