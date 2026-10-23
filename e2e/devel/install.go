@@ -364,6 +364,11 @@ func Diagnose(ctx context.Context, c Config) {
 	section("route", "get", "httproute", "-l", sel)
 	section("events", "get", "events", "--sort-by=.lastTimestamp")
 	section("migrate logs", "logs", "-l", "app.kubernetes.io/instance="+c.Release+",app.kubernetes.io/component=migrate", "--all-containers", "--tail=200", "--prefix")
+	// What a pod that is not ready said, and what the one that crashed said
+	// before it was restarted: the first thing anybody asks of a failed run.
+	section("pod logs", "logs", "-l", "app.kubernetes.io/instance="+c.Release, "--all-containers", "--tail=60", "--prefix", "--ignore-errors")
+	section("previous pod logs", "logs", "-l", "app.kubernetes.io/instance="+c.Release, "--all-containers", "--previous", "--tail=60", "--prefix", "--ignore-errors")
+	section("describe", "describe", "pods", "-l", "app.kubernetes.io/instance="+c.Release)
 }
 
 // Env is what the test process reads: the release's public base URL, and
