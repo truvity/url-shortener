@@ -253,6 +253,10 @@ lint:
     editorconfig-checker -disable-indentation -disable-indent-size \
         -exclude 'testdata/golden/' || fail=1
 
+    # Every shell script parses. A syntax error in one that only a workflow
+    # runs is found by the first run on a cluster otherwise.
+    for sh in $(git ls-files '*.sh'); do bash -n "$sh" || fail=1; done
+
     # The toolchain is declared once and resolves to what it declares.
     python3 hack/toolchain-check.py || fail=1
 
