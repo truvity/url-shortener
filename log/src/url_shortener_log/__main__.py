@@ -112,13 +112,23 @@ async def run(cfg: config.Config) -> int:  # noqa: C901, PLR0915 — a compositi
     # The store. Reached once before serving, so that a bucket nobody granted
     # access to is a refusal at start-up rather than a surprise an hour later
     # when the first batch fills.
+    #
+    # A listing of THIS component's own prefix, not HeadBucket: a workload
+    # that may only write under its prefix of a shared bucket (the usual
+    # grant) holds s3:ListBucket on that prefix and no more, which HeadBucket
+    # does not honour. Listing the prefix asks the question that matters --
+    # can this process reach the place it will write -- of exactly what it was
+    # granted.
     bucket = settings["bucket"]
+    prefix = settings.get("prefix", archive.DEFAULT_PREFIX)
     s3 = archive.client(bucket, cfg.get("secrets"))
-    await asyncio.to_thread(s3.head_bucket, Bucket=bucket["name"])
+    await asyncio.to_thread(
+        s3.list_objects_v2, Bucket=bucket["name"], Prefix=prefix.rstrip("/") + "/", MaxKeys=1
+    )
     writer = archive.Writer(
         s3,
         bucket["name"],
-        prefix=settings.get("prefix", archive.DEFAULT_PREFIX),
+        prefix=prefix,
         max_records=batch.get("maxRecords", archive.DEFAULT_MAX_RECORDS),
         max_seconds=batch.get("maxSeconds", archive.DEFAULT_MAX_SECONDS),
     )
