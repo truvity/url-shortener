@@ -210,10 +210,13 @@ func (c Config) InfraSet() []string {
 		"tier=test",
 		"postgres.runtimePasswordSecret=" + c.RuntimeSecret(),
 		// The broker gives each namespace an account of its own; the stream
-		// is created inside it, and one copy is a test's answer.
+		// is created inside it, and one copy is a test's answer. FILE
+		// storage, because a namespace's account carries no memory-storage
+		// allowance: the stream is created either way and every publish to a
+		// memory stream is then refused with "insufficient resources".
 		"events.account=" + c.Namespace,
 		"events.replicas=1",
-		"events.storage=memory",
+		"events.storage=file",
 		"events.maxAge=1h",
 	}
 }
