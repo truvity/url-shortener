@@ -1,7 +1,9 @@
 # Generated from a contract by contracts.python. Do not edit.
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+import json
+import re
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import (
     AfterValidator,
@@ -18,6 +20,40 @@ def _no_line_break(value: str) -> str:
     # Every character that ends a line in some engine: LF, CR, FF, VT, NEL, LS, PS.
     if any(c in value for c in "\n\r\f\v\x85\u2028\u2029"):
         raise ValueError("a line break is not allowed")
+    return value
+
+
+def _not_pattern(pattern: str, reason: str):
+    compiled = re.compile(pattern)
+
+    def check(value: str) -> str:
+        if compiled.search(value):
+            raise ValueError(f"must not match {pattern}: {reason}")
+        return value
+
+    return check
+
+
+def _one_of(allowed: list[Any]):
+    def check(value: Any) -> Any:
+        if value not in allowed:
+            raise ValueError(f"must be one of {allowed}")
+        return value
+
+    return check
+
+
+def _canon(value: Any) -> str:
+    # JSON with the keys sorted, so that two values that differ only in the
+    # order of an object's keys are one value (JSON Schema's equality).
+    if isinstance(value, BaseModel):
+        value = value.model_dump(mode="json", by_alias=True)
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def _distinct(value: list[Any]) -> list[Any]:
+    if len({_canon(item) for item in value}) != len(value):
+        raise ValueError("items must be distinct")
     return value
 
 
@@ -61,12 +97,15 @@ def _has_keys(keys: list[str]):
 class _Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    # The keys that may be `null` (`@Nullable`); a subclass adds to its base's.
+    _nullable: ClassVar[frozenset[str]] = frozenset()
+
     @model_validator(mode="before")
     @classmethod
     def _optional_is_absent_not_null(cls, data: Any) -> Any:
         if isinstance(data, dict):
             for key, value in data.items():
-                if value is None:
+                if value is None and key not in cls._nullable:
                     raise ValueError(f"{key}: null is not a value; omit the key")
         return data
 
@@ -86,8 +125,8 @@ AbsPath = Annotated[str, StringConstraints(pattern=r"^/[^\n]+"), AfterValidator(
 OtelProtocol = Literal["grpc", "http/protobuf"]
 Named = Annotated[dict[str, Any], AfterValidator(_has_keys(["name"]))]
 Mounted = Annotated[dict[str, Any], AfterValidator(_has_keys(["name", "mountPath"]))]
-PostgresUrl = Annotated[str, StringConstraints(pattern=r"^postgres(ql)?://"), AfterValidator(_no_line_break)]
-GoDuration = Annotated[str, StringConstraints(pattern=r"^[0-9]+(ns|us|µs|ms|s|m|h)$"), AfterValidator(_no_line_break)]
+PostgresUrl = Annotated[str, StringConstraints(pattern=r"^postgres(ql)?://[^\t \xA0  -   　/?#]+([/?#][^\t \xA0  -   　]*)?$"), AfterValidator(_no_line_break), AfterValidator(_not_pattern(r"^postgres(ql)?://[^/?#@:]*:[^/?#]*@", "a password in the user info: use a SecretRef")), AfterValidator(_not_pattern(r"[?&](p|%70)(a|%61)(s|%73)(s|%73)(w|%77)(o|%6f|%6F)(r|%72)(d|%64)=", "a password query parameter: use a SecretRef")), AfterValidator(_not_pattern(r"[?&](s|%73)(s|%73)(l|%6c|%6C)(p|%70)(a|%61)(s|%73)(s|%73)(w|%77)(o|%6f|%6F)(r|%72)(d|%64)=", "an sslpassword query parameter: use a SecretRef")), AfterValidator(_not_pattern(r"[?&](p|%70)(a|%61)(s|%73)(s|%73)(f|%66)(i|%69)(l|%6c|%6C)(e|%65)=", "a passfile query parameter: use a SecretRef")), AfterValidator(_not_pattern(r"([?&](s|%73)(s|%73)(l|%6c|%6C)(m|%6d|%6D)(o|%6f|%6F)(d|%64)(e|%65)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(r|%72)(o|%6f|%6F)(o|%6f|%6F)(t|%74)(c|%63)(e|%65)(r|%72)(t|%74)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(c|%63)(e|%65)(r|%72)(t|%74)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(k|%6b|%6B)(e|%65)(y|%79)=)", "a TLS query parameter (sslmode, sslrootcert, sslcert, sslkey): use the transport's TlsMode"))]
+GoDuration = Annotated[str, StringConstraints(pattern=r"^([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+$"), AfterValidator(_no_line_break)]
 CspMode = Literal["off", "report-only", "enforce"]
 HttpOrigin = Annotated[str, StringConstraints(pattern=r"^https?://[A-Za-z0-9.*-]+(:[0-9]+)?$"), AfterValidator(_no_line_break)]
 ReportUri = Annotated[str, StringConstraints(pattern=r"^[^\t \xA0  -   　;,'\"]*$"), AfterValidator(_no_line_break)]
@@ -420,7 +459,7 @@ class PlatformConfigMap(_Closed):
 
 class Postgres(_Closed):
     """A PostgreSQL connection. The URL carries no password: it names the environment variable that does."""
-    #: A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require.
+    #: A connection URL without credentials, for example postgres://user@host:5432/dbname. It carries no password and no `sslmode` (or other TLS parameter): the password is named by `passwordEnv`, and transport security is the service's own setting.
     url: PostgresUrl
     #: The NAME of the environment variable holding the password. Unset means the connection needs none.
     passwordEnv: NonEmptyString | None = None
