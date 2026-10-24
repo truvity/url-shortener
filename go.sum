@@ -104,8 +104,8 @@ github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWD
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/tinylib/msgp v1.6.5 h1:iAH6XTP7BpzErjBZlujJQXxA+GmRi2YWs6M4KdLtNbE=
 github.com/tinylib/msgp v1.6.5/go.mod h1:RSp0LW9oSxFut3KzESt5Voq4GVWyS+PSulT77roAqEA=
-github.com/truvity/cnpg/v2 v2.33.1 h1:WMzezQ0qz2z90xb4gUjahxdD1v7A9lnEAc+OWQD6IuQ=
-github.com/truvity/cnpg/v2 v2.33.1/go.mod h1:T4URZ22EaxQHouem5ccTMX7iyHFXu+K0r5SeJE1EgAk=
+github.com/truvity/cnpg/v2 v2.35.0 h1:FvsFika5FhqrI6/MLau0PlDQOk3Hg9YqahcqTkKkFTM=
+github.com/truvity/cnpg/v2 v2.35.0/go.mod h1:KsOgDJG/AYwqs9mRM+sDZiW3aTYAOYbK0+zQrAh2JO0=
 github.com/truvity/ocictl v0.8.0 h1:nTkXvROo/TfWh8pK9XCmu5m+/68lpN+EHF0DBBs5Urk=
 github.com/truvity/ocictl v0.8.0/go.mod h1:VSN3HLSAygBO6rnEXumPr0yerJiffN5A2VSuY+gMwFM=
 github.com/truvity/policy v1.54.2 h1:fHDt1tSQ7cvrb4C3SsqhylKtvBAc2fdFZOLEIJCPwTU=
