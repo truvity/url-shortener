@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-    uses: truvity/ci-workflows/.github/workflows/release-public.yaml@f0f75f715a4feef8ab1e4e6222e84708bb32f6cd # v5.5.0
+    uses: truvity/ci-workflows/.github/workflows/release-public.yaml@cde15d963ff2fadebf262680f565fc82c9bbc14b # v5.6.2
     with:
       # ONE job builds and pushes the images, then packages the charts from the
       # digests it produced; a chart whose images.* are not all digest-pinned is

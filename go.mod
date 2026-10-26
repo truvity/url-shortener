@@ -10,7 +10,7 @@ require (
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/nats-io/nats.go v1.54.0
+	github.com/nats-io/nats.go v1.55.0
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
 	github.com/truvity/cnpg/v2 v2.36.0
