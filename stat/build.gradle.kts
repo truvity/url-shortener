@@ -95,9 +95,9 @@ dependencies {
     // Connect, as a CLIENT. The Kotlin library generates no servers, which
     // is a real constraint on where a JVM service sits in a topology and is
     // written down in docs/canon/kotlin.md.
-    implementation("com.connectrpc:connect-kotlin:0.9.0")
-    implementation("com.connectrpc:connect-kotlin-okhttp:0.9.0")
-    implementation("com.connectrpc:connect-kotlin-google-java-ext:0.9.0")
+    implementation("com.connectrpc:connect-kotlin:0.10.0")
+    implementation("com.connectrpc:connect-kotlin-okhttp:0.10.0")
+    implementation("com.connectrpc:connect-kotlin-google-java-ext:0.10.0")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
 
@@ -129,7 +129,7 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 val connectGenerator: Configuration by configurations.creating
 
 dependencies {
-    connectGenerator("com.connectrpc:protoc-gen-connect-kotlin:0.9.0")
+    connectGenerator("com.connectrpc:protoc-gen-connect-kotlin:0.10.0")
 }
 
 val connectGeneratorScript = layout.buildDirectory.file("protoc-gen-connect-kotlin")
