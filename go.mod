@@ -13,7 +13,7 @@ require (
 	github.com/nats-io/nats.go v1.55.0
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
-	github.com/truvity/cnpg/v2 v2.36.2
+	github.com/truvity/cnpg/v2 v2.37.0
 	github.com/truvity/policy v1.54.2
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/metric v1.47.0
