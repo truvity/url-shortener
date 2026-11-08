@@ -8,7 +8,7 @@ plugins {
     kotlin("plugin.spring") version "2.4.21"
     id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
-    id("com.google.protobuf") version "0.10.0"
+    id("com.google.protobuf") version "0.10.1"
 }
 
 group = "com.truvity.example"
