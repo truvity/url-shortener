@@ -11,11 +11,38 @@
   "properties": {
     "url": {
       "type": "string",
-      "pattern": "^postgres(ql)?://",
+      "pattern": "^postgres(ql)?://[^\\t \\xA0  -   　/?#]+([/?#][^\\t \\xA0  -   　]*)?$",
       "not": {
         "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
       },
-      "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require."
+      "allOf": [
+        {
+          "not": {
+            "pattern": "^postgres(ql)?://[^/?#@:]*:[^/?#]*@"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[?&](p|%70)(a|%61)(s|%73)(s|%73)(w|%77)(o|%6f|%6F)(r|%72)(d|%64)="
+          }
+        },
+        {
+          "not": {
+            "pattern": "[?&](s|%73)(s|%73)(l|%6c|%6C)(p|%70)(a|%61)(s|%73)(s|%73)(w|%77)(o|%6f|%6F)(r|%72)(d|%64)="
+          }
+        },
+        {
+          "not": {
+            "pattern": "[?&](p|%70)(a|%61)(s|%73)(s|%73)(f|%66)(i|%69)(l|%6c|%6C)(e|%65)="
+          }
+        },
+        {
+          "not": {
+            "pattern": "([?&](s|%73)(s|%73)(l|%6c|%6C)(m|%6d|%6D)(o|%6f|%6F)(d|%64)(e|%65)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(r|%72)(o|%6f|%6F)(o|%6f|%6F)(t|%74)(c|%63)(e|%65)(r|%72)(t|%74)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(c|%63)(e|%65)(r|%72)(t|%74)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(k|%6b|%6B)(e|%65)(y|%79)=)"
+          }
+        }
+      ],
+      "description": "A connection URL without credentials, for example postgres://user@host:5432/dbname. It carries no password and no `sslmode` (or other TLS parameter): the password is named by `passwordEnv`, and transport security is the service's own setting."
     },
     "passwordEnv": {
       "type": "string",
