@@ -63,7 +63,7 @@ jobs:
       E2E_EXPECT_GATE: ${{ vars.E2E_EXPECT_GATE }}
       # The release is unique per run and attempt (e2e/devel).
     steps:
-      - uses: truvity/ci-actions/public-runners@ffcd6f12b54f23410657533d40a365a61ae4f809 # v3.10.1
+      - uses: truvity/ci-actions/public-runners@07baa32692f4ad11e5b1a37ceae5bcadb6faefc4 # v3.11.0
         with:
           runners: ubuntu-latest
           visibility: ${{ github.event.repository.visibility }}
@@ -74,7 +74,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: truvity/ci-actions/setup-devbox@ffcd6f12b54f23410657533d40a365a61ae4f809 # v3.10.1
+      - uses: truvity/ci-actions/setup-devbox@07baa32692f4ad11e5b1a37ceae5bcadb6faefc4 # v3.11.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
