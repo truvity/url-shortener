@@ -240,6 +240,20 @@ in `.github/workflows/integration.yaml` on pushes to `master`, on release
 tags and on manual dispatch, never on a pull request from a fork; a person with
 access runs the same steps with `just e2e`.
 
+## Platform part and company part
+
+**Platform part.** None. The platform admin applies nothing from this
+repository. The charts expect what the platform already runs: a gateway for
+the route, a PostgreSQL service, a NATS broker and a telemetry endpoint.
+
+**Company part.** A company that runs the example installs both charts,
+[`url-shortener`](charts/url-shortener) and
+[`url-shortener-infra`](charts/url-shortener-infra), under one release name in
+its own namespaces, and writes their values in its gitops repository: the
+database and broker addresses, the gateway the route attaches to, and the
+optional dashboards. Each chart's `values.yaml` and `values.schema.json` list
+every value.
+
 ## Consumers
 
 Nobody imports this repository: its Go module is a leaf. The delivery pipeline
