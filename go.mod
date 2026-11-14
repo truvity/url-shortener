@@ -9,7 +9,7 @@ require (
 	connectrpc.com/otelconnect v0.10.0
 	github.com/danielgtaylor/huma/v2 v2.40.0
 	github.com/gofiber/fiber/v3 v3.7.0
-	github.com/jackc/pgx/v5 v5.12.0
+	github.com/jackc/pgx/v5 v5.13.0
 	github.com/nats-io/nats.go v1.55.0
 	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
