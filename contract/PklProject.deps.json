@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
   "resolvedDependencies": {
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.templates@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.7.4/contracts.templates@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.templates@0.4.1",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.7.4/contracts.templates@0.7.4",
       "checksums": {
-        "sha256": "508c762c719e6d967502e0012c5b010f3d01bfe32f15d25c963a375dc7a0c996"
+        "sha256": "99d37d93a3825d17a2c22963b6fae18811f0bc15192de7d5d379c7a2de704329"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.vocab@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.7.4/contracts.vocab@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.vocab@0.4.1",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.7.4/contracts.vocab@0.7.4",
       "checksums": {
-        "sha256": "89461b59624df02cd04be40e46978185398a5d0957274398678605be275881c4"
+        "sha256": "311afc7968c2a6484e365cc12a42559cadcc413cfe0db188e83ef687e20a6c8c"
       }
     },
-    "package://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.fragments@0": {
+    "package://github.com/truvity/pkl-contracts/releases/download/v0.7.4/contracts.fragments@0": {
       "type": "remote",
-      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.4.1/contracts.fragments@0.4.1",
+      "uri": "projectpackage://github.com/truvity/pkl-contracts/releases/download/v0.7.4/contracts.fragments@0.7.4",
       "checksums": {
-        "sha256": "21ab4d02de93bf8417dffe82c47f74cf63d2edb99fd9fdcde5886397e24b31c3"
+        "sha256": "66f4f5f3e14de3e95a4efea35921bf6c1b12de9737e4cd896546c442696a790d"
       }
     }
   }
