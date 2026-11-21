@@ -3,6 +3,21 @@ import { z } from "zod";
 
 const noLineBreak = (s: string): boolean => !/[\n\r\f\v\u0085\u2028\u2029]/.test(s);
 
+// The number of own keys of an object or a record.
+const sized = (o: object): number => Object.keys(o).length;
+
+// JSON with the keys of every object in order, so that two values that differ
+// only in the order of an object's keys are one value (JSON Schema's equality).
+const canon = (v: unknown): string =>
+  JSON.stringify(v, (_k, x) =>
+    x !== null && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : x,
+  );
+
+// Whether no two items are equal.
+const distinct = (a: unknown[]): boolean => new Set(a.map(canon)).size === a.length;
+
 // The value at a path through blocks; absent on the way is absent.
 const at = (o: unknown, path: string[]): unknown => {
   let v: unknown = o;
@@ -61,11 +76,11 @@ export type Named = z.infer<typeof Named>;
 /** An open object that must carry `name` and `mountPath`. */
 export const Mounted = z.looseObject({}).refine((o) => ["name", "mountPath"].every((k) => k in o));
 export type Mounted = z.infer<typeof Mounted>;
-/** A PostgreSQL connection URL, by its scheme. */
-export const PostgresUrl = z.string().regex(/^postgres(ql)?:\/\//).refine(noLineBreak);
+/** A PostgreSQL connection URL: `postgres://` or `postgresql://` and a host, that carries NO credential and NO TLS setting:    - no password in the user info (`scheme://user:pass@host`); the user alone     (`scheme://user@host`) is fine;   - no `password=` or `sslpassword=` query parameter, nor a percent-encoded     spelling of the name (`pass%77ord=`);   - no `passfile=`;   - no `sslmode=`, `sslrootcert=`, `sslcert=` or `sslkey=`: transport security     is a setting of its own (a `TlsMode`), which the consumer turns into the     connection's `sslmode`, not a part of the address.  The credential lives in a `SecretRef`. Before v0.5.0 the alias checked the scheme only. Pkl enforces the rules; the same rules are `NotPattern` annotations, which a generator renders as `not: { pattern }` (JSON Schema), a refinement (zod) and a validator (pydantic). */
+export const PostgresUrl = z.string().regex(/^postgres(ql)?:\/\/[^\t \xA0  -   　\/?#]+([\/?#][^\t \xA0  -   　]*)?$/).refine(noLineBreak).refine((s) => !/^postgres(ql)?:\/\/[^\/?#@:]*:[^\/?#]*@/.test(s), { message: "a password in the user info: use a SecretRef" }).refine((s) => !/[?&](p|%70)(a|%61)(s|%73)(s|%73)(w|%77)(o|%6f|%6F)(r|%72)(d|%64)=/.test(s), { message: "a password query parameter: use a SecretRef" }).refine((s) => !/[?&](s|%73)(s|%73)(l|%6c|%6C)(p|%70)(a|%61)(s|%73)(s|%73)(w|%77)(o|%6f|%6F)(r|%72)(d|%64)=/.test(s), { message: "an sslpassword query parameter: use a SecretRef" }).refine((s) => !/[?&](p|%70)(a|%61)(s|%73)(s|%73)(f|%66)(i|%69)(l|%6c|%6C)(e|%65)=/.test(s), { message: "a passfile query parameter: use a SecretRef" }).refine((s) => !/([?&](s|%73)(s|%73)(l|%6c|%6C)(m|%6d|%6D)(o|%6f|%6F)(d|%64)(e|%65)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(r|%72)(o|%6f|%6F)(o|%6f|%6F)(t|%74)(c|%63)(e|%65)(r|%72)(t|%74)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(c|%63)(e|%65)(r|%72)(t|%74)=|[?&](s|%73)(s|%73)(l|%6c|%6C)(k|%6b|%6B)(e|%65)(y|%79)=)/.test(s), { message: "a TLS query parameter (sslmode, sslrootcert, sslcert, sslkey): use the transport's TlsMode" });
 export type PostgresUrl = z.infer<typeof PostgresUrl>;
-/** A duration in Go's spelling, as a string: `10s`, `500ms`. Pkl's own `Duration` renders as an object, which no other language reads. */
-export const GoDuration = z.string().regex(/^[0-9]+(ns|us|µs|ms|s|m|h)$/).refine(noLineBreak);
+/** A duration in Go's `time.ParseDuration` grammar, as a string, restricted to a subset: one or more `<number><unit>` parts, the number whole or with a decimal part that has digits on both sides, the units `ns`, `us`, `µs` (U+00B5), `μs` (U+03BC), `ms`, `s`, `m` and `h`: `24h0m0s`, `1h30m`, `1.5s`, `5m0s`, `500ms`. Refused: a sign (`-1s`), a bare `0` (Go accepts it, a configuration should say `0s`), `.5s` and `5.s`, a day unit (`1d`), ISO 8601 (`PT12H`) and the empty string. Pkl's own `Duration` renders as an object, which no other language reads, hence a string. Each system that reads durations has its own grammar, and a field takes the type of the system that reads it: `PromDuration`, `GatewayDuration`, `KarpenterDuration`, `KargoDuration`, `Retention`. */
+export const GoDuration = z.string().regex(/^([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+$/).refine(noLineBreak);
 export type GoDuration = z.infer<typeof GoDuration>;
 /** What a page's content security policy does. */
 export const CspMode = z.enum(["off", "report-only", "enforce"]);
@@ -451,7 +466,7 @@ export type PlatformConfigMap = z.infer<typeof PlatformConfigMap>;
 
 /** A PostgreSQL connection. The URL carries no password: it names the environment variable that does. */
 export const Postgres_shape = {
-  /** A connection URL without credentials, for example postgres://user@host:5432/dbname?sslmode=require. */
+  /** A connection URL without credentials, for example postgres://user@host:5432/dbname. It carries no password and no `sslmode` (or other TLS parameter): the password is named by `passwordEnv`, and transport security is the service's own setting. */
   url: PostgresUrl,
   /** The NAME of the environment variable holding the password. Unset means the connection needs none. */
   passwordEnv: NonEmptyString.optional(),
