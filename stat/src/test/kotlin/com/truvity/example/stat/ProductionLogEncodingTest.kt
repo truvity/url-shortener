@@ -5,6 +5,8 @@ import ch.qos.logback.classic.joran.JoranConfigurator
 import ch.qos.logback.classic.util.LogbackMDCAdapter
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.opentelemetry.sdk.trace.SdkTracerProvider
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
+import io.opentelemetry.sdk.trace.export.SpanExporter
 import org.springframework.core.env.Environment
 import org.springframework.core.env.StandardEnvironment
 import java.io.ByteArrayOutputStream
@@ -81,7 +83,12 @@ class ProductionLogEncodingTest {
 
     @Test
     fun `the production encoder emits trace_id and span_id as top-level fields`() {
-        val tracer = SdkTracerProvider.builder().build().get("test")
+        // A provider with no span processor hands out no-op tracers since SDK 1.68
+        // (every span is invalid, with zero ids), so this one has a processor that
+        // exports nowhere.
+        val tracer =
+            SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.composite())).build()
+                .get("test")
         val span = tracer.spanBuilder("request").startSpan()
         span.makeCurrent().use {
             context.getLogger("correlation").info("handled")

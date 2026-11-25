@@ -6,6 +6,18 @@ subjects under them are the GitHub Release's own list.
 
 ## Unreleased
 
+### Fixed
+
+- **`stat` starts again: the OpenTelemetry versions agree.** v1.56.0 took the Spring
+  Boot starter to 2.34.0 (built on SDK and API 1.68.0) while the build still pinned
+  `opentelemetry.version` at 1.65.0, so the pod died at startup with a
+  `NoClassDefFoundError` (`io/opentelemetry/common/impl/ConfigUtil`) out of
+  `autoConfiguredOpenTelemetrySdk`. The pin is 1.68.0 and the two `-alpha`
+  instrumentation modules are 2.34.0-alpha, the same release as the starter.
+  A new test starts the application context with the starter's auto-configuration, so a
+  mismatch fails the build rather than the rollout; Renovate now moves the starter,
+  the instrumentation modules and the SDK pin in one pull request.
+
 ## v1.56.0
 
 ### Added

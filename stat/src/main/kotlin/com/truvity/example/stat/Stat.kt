@@ -228,10 +228,14 @@ fun decode(detailType: String?, body: String, mapper: com.fasterxml.jackson.data
     return Redirect(node.at("/url_key").asText(""), longUrl)
 }
 
-/** Reads a trace context out of a message's headers. */
+/**
+ * Reads a trace context out of a message's headers.
+ *
+ * No `keys`: OpenTelemetry API 1.68 deprecates it (the propagators read the
+ * fields they know by name), and an override of a deprecated member is a
+ * compile error here.
+ */
 internal object NatsHeaders : TextMapGetter<Headers> {
-    override fun keys(carrier: Headers): Iterable<String> = carrier.keySet()
-
     override fun get(carrier: Headers?, key: String): String? = carrier?.getFirst(key)
 }
 

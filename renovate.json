@@ -41,6 +41,15 @@
       ],
       "groupName": "truvity/policy (Go module and service-lib chart)",
       "automerge": false
+    },
+    {
+      "description": "OpenTelemetry moves as one set. The Spring Boot starter and the -alpha instrumentation modules (io.opentelemetry.instrumentation) are compiled against one release of the SDK and API (io.opentelemetry), pinned in stat/build.gradle.kts as `opentelemetry.version`. A bump of the starter alone starts the SDK on an API it was not built for and the pod dies at startup with a NoClassDefFoundError out of autoConfiguredOpenTelemetrySdk (v1.56.0). One pull request moves all of them; OpenTelemetryStartupTest starts the context and fails it if they disagree. Never automerged: a mismatch the test cannot see deserves a reader.",
+      "matchPackageNames": [
+        "io.opentelemetry:**",
+        "io.opentelemetry.instrumentation:**"
+      ],
+      "groupName": "OpenTelemetry (starter, instrumentation and SDK)",
+      "automerge": false
     }
   ],
   "customManagers": [
@@ -55,6 +64,18 @@
         "(?:base_image|defaultBaseImage): (?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "The OpenTelemetry SDK and API release pinned as a Spring dependency-management property in stat/build.gradle.kts: Renovate's gradle manager does not read `extra[...]`, so without this the property would never move with the starter it has to match.",
+      "managerFilePatterns": [
+        "/(^|/)stat/build\\.gradle\\.kts$/"
+      ],
+      "matchStrings": [
+        "extra\\[\"opentelemetry\\.version\"\\] = \"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "io.opentelemetry:opentelemetry-bom",
+      "datasourceTemplate": "maven"
     }
   ],
   "prConcurrentLimit": 5
