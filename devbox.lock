@@ -358,9 +358,9 @@
         }
       }
     },
-    "https://github.com/truvity/sluis/releases/download/v1.74.0/sluisctl_1.74.0_nix-flake.tar.gz#sluisctl": {
+    "https://github.com/truvity/sluis/releases/download/v1.87.0/sluisctl_1.87.0_nix-flake.tar.gz#sluisctl": {
       "last_modified": "1970-01-01T00:00:00Z",
-      "resolved": "tarball+https://github.com/truvity/sluis/releases/download/v1.74.0/sluisctl_1.74.0_nix-flake.tar.gz?narHash=sha256-%2FjuOmg1cS2a1ZccSqUE0864XDTLce0WtXJZ2MNP0TBM%3D#sluisctl"
+      "resolved": "tarball+https://github.com/truvity/sluis/releases/download/v1.87.0/sluisctl_1.87.0_nix-flake.tar.gz?narHash=sha256-toOAfsvgWirrlviI6RNSOTb1rspgD%2BYjR3KiYSNb0mE%3D#sluisctl"
     },
     "just-lsp@0.6.2": {
       "last_modified": "2026-08-27T07:16:00Z",
