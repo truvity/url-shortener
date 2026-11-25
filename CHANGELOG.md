@@ -21,6 +21,25 @@ subjects under them are the GitHub Release's own list.
   sees no drift. `route.parentRef` is unchanged and renders the same bytes. The
   chart renders no ingress NetworkPolicy, so there is nothing else to admit.
 
+## v1.55.2
+
+### Changed
+
+- Dependency lock file maintenance (automatic patch release).
+
+## v1.55.1
+
+### Fixed
+
+- **The image prune deletes the attestations of the pruned images too.**
+  Before, a pruned image left its attestation manifests behind in the
+  registry.
+
+### Changed
+
+- Dependency updates: lock file maintenance and docker/setup-buildx-action
+  v3.12.0 (automatic patch release).
+
 ## v1.55.0
 
 ### Changed
