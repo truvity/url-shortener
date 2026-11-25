@@ -30,7 +30,7 @@
       "version":        "18.4",
       "disable_plugin": true
     },
-    "https://github.com/truvity/sluis/releases/download/v1.74.0/sluisctl_1.74.0_nix-flake.tar.gz#sluisctl": "",
+    "https://github.com/truvity/sluis/releases/download/v1.87.0/sluisctl_1.87.0_nix-flake.tar.gz#sluisctl": "",
     "kubeconform":           "0.8.0",
     "biome":                 "2.5.14",
     "editorconfig-checker":  "4.0.2"
