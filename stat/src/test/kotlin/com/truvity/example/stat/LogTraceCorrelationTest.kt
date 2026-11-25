@@ -4,6 +4,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.opentelemetry.instrumentation.logback.mdc.v1_0.OpenTelemetryAppender
 import io.opentelemetry.sdk.trace.SdkTracerProvider
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
+import io.opentelemetry.sdk.trace.export.SpanExporter
 import org.slf4j.LoggerFactory
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -29,7 +31,12 @@ class LogTraceCorrelationTest {
 
     @Test
     fun `a line logged inside a span carries its ids`() {
-        val tracer = SdkTracerProvider.builder().build().get("test")
+        // A provider with no span processor hands out no-op tracers since SDK 1.68
+        // (every span is invalid, with zero ids), so this one has a processor that
+        // exports nowhere.
+        val tracer =
+            SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.composite())).build()
+                .get("test")
         val span = tracer.spanBuilder("request").startSpan()
         span.makeCurrent().use { logger.info("handled") }
         span.end()

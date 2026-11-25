@@ -191,7 +191,9 @@ class TraceContinuityTest {
     // way production hands them the Spring-built one.
     private fun sdk(): OpenTelemetrySdk =
         OpenTelemetrySdk.builder()
-            .setTracerProvider(SdkTracerProvider.builder().build())
+            // A provider with no span processor hands out no-op tracers since
+            // SDK 1.68, so this one has a processor that exports nowhere.
+            .setTracerProvider(SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.composite())).build())
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .build()
 

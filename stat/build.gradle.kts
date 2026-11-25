@@ -34,13 +34,18 @@ extra["snakeyaml.version"] = "2.5"
 extra["kotlin-serialization.version"] = "1.11.0"
 
 // And once more for OpenTelemetry. The instrumentation below is compiled
-// against the API and SDK it names (1.65.0 for instrumentation 2.31.1); the
+// against the API and SDK it names (1.68.0 for instrumentation 2.34.0); the
 // Spring Boot BOM manages `opentelemetry-bom` at an older release and would
 // silently resolve the API, SDK and exporters DOWN to it. The instrumentation
 // then links against methods the resolved API does not have, and that is a
 // NoSuchMethodError at the first span rather than a build failure. Keep this
-// equal to the SDK the instrumentation version below is built on.
-extra["opentelemetry.version"] = "1.65.0"
+// equal to the SDK the instrumentation version below is built on, and move
+// the three instrumentation artifacts below (the starter and the two -alpha
+// modules) together with it. Left behind, the starter fails at startup with a
+// NoClassDefFoundError out of `autoConfiguredOpenTelemetrySdk` (v1.56.0: the
+// starter at 2.34.0 on an SDK pinned at 1.65.0); OpenTelemetryStartupTest
+// starts the context and fails the build instead.
+extra["opentelemetry.version"] = "1.68.0"
 
 kotlin {
     jvmToolchain(21)
@@ -76,18 +81,18 @@ dependencies {
     // configure it directly). Without this, spans exist for nothing this
     // process ever does -- it is a consumer with one outbound call, and
     // neither end is something the starter sees.
-    implementation("io.opentelemetry.instrumentation:opentelemetry-okhttp-3.0:2.31.1-alpha")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-okhttp-3.0:2.34.0-alpha")
 
     // Log <-> trace correlation. The starter above does NOT bring this: it
     // wires the SDK and the web/client instrumentation, but injecting
     // trace_id/span_id into Logback's MDC is a separate module, referenced
     // by class name from logback-spring.xml rather than from Kotlin code --
     // runtimeOnly is what that shape asks for in the service itself.
-    runtimeOnly("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.31.1-alpha")
+    runtimeOnly("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.34.0-alpha")
     // The test DOES reference the class directly, to drive the same
     // appender against a ListAppender instead of the console -- so the
     // test source set needs it at compile time too.
-    testImplementation("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.31.1-alpha")
+    testImplementation("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.34.0-alpha")
 
     // The broker's own client.
     implementation("io.nats:jnats:2.27.0")
