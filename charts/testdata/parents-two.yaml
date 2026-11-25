@@ -1,0 +1,30 @@
+# A route that names two parents while it moves between gateways: the shared
+# fleet gateway and a per-vendor one (exposure.parentRefs). Rendered by
+# TestWhatTheChartRenders, so the list spelling is held line for line, as
+# `everything` holds the single parent.
+database:
+  host: pg
+  clusterDomain: cluster.example
+  tls:
+    rootCA:
+      configMapName: pg-ca
+  migration:
+    passwordSecret: owner
+  app:
+    passwordSecret: app
+events:
+  url: nats://nats:4222
+archive:
+  bucket:
+    name: archive
+route:
+  enabled: true
+  hostname: shortener.example.invalid
+exposure:
+  parentRefs:
+    - name: shared
+      namespace: envoy-gateway-system
+      sectionName: https
+    - name: shared-generic-cloudflare
+      namespace: edge-shared-generic-cloudflare
+      sectionName: https
