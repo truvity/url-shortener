@@ -194,7 +194,7 @@ func TestADigestPinnedRenderAlsoProducesWhatTheBinariesAccept(t *testing.T) {
 //
 // Regenerate with `just golden` after reading the diff, never before.
 func TestWhatTheChartRenders(t *testing.T) {
-	for _, name := range []string{"minimal", "everything", "per-component", "primary"} {
+	for _, name := range []string{"minimal", "everything", "per-component", "primary", "parents-two"} {
 		t.Run(name, func(t *testing.T) {
 			out, err := render(t, "-f", filepath.Join("testdata", name+".yaml"))
 			if err != nil {
@@ -319,6 +319,112 @@ func TestTheRouteAttachesToTheParentItWasGiven(t *testing.T) {
 		if got := parent[key]; got != want {
 			t.Errorf("parentRef.%s = %v, want %v", key, got, want)
 		}
+	}
+}
+
+// A route names the parents it was given, one or a list, and the list is the
+// way to move between gateways without an outage.
+//
+// A route that moves from one gateway to another with ONE parent leaves the
+// old one and joins the new in the same apply: the gap is an outage (url-
+// shortener on stage, 62 s). With two parents for a while there is no gap.
+// route.parentRef keeps working unchanged and wins where it is set; the list
+// is read only when it is not, the same interface as the other charts.
+func TestARouteMayNameMoreThanOneParent(t *testing.T) {
+	parentsOf := func(t *testing.T, extra ...string) []map[string]any {
+		t.Helper()
+		out, err := render(t, defaults(append([]string{
+			"--set", "route.enabled=true", "--set", "route.hostname=example.test",
+		}, extra...)...)...)
+		if err != nil {
+			t.Fatalf("the chart does not render: %v\n%s", err, out)
+		}
+		raw, _ := docOfKind(t, out, "HTTPRoute")["spec"].(map[string]any)["parentRefs"].([]any)
+		var parents []map[string]any
+		for _, p := range raw {
+			parents = append(parents, p.(map[string]any))
+		}
+		return parents
+	}
+
+	t.Run("two parents render two, with their defaults written out", func(t *testing.T) {
+		parents := parentsOf(t,
+			"--set", "exposure.parentRefs[0].name=shared",
+			"--set", "exposure.parentRefs[0].namespace=envoy-gateway-system",
+			"--set", "exposure.parentRefs[1].name=shared-generic-cloudflare",
+			"--set", "exposure.parentRefs[1].namespace=edge-shared-generic-cloudflare",
+			"--set", "exposure.parentRefs[1].sectionName=https",
+		)
+		if len(parents) != 2 {
+			t.Fatalf("expected two parents, got %#v", parents)
+		}
+		for i, want := range []map[string]any{
+			{"group": "gateway.networking.k8s.io", "kind": "Gateway", "name": "shared", "namespace": "envoy-gateway-system"},
+			{"group": "gateway.networking.k8s.io", "kind": "Gateway", "name": "shared-generic-cloudflare", "namespace": "edge-shared-generic-cloudflare", "sectionName": "https"},
+		} {
+			if !reflect.DeepEqual(parents[i], want) {
+				t.Errorf("parent %d = %v, want %v", i, parents[i], want)
+			}
+		}
+	})
+
+	t.Run("one entry of the list renders one parent", func(t *testing.T) {
+		parents := parentsOf(t, "--set", "exposure.parentRefs[0].name=shared")
+		if len(parents) != 1 || parents[0]["name"] != "shared" {
+			t.Errorf("expected one parent named shared, got %#v", parents)
+		}
+	})
+
+	t.Run("route.parentRef wins where it is set", func(t *testing.T) {
+		parents := parentsOf(t,
+			"--set", "route.parentRef.name=single",
+			"--set", "exposure.parentRefs[0].name=listed",
+		)
+		if len(parents) != 1 || parents[0]["name"] != "single" {
+			t.Errorf("expected only the single parent, got %#v", parents)
+		}
+	})
+
+	t.Run("an entry with no name is refused", func(t *testing.T) {
+		out, err := render(t, defaults(
+			"--set", "route.enabled=true",
+			"--set", "exposure.parentRefs[0].namespace=gateways",
+		)...)
+		// The schema refuses it first, and the template says the same if it is
+		// ever run without one.
+		if err == nil || !strings.Contains(out, "/exposure/parentRefs/0") || !strings.Contains(out, "name") {
+			t.Fatalf("expected a refusal naming the entry, got err=%v\n%s", err, out)
+		}
+	})
+
+	t.Run("no parent at all is refused as it always was", func(t *testing.T) {
+		out, err := render(t, defaults("--set", "route.enabled=true")...)
+		if err == nil || !strings.Contains(out, "route.parentRef.name is required") {
+			t.Fatalf("expected the single parent's refusal, got err=%v\n%s", err, out)
+		}
+	})
+}
+
+// The same single parent renders the same bytes whether the list is absent or
+// empty: adding the list moved nothing for a platform that never sets it.
+func TestAnEmptyParentListChangesNothing(t *testing.T) {
+	args := defaults(
+		"--set", "images.web.tag=dev",
+		"--set", "route.enabled=true",
+		"--set", "route.hostname=example.test",
+		"--set", "route.parentRef.name=business",
+		"--set", "route.parentRef.namespace=gateways",
+	)
+	without, err := render(t, args...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, without)
+	}
+	with, err := render(t, append(args, "--set-json", "exposure.parentRefs=[]")...)
+	if err != nil {
+		t.Fatalf("the chart does not render: %v\n%s", err, with)
+	}
+	if with != without {
+		t.Errorf("an empty parent list moved the render:\n%s", firstDifference(without, with))
 	}
 }
 

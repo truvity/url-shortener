@@ -6,6 +6,19 @@ subjects under them are the GitHub Release's own list.
 
 ## Unreleased
 
+### Added
+
+- **The route takes a list of parents: `exposure.parentRefs`.** A route that moves
+  between gateways (the shared fleet Gateway to a per-vendor one, later an internal
+  load balancer) with one parent leaves the old and joins the new in the same
+  apply, and the gap is an outage. With a list it names both while traffic moves
+  and one afterwards. It is read only when `route.parentRef` is not set, and has
+  the same shape as `exposure.parentRefs` of the other charts of the platform
+  (`name`, `namespace`, `sectionName`, `kind`, `group`); `group` and `kind` are
+  always rendered (`gateway.networking.k8s.io`, `Gateway` when left out), so Argo CD
+  sees no drift. `route.parentRef` is unchanged and renders the same bytes. The
+  chart renders no ingress NetworkPolicy, so there is nothing else to admit.
+
 ## v1.55.0
 
 ### Changed

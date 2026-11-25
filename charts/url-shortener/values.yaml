@@ -516,6 +516,27 @@ resources:
 jvmOptions:
   stat: "-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
 
+# Where the route attaches when `route.parentRef` is not set: a LIST of
+# Gateway API parent references, for a move between gateways.
+#
+# A move between two gateways with one parent is a cut: the route leaves the
+# old one and joins the new one in the same apply, and the gap between them is
+# an outage. With a list the route names both while traffic moves and one
+# afterwards. The list spelling is the same as the other charts of the
+# platform (`exposure.parentRefs`); `route.parentRef` (ONE parent) wins where
+# it is set, so a platform that moves chart by chart can use either.
+#
+# Each entry takes `name` (required), `namespace`, `sectionName`, `kind` and
+# `group`. `group` and `kind` default to `gateway.networking.k8s.io` and
+# `Gateway` and are rendered either way: the API server fills them in, and
+# Argo CD reads a missing one as drift.
+exposure:
+  parentRefs: []
+#    - name: shared
+#      namespace: envoy-gateway-system
+#    - name: shared-generic-cloudflare
+#      namespace: edge-shared-generic-cloudflare
+
 # The route this service is reached through. Off by default: a chart that
 # exposes something the moment it is installed is a chart that exposes
 # something nobody decided to expose.

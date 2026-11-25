@@ -21,6 +21,14 @@ metadata:
   labels: {{- include "url-shortener.labels" . | nindent 4 }}
 spec:
   parentRefs:
+    {{- /*
+    ONE parent (route.parentRef), or a LIST of them (exposure.parentRefs)
+    while a route moves from one gateway to another: for a while it names
+    both, so nothing is cut over, and afterwards it names one. The single
+    parent wins where it is set; the list is read only when it is not. Neither
+    set is still refused, with the message the single parent has always given.
+    */}}
+    {{- if or .Values.route.parentRef.name (not .Values.exposure.parentRefs) }}
     - name: {{ required "route.parentRef.name is required when route.enabled is true: a route that names no parent attaches nowhere" .Values.route.parentRef.name }}
       {{- /*
       The parent's KIND, because a Gateway is not the only thing a route
@@ -41,6 +49,19 @@ spec:
       {{- with .Values.route.parentRef.sectionName }}
       sectionName: {{ . }}
       {{- end }}
+    {{- else }}
+    {{- range $i, $p := .Values.exposure.parentRefs }}
+    - group: {{ $p.group | default "gateway.networking.k8s.io" }}
+      kind: {{ $p.kind | default "Gateway" }}
+      name: {{ required (printf "exposure.parentRefs[%d].name is required: a route that names no parent attaches nowhere" $i) $p.name }}
+      {{- with $p.namespace }}
+      namespace: {{ . }}
+      {{- end }}
+      {{- with $p.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
   {{- with .Values.route.hostname }}
   hostnames: [{{ . | quote }}]
   {{- end }}

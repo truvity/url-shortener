@@ -497,6 +497,28 @@
         }
       }
     },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the route attaches when route.parentRef is not set: a list of Gateway API parent references, so a route can name two gateways while it moves between them.",
+      "properties": {
+        "parentRefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "group": { "type": "string" },
+              "kind": { "type": "string" },
+              "name": { "type": "string", "minLength": 1 },
+              "namespace": { "type": "string" },
+              "sectionName": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "route": {
       "type": "object",
       "additionalProperties": false,
