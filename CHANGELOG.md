@@ -6,6 +6,8 @@ subjects under them are the GitHub Release's own list.
 
 ## Unreleased
 
+## v1.56.1
+
 ### Fixed
 
 - **`stat` starts again: the OpenTelemetry versions agree.** v1.56.0 took the Spring
