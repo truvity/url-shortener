@@ -240,6 +240,31 @@ in `.github/workflows/integration.yaml` on pushes to `master`, on release
 tags and on manual dispatch, never on a pull request from a fork; a person with
 access runs the same steps with `just e2e`.
 
+## Platform part and company part
+
+**Platform part.** The platform admin applies no chart from this repository by
+hand. It decides the values that
+[`url-shortener-infra`](charts/url-shortener-infra/values.yaml) marks as the
+platform's half: whether the platform owns the database
+(`postgres.platformOwned`), where its instances run, its archive and server
+certificate, the stream's account, copies and age, and, on a `primary` install,
+the names of the cloud objects and the permissions boundary. It passes them to
+the charts through the bootstrap it renders for the project. The charts expect
+what the platform already runs: the CloudNativePG operator, a NATS server with
+its JetStream controller, and for the optional parts a gateway, a telemetry
+endpoint and the operators for dashboards and alerts.
+
+**Company part.** A company that runs the example declares both charts,
+[`url-shortener`](charts/url-shortener) and
+[`url-shortener-infra`](charts/url-shortener-infra), under one release name in
+its gitops repository, and Argo CD applies them in the company's own
+namespaces. The company writes the addresses of its database and broker, the
+names of its secrets and its archive bucket, the gateway the route attaches to,
+and the optional dashboards; it asks the platform to change a value marked as
+the platform's half ([how to
+ask](https://github.com/truvity/policy/blob/master/docs/delegation-model.md#how-to-ask-the-platform-for-something)).
+Each chart's `values.yaml` and `values.schema.json` list every value.
+
 ## Consumers
 
 Nobody imports this repository: its Go module is a leaf. The delivery pipeline
