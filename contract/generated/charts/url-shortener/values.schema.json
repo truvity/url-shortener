@@ -70,7 +70,7 @@
         },
         "interval": {
           "type": "string",
-          "pattern": "^[0-9]+(s|m|h)$",
+          "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
           "not": {
             "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
           }
@@ -125,7 +125,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -139,7 +139,7 @@
             },
             "window": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -157,7 +157,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -175,7 +175,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -198,7 +198,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -235,7 +235,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -264,7 +264,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -293,7 +293,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -316,7 +316,7 @@
             },
             "for": {
               "type": "string",
-              "pattern": "^[0-9]+(s|m|h)$",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
               "not": {
                 "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
               },
@@ -927,7 +927,7 @@
                 "name": {
                   "type": "string",
                   "maxLength": 253,
-                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
                   "not": {
                     "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
@@ -947,7 +947,7 @@
                 "name": {
                   "type": "string",
                   "maxLength": 253,
-                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
                   "not": {
                     "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
@@ -967,7 +967,7 @@
                 "name": {
                   "type": "string",
                   "maxLength": 253,
-                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
                   "not": {
                     "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
@@ -987,7 +987,7 @@
                 "name": {
                   "type": "string",
                   "maxLength": 253,
-                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
                   "not": {
                     "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
@@ -1007,7 +1007,7 @@
                 "name": {
                   "type": "string",
                   "maxLength": 253,
-                  "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$",
+                  "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
                   "not": {
                     "pattern": "[\\n\\r\\f\\x0B\\x85\u2028\u2029]"
                   }
@@ -1786,6 +1786,5 @@
         ]
       }
     }
-  ],
-  "$defs": {}
+  ]
 }
